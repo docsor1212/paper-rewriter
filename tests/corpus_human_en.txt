@@ -1,0 +1,5 @@
+We recruited 214 patients between March and September. Selection was simple: adults over 18, biopsy-confirmed, no prior immunosuppressants. Children were excluded — the ethics board wanted a separate protocol, and honestly, the pediatric dosing question deserves its own trial.
+
+The drug failed its primary endpoint. Median progression-free survival was 6.8 months versus 6.2 for placebo, and the confidence intervals overlapped enough that no statistician in the room believed the difference. What surprised us was the subgroup: eleven of thirty patients with the EZH2 mutation stayed on treatment past a year. Eleven is not a schedule for success, but it is not noise either.
+
+A follow-up trial seems justified. We would narrow eligibility to mutation-positive patients, dose higher, and measure response at eight weeks instead of twelve. If the subgroup effect vanishes under better power, that is a finding too — it would tell us the earlier signal was luck, and we would save the next cohort from a useless regimen.
