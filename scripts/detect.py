@@ -30,6 +30,7 @@ def main():
     ap.add_argument("--lang", choices=["zh", "en", "mix", "auto"], default="auto")
     ap.add_argument("--profile", choices=["academic", "general"], default="academic",
                     help="academic=论文口径（默认）；general=非学术文本，八股/公文信号降权")
+    ap.add_argument("--suggestions", help="输出修订建议工作单（markdown 侧车）到此路径")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
 
@@ -51,6 +52,18 @@ def main():
 
     r = hxt_core.scan(text, lang=None if args.lang == "auto" else args.lang,
                       profile=args.profile)
+
+    if args.suggestions:
+        guide = {"zh": "references/style_guide_zh.md",
+                 "en": "references/style_guide_en.md"}.get(r["lang"],
+                                                           "references/style_guide_zh.md")
+        try:
+            with open(args.suggestions, "w", encoding="utf-8") as f:
+                f.write(hxt_core.build_suggestions(text, r, guide))
+            print("修订建议工作单已写入 %s" % args.suggestions, file=sys.stderr)
+        except OSError as e:
+            print("错误: 无法写入 %s（%s）" % (args.suggestions, e), file=sys.stderr)
+            sys.exit(2)
 
     if args.score:
         print("%d/%s" % (r["score"], r["level"]))

@@ -49,6 +49,7 @@ def main():
     ap.add_argument("--profile", choices=["academic", "general"], default="academic",
                     help="academic=论文口径（默认）；general=非学术文本")
     ap.add_argument("--max-length-change", type=float, default=25.0)
+    ap.add_argument("--suggestions", help="输出修订建议工作单（markdown 侧车）到此路径")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
@@ -93,6 +94,17 @@ def main():
                       ("特征已低；按 %s 复核语义自然度即可" % GUIDE.get(lang, "指南")),
     }
 
+    if args.suggestions:
+        guide = {"zh": "references/style_guide_zh.md",
+                 "en": "references/style_guide_en.md"}.get(lang,
+                                                           "references/style_guide_zh.md")
+        try:
+            with open(args.suggestions, "w", encoding="utf-8") as f:
+                f.write(hxt_core.build_suggestions(orig, rn, guide))
+        except OSError as e:
+            print("错误: 无法写入 %s（%s）" % (args.suggestions, e), file=sys.stderr)
+            sys.exit(2)
+
     report = {
         "mode": mode,
         "before": {"score": ro["score"], "level": ro["level"], "critical": ro["critical_hit"]},
@@ -121,6 +133,8 @@ def main():
         for p in brief["remaining_patterns"]:
             print("  · 剩余特征: " + p)
         print("  下一步: " + brief["next_action"])
+        if getattr(args, "suggestions", None):
+            print("修订建议工作单: " + args.suggestions)
         print("口径: " + report["honest_note"])
     sys.exit(0)
 

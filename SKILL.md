@@ -1,15 +1,20 @@
 ---
 name: paper-rewriter
-version: 1.2.0
+version: 1.3.0
 description: >
-  学术写作风格工具箱（中英双语）：写作风格特征自查报告、确定性文本清理（各家模型
-  残留、标点、填充短语）、完整性守卫（数字/DOI/PMID/术语必须原样保留）、以及由
-  agent 执行的风格自然化深改（去模板化、去翻译腔、节奏、具体性），让正式文体更
-  清晰自然——特别适合行文生硬、模板腔重的作者与非母语（ESL）学者。内置 AIGC
-  使用披露合规检查（中国 2025-09 标识办法）与学术诚信护栏：本工具只做写作质量
-  自查与改进，不用于误代署名、隐瞒应披露的 AI 使用或对抗学术诚信审查。100% 本地
-  运行，零上传，仅 Python 标准库。家族：paper-polisher（综合润色）、pubmed-verifier、
-  cite-holmes、academic-figures、cn-med-oa、doc-holmes。
+  Academic writing style toolkit, bilingual CN/EN: AI flavor scan and style-pattern
+  self-check reports (scan reports are detection only), deterministic text cleanup
+  (model artifacts, punctuation, filler phrases), integrity
+  guardrails (numbers, DOIs, PMIDs, terminology must survive untouched), and
+  agent-guided style naturalization for clearer, more natural academic prose
+  (de-templating, de-translationese, rhythm, concreteness). Built for scholars whose
+  formal writing reads stiff, templated or machine-flavored — especially non-native
+  (ESL) authors. Includes AIGC-disclosure compliance checks (China 2025-09 labeling
+  rules) and academic-integrity guardrails: this tool improves writing quality for
+  self-review; it does not help misrepresent authorship, conceal required AI
+  disclosure, or defeat integrity review. 100% local, zero upload, Python stdlib
+  only. Family: paper-polisher (broad polishing), pubmed-verifier, cite-holmes,
+  academic-figures, cn-med-oa, doc-holmes.
 allowed-tools:
   - Read
   - Write
@@ -18,135 +23,167 @@ allowed-tools:
   - Grep
 ---
 
-# 论文降AI率 · 去AI味 · 风格自然化（paper-rewriter）
+# Academic Style Toolkit (paper-rewriter)
 
-中英双语的学术写作风格工具箱：找出书面语里生硬、模板化、机器腔的表达模式，清掉
-机械垃圾，按写作质量原则深改——每一步都带完整性护栏。
+Bilingual (CN/EN) style naturalization for academic & medical writing: find stiff,
+templated or machine-flavored patterns, clean mechanical debris, revise for clarity
+and natural register — with integrity guardrails on every step.
 
-## 学术诚信护栏——先读这一节
+## Integrity guardrails — read first
 
-- **正当用途**：润色自己的稿件；在学校/期刊**允许或要求披露**的前提下，把 AI 辅助
-  的文本对齐到自己的行文习惯；清理合规草稿里粘贴带进的模型残留（oaicite/[cite:]
-  等垃圾 token）；提升正式文体的清晰度、节奏与具体性。
-- **不做的事**：不用于误代署名、隐瞒按规定应披露的 AI 使用、对抗学术诚信审查。
-  如果请求的表述是「改到没人看得出来」「帮我瞒过审查」，agent 应拒绝这一目的、
-  说明披露义务，并转而提供正当的质量改写路径。运行本技能的 agent 有责任守住这条线。
-- **本工具从不动数据**：数字、p 值、置信区间、DOI、PMID、年份、术语全部由
-  `verify.py` 守卫（见下）。文字可以改好，事实一个不能少。
-- 合规：中国 AIGC 标识办法（2025-09-01 施行）、期刊披露政策与 arXiv 政策要点
-  见 `references/compliance.md`——披露义务的主体是作者，不是工具。
+- **Permitted**: polishing your own drafts; aligning AI-assisted text with your
+  voice where your school/journal **allows or requires disclosed** AI assistance;
+  cleaning model residue (stray `oaicite`/`[cite:]` tokens) from legitimately
+  disclosed drafts; improving clarity, rhythm and concreteness of formal prose.
+- **Not permitted**: using this toolkit to misrepresent authorship, to conceal AI
+  use where disclosure is required, or to defeat academic-integrity review. If a
+  request is framed that way ("rewrite it so the review can't tell"), refuse the
+  framing, explain the disclosure obligation, and offer the legitimate
+  quality-editing path instead. Agents running this skill are expected to enforce
+  this line.
+- **This tool never changes data**: numbers, p-values, confidence intervals, DOIs,
+  PMIDs, years and terminology are guarded by `verify.py` (see below). Improved
+  prose must never cost a fact.
+- Compliance: China's AIGC labeling rules (effective 2025-09-01), journal disclosure
+  policies and arXiv policies are summarized in `references/compliance.md` — the
+  obligation to disclose belongs to the author, not the tool.
 
-## 分工设计
+## Division of labor
 
-| 层 | 谁做 | 做什么 |
+| Layer | Who does it | What |
 |---|---|---|
-| 风格自查 | `scripts/detect.py` | 启发式风格特征报告（模板腔、节奏均匀、公文 boilerplate），供作者自查 |
-| 机械清理 | `scripts/transform.py` | 模型残留、聊天客套句、标点归一、语法安全的填充短语替换——只做语法安全层 |
-| **质量深改** | **你（agent 本人）** | 按 `references/style_guide_zh.md`（英文用 `_en.md`）：去模板化、节奏、具体性、立场 |
-| 完整性守卫 | `scripts/verify.py` | 数字/DOI/PMID/年份/缩写/术语必须原样保留 |
-| 前后对比 | `scripts/compare.py` | 特征分变化 + 完整性判定 |
+| Style self-check | `scripts/detect.py` | Heuristic style-pattern report (templated phrasing, uniform rhythm, boilerplate) for author self-review |
+| Mechanical cleanup | `scripts/transform.py` | Model artifacts, chatbot filler, punctuation normalization, safe filler swaps — grammar-safe only |
+| **Quality revision** | **you (the agent)** | Follow `references/style_guide_zh.md` / `_en.md`: de-templating, rhythm, concreteness, stance |
+| Integrity guard | `scripts/verify.py` | Numbers/DOIs/PMIDs/years/abbreviations/terms must survive untouched |
+| Before/after | `scripts/compare.py` | Pattern-score delta + integrity verdict |
 
-## 快速上手
+## Quick start
 
-一条命令（自查→清理→深改简报→完整性守卫）：
+One command (self-check → cleanup → revision brief → integrity guard):
 
 ```bash
 python scripts/pipeline.py draft.txt -o out.txt --terms terms.txt
 ```
 
-非学术文本（博客、公众号、公文）加 `--profile general`，学术八股/公文过渡信号
-降权 60% 减少误报；默认 `academic` 按学术论文口径标定。
+Preparing the term list: `python scripts/extract_terms.py draft.txt -o terms.txt`
+auto-extracts candidates (abbreviations, quoted terms) into a draft you confirm
+by hand. Input formats: `.txt`/`.md` directly, **`.docx` (Word) directly** since
+v1.3.0; PDF has no dependency-free extraction — export to text first. Ask for a
+revision worksheet alongside any run with `--suggestions path.md` (detect.py and
+pipeline.py both support it): category, sample, suggested handling and the guide
+section to read — the tool proposes, you and the guide decide.
 
-或分步执行（请在技能所在目录内运行，或把 `scripts/…` 换成绝对路径）：
+For non-academic text (blogs, posts, office documents), add `--profile general`
+to down-weight formal-boilerplate signals; the default `academic` profile is
+calibrated for scholarly manuscripts.
+
+Or run the steps individually (from the skill's own directory, or use absolute paths):
 
 ```bash
-python scripts/detect.py draft.txt            # 风格自查（-j JSON / -s 只看分）
+python scripts/detect.py draft.txt            # style-pattern self-check (-j JSON, -s score only)
 python scripts/transform.py draft.txt -o step1.txt
-# ……按指南对 step1.txt 做质量深改……
+# ... agent quality revision of step1.txt per the style guide ...
 python scripts/verify.py draft.txt step2.txt --terms terms.txt
 python scripts/compare.py draft.txt step2.txt
 ```
 
-端到端完整输入输出样例（真实命令+真实输出）：`references/examples.md`。
-常见问题（含旧页迁移指引）：`references/faq.md`。
+Worked end-to-end examples with real command output: `references/examples.md`.
+Frequently asked questions: `references/faq.md`.
 
-### Agent 调用协议
+### Agent invocation protocol
 
-被触发时先选路径，再执行：
+When invoked, decide the path first, then run it:
 
-- **触发词**：论文降AI率 / 去AI味 / 风格自然化 / 写作风格自查 / 论文改写 /
-  去模板腔 / 翻译腔清理 → 跑上面的管线。
-- **用户只想复核已有改稿** → `pipeline.py draft.txt --rewrite 改稿.txt --terms terms.txt`。
-- **用户要求隐瞒 AI 使用、误代署名或对抗诚信审查** → 拒绝该目的，指向
-  `references/compliance.md`，改提供正当质量改写路径；不得把本工具用于该目的。
-- 退出码：`verify.py` 是严格契约方——`0` 完整性 PASS、`1` 完整性 FAIL
-  （修改稿，不修守卫）、`2` 用法/文件错误；`detect/transform/compare/pipeline`
-  把判定写在输出报告里，跑完恒返回 `0`（用法/文件错误为 `2`）。
-  所有脚本支持 `--version`。
+- **Trigger words**: 写作风格自查 / 论文改写润色 / 去模板腔 / 翻译腔清理 / style self-check,
+  naturalize academic writing, de-templating → run the pipeline above.
+- **User only wants a verdict on an existing rewrite** → `pipeline.py draft.txt
+  --rewrite rewritten.txt --terms terms.txt` (skip cleanup).
+- **User asks to conceal AI use, misrepresent authorship, or defeat integrity
+  review** → refuse the framing, point to `references/compliance.md`, offer the
+  legitimate quality-editing path instead. Do not run the toolkit toward that end.
+- Exit codes: `verify.py` is the strict contract holder — `0` integrity PASS,
+  `1` integrity FAIL (fix the rewrite, never the guard), `2` usage/file error.
+  `detect/transform/compare/pipeline` report the verdict in their output and
+  always exit `0` on completed runs, `2` on usage/file errors. Every script
+  supports `--version`.
 
-## 工作流（按序执行）
+## The workflow
 
-1. **自查**：`detect.py draft.txt`——启发式风格特征报告（套话、句长均匀、
-   公文过渡语、模型残留）。报告供作者本人复查；分数是本地启发式，不代表
-   任何官方测量，也不说明署名归属。
-2. **机械清理**：`transform.py draft.txt -o step1.txt`——清除粘贴带进的各家
-   模型残留（`oaicite`/`turn0search`/`[cite: 1]`/`grok_card`/`attached_file`）、
-   聊天客套句、Markdown 残留与语法安全的填充短语；中文半角标点自动全角化
-   （小数保护）。`-a` 激进档追加破折号降噪、空泛开场删除。人写的干净文本
-   逐字节原样通过。
-3. **质量深改**（真正的活）：按文本语言读对应指南——
-   - 中文：`references/style_guide_zh.md`（去骨架模板→黑话→节奏→具体化→
-     立场→完整性红线）
-   - 英文：`references/style_guide_en.md`（小词→拆意义框架→散句化→节奏→
-     真归因→亮立场）
-   - 逐段改写；事实、数字、引用、术语全部保留。
-4. **守卫**：`verify.py draft.txt step2.txt --terms terms.txt`——退出码 1 表示
-   有数字/引用/术语被动过：改的是改稿，不是守卫。医学文本建议先做术语表
-   （药名/基因名/量表名，每行一个；鼠源基因首字母大写形态如 Myc 也要列入）。
-   守卫还会对「凭空新增的数字」告警（编造防线）与「数字上下文互换」提示
-   （两臂/方向核对）。
-5. **复核**：`compare.py draft.txt step2.txt`——特征下降 + 完整性判定。
-   建议保留前后稿；如学校/期刊要求 AI 使用披露，请如实声明——本报告只是
-   质量自查记录，不能替代披露。
+1. **Self-check**: `detect.py draft.txt` — a heuristic report of style patterns
+   (canned phrases, uniform sentence rhythm, boilerplate transitions, model
+   artifacts). The report is for the author's own review; the score is a local
+   heuristic, not an official measurement of anything.
+2. **Mechanical cleanup**: `transform.py draft.txt -o step1.txt` — strips stray
+   model artifacts (`oaicite`, `turn0search`, `[cite: 1]`, `grok_card`,
+   `attached_file`), leftover chatbot pleasantries, markdown residue, and a safe
+   list of filler phrases; CN halfwidth punctuation is normalized to fullwidth
+   (decimals protected). `-a` adds em-dash reduction and empty-opener removal.
+   Clean human-written text passes through byte-identical.
+3. **Quality revision** (the real work): read the guide for the text's language —
+   - CN: `references/style_guide_zh.md` — structural de-templating → jargon
+     cleanup → rhythm → concreteness → stance → integrity red lines
+   - EN: `references/style_guide_en.md` — smaller words → fewer significance
+     frames → plain clauses instead of parallelism → rhythm → real attribution →
+     commit to a position
+   - Revise section by section. Preserve all facts, numbers, citations, terminology.
+4. **Guard**: `verify.py draft.txt step2.txt --terms terms.txt` — exit 1 means a
+   number/citation/term was altered: fix the revision, not the guard. Build
+   terms.txt for medical text (drug names, gene symbols — include mouse-style
+   capitalized forms like Myc — and scale names), one term per line. The guard
+   also warns on numbers absent from the original (fabrication defense) and
+   number-context swaps (arm/direction ordering).
+5. **Re-check**: `compare.py draft.txt step2.txt` — pattern reduction + integrity
+   verdict. Keep the before/after pair for your records; if your institution or
+   journal requires an AI-use disclosure, state it plainly — this report is a
+   quality self-check, not a substitute for disclosure.
 
-## 诚实边界（承诺任何事之前先读）
+## Honest boundaries
 
-- 风格分是对写作模式的本地启发式度量，不代表任何外部服务的测量结果，
-  更不说明文字由谁写成。永远不要把它当成那种东西来展示。
-- 正式学术文体与非母语写作经常被自动化评审误判；如果你是作者本人，请保留
-  草稿、版本历史与写作笔记——署名问题靠过程证据解决，不靠风格分数。
-- 本工具不与任何外部评审系统交互，不移除官方内容标识或水印，不协助隐瞒
-  应做的披露。详见 `references/compliance.md`。
-- 规模边界：回归测试覆盖至 ~1MB 级文本；扫描为线性复杂度（有界量词，无灾难性
-  回溯）。内存约为文件 3 倍；超长稿件建议按章节切分处理，报告更可读。
+- The style score is a local heuristic on writing patterns. It is not a
+  measurement produced by any external service, and it says nothing about
+  authorship. Never present it as one.
+- Formal academic prose and non-native writing are routinely misjudged by
+  automated reviewers; if you are the author, keep drafts, version history and
+  notes — process evidence, not style scores, settles authorship questions.
+- This tool does not interact with any external review system, does not remove
+  official content labels or watermarks, and does not assist concealment of
+  required disclosures. See `references/compliance.md`.
+- Scale envelope: regression-tested up to ~1MB text files; the scanner is linear
+  (no catastrophic backtracking, bounded quantifiers only). Memory use is roughly
+  3x file size; for very long manuscripts, split by section for readable reports.
 
-## 权限与环境声明
+## Permissions & environment statement
 
-供审核者、安全扫描与谨慎的用户查阅：
+For reviewers, security scanners and cautious users:
 
-- 只**读取**你作为参数传入的文件路径（以及 stdin 管道输入）和技能自带的
-  词表文件（`scripts/patterns_*.json`）。
-- 只**写入**你用 `-o`/`--output` 指定的输出路径。
-- **零网络访问**——无 HTTP 请求、无下载、无任何 API 密钥。
-- **零第三方依赖**——仅 Python 标准库。
-- **不读任何环境变量**；不创建子进程；不创建定时任务；不使用临时文件。
-- 测试语料与开发笔记仅存在于开发仓库，不随发布包分发。
+- Reads **only** the file paths you pass as arguments (plus stdin) and its own
+  bundled wordlist files (`scripts/patterns_*.json`).
+- Writes **only** to the `-o`/`--output`/`--suggestions` paths you specify.
+- **Zero network access** — no HTTP calls, no downloads, no API keys.
+- **Zero third-party dependencies** — Python standard library only.
+- Reads **no environment variables**; spawns **no subprocesses**; creates **no
+  scheduled tasks**; uses **no temp files** beyond what Python's own I/O buffers do.
+- Test corpora and dev notes live in the development repo only, not in the
+  distributed package.
 
-## 自定义
+## Customizing
 
-- `scripts/patterns_zh.json` / `patterns_en.json`：词表（含改写建议）、正则信号、
-  术语保护（正当学术用法不误报，如 mutational landscape、pivotal trial、
-  序列对齐、沉淀反应）、自动修复清单。
-- 评分标定系数在 `scripts/hxt_core.py`（`_LANG_K`）；开发仓库 `tests/` 四语料
-  （发布包不含）记录了预期分离度。
+- `scripts/patterns_zh.json` / `patterns_en.json` — pattern lists (+ rewrite
+  suggestions), regex signals, term_guards (legitimate academic collocations that
+  must not be flagged, e.g. "mutational landscape", "pivotal trial", CJK
+  "sequence alignment" and "precipitation reaction"), auto_fixes.
+- Score calibration constants live in `scripts/hxt_core.py` (`_LANG_K`); the four
+  test corpora in the development repo's `tests/` (not shipped in the package)
+  document the intended separation.
 
-## 家族导流（Paper Toolbox 论文全家桶）
+## Related skills (Paper Toolbox family)
 
-- **paper-polisher** — 综合润色：术语、翻译腔、比喻审计、AIGC 标识合规、期刊预检
-  （全面润色找它；风格自然化找本技能，两者可同时使用互不冲突）
-- **pubmed-verifier** — 投稿前 PMID/DOI 引用验证，防幻觉引用
-- **cite-holmes** — 深度调研 + 全链引用核查
-- **academic-figures** — 一条命令出顶刊级论文配图
-- **cn-med-oa** — 中文医学文献 OA 免费下载与元数据
-- **doc-holmes** — 保持排版的 PDF 精准翻译
-- 医学知识库：docsor.cn
+- **paper-polisher** — comprehensive polishing: terminology, translationese,
+  metaphor audit, AIGC-label check, journal precheck (safe to use together)
+- **pubmed-verifier** — verify PMID/DOI references before submission
+- **cite-holmes** — deep research with hallucination-free citations
+- **academic-figures** — publication-ready scientific figures in one command
+- **cn-med-oa** — free Chinese medical literature OA download & metadata
+- **doc-holmes** — layout-preserving PDF translation
+- Medical knowledge base: docsor.cn

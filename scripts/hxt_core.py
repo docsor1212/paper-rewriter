@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 import json
 import os
@@ -31,6 +31,8 @@ def read_text(path, max_mb=5.0):
         raise ValueError(
             "文件 %.1fMB 超过 %.0fMB 上限——请按章节切分后分批处理，报告也会更可读"
             % (size / 1048576.0, max_mb))
+    if path.lower().endswith(".docx"):
+        return _extract_docx(path)
     with open(path, "rb") as f:
         data = f.read()
     if 0 in data:
@@ -44,6 +46,98 @@ def read_text(path, max_mb=5.0):
             "输入文件解码后乱码占比过高（疑似 GBK/UTF-16 等非 UTF-8 编码）——"
             "请转存为 UTF-8 纯文本后重试")
     return text
+
+
+def _extract_docx(path):
+    """docx 纯文本抽取（v1.3.0，纯标准库）：zipfile 读 word/document.xml，
+    段落边界转换行，剥全部 XML 标签后还原实体。PDF 无零依赖可靠抽取，
+    不做假承诺——请先导出为文本。"""
+    import zipfile, html as _html
+    try:
+        with zipfile.ZipFile(path) as z:
+            # zip 炸弹守卫：max_mb 量的是压缩包，必须另查未压缩尺寸
+            info = z.getinfo("word/document.xml")
+            if info.file_size > 20 * 1024 * 1024:
+                raise ValueError(
+                    "docx 正文解压后超过 20MB——请删除嵌入媒体后另存，或拆分文档")
+            xml = z.read("word/document.xml").decode("utf-8", errors="replace")
+    except KeyError as e:
+        raise ValueError(
+            "输入 .docx 缺少正文部件（%s）——可能只是改了扩展名，请另存为真正的 .docx" % e)
+    except RuntimeError as e:
+        raise ValueError(
+            "输入 .docx 受密码保护——请解除密码后另存（%s）" % e)
+    except zipfile.BadZipFile as e:
+        raise ValueError(
+            "输入 .docx 无法解析（文件损坏或实际不是 docx 格式）——"
+            "请另存为 .docx，或转存为 UTF-8 纯文本（%s）" % e)
+    # 域代码（TOC/PAGEREF）与修订删除文本不属正文，剥除（防误报）
+    xml = re.sub(r"<w:instrText\b.*?</w:instrText>", "", xml, flags=re.S)
+    xml = re.sub(r"<w:delText\b.*?</w:delText>", "", xml, flags=re.S)
+    xml = re.sub(r"<w:p\b", "\n<w:p ", xml)
+    xml = re.sub(r"<w:br\b|<w:cr\b", "\n<w:br ", xml)
+    xml = re.sub(r"<w:tab\b", "\t<w:tab ", xml)
+    text = _html.unescape(re.sub(r"<[^>]+>", "", xml))
+    text = re.sub(r"\n{3,}", "\n\n", text).strip() + "\n"
+    # 乱码守卫与纯文本路径同款（docx 内嵌非 UTF-8 XML 的最坏失败态）
+    if text.count(chr(0xFFFD)) / max(1, len(text)) > 0.02:
+        raise ValueError(
+            "docx 抽取文本乱码占比过高（内嵌 XML 疑非 UTF-8）——请另存为 .docx 或转存 UTF-8 文本")
+    return text
+
+
+# 修订建议工作单：把诊断升级为可执行的结构化建议（工具不代写，诚信位置不变）
+_ADVICE = {
+    "zh_jargon": ("黑话替换", "按词表建议替换；句子塌了就重写整句（指南第 2 步）"),
+    "zh_eightleg": ("模板结构", "删仪式感开场/拆投票式列举（指南第 1 步）"),
+    "zh_trans": ("翻译腔", "改为直接陈述（指南第 1/5 步）"),
+    "zh_jargon_struct": ("空泛排比", "拆成散句或单点讲透；有信息增量的递进不必拆（指南第 3 步）"),
+    "zh_punct": ("标点", "半角→全角（transform.py 可自动处理）"),
+    "en_vocab": ("AI 高频词", "换更小的词；句子塌了就重写（EN 指南第 1 步）"),
+    "en_inflation": ("意义拔高", "删除框架，直接说事实（EN 指南第 2 步）"),
+    "en_copula": ("系动词回避", "改回 is/are 直接陈述（EN 指南第 1 步）"),
+    "en_promo": ("宣传腔", "删营销形容词，给可核对的事实（EN 指南第 2 步）"),
+    "en_vague": ("模糊归因", "给出处、引用或删除该说法（EN 指南第 5 步）"),
+    "en_ing": ("-ing 尾挂", "改成独立句或删除（EN 指南第 4 步）"),
+    "en_para": ("负向平行句", "拆成两个平铺陈述（EN 指南第 3 步）"),
+    "en_chal": ("挑战/展望公式段", "删公式，写具体判断（EN 指南第 7 步）"),
+    "en_filler": ("填充短语", "transform.py 可自动处理大部分"),
+    "markdown": ("Markdown 残留", "transform.py 可自动处理"),
+}
+
+
+def build_suggestions(orig, r, guide):
+    """诊断 → 结构化修订工作单（markdown 字符串）。"""
+    lines = ["# 修订建议工作单（paper-rewriter v%s）" % __version__, "",
+             "> 本单只给建议、不代改原文；逐条采纳后务必跑 `verify.py` 守卫完整性，"
+             "再跑 `compare.py` 复核。完整方法论见 `%s`。" % guide, ""]
+    lines.append("模式: %s | 语言: %s | 特征分: %d [%s]%s" % (
+        r.get("profile"), r.get("lang"), r["score"], r["level"],
+        "  ⚠ 含模型残留，先跑 transform.py 清理" if r["critical_hit"] else ""))
+    lines.append("")
+    if not r["categories"]:
+        lines.append("未发现明显特征。")
+        lines.append("")
+    idx = 0
+    for cid, c in sorted(r["categories"].items(),
+                         key=lambda kv: -kv[1]["count"] * kv[1]["weight"]):
+        title, advice = _ADVICE.get(cid, (c["label"], "按指南相应章节处理"))
+        idx += 1
+        lines.append("## %d. %s（%d 处）" % (idx, title, c["count"]))
+        lines.append("处理原则: %s" % advice)
+        for smp in c["samples"][:5]:
+            lines.append("- %s" % smp)
+        lines.append("")
+    st = r.get("stats") or {}
+    cv = st.get("burstiness_cv")
+    if cv is not None:
+        lines.append("## 节奏提示")
+        lines.append("- 句长变异系数 %.2f%s；连续长句后刻意插短句，段落长短错开。"
+                     % (cv, "（偏均匀）" if cv < 0.45 else "（自然区间）"))
+        lines.append("")
+    lines.append("---")
+    lines.append("诚实口径: 本工作单基于本地启发式风格诊断，不构成对任何外部评审结果的承诺。")
+    return "\n".join(lines)
 
 
 _PATTERN_CACHE = {}
