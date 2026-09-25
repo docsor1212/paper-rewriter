@@ -50,8 +50,12 @@ def main():
         print("错误: 输入为空", file=sys.stderr)
         sys.exit(2)
 
-    r = hxt_core.scan(text, lang=None if args.lang == "auto" else args.lang,
-                      profile=args.profile)
+    if len(text) > 1_000_000:
+        r = hxt_core.scan_chunked(text, lang=None if args.lang == "auto" else args.lang,
+                                  profile=args.profile)
+    else:
+        r = hxt_core.scan(text, lang=None if args.lang == "auto" else args.lang,
+                          profile=args.profile)
 
     if args.suggestions:
         guide = {"zh": "references/style_guide_zh.md",

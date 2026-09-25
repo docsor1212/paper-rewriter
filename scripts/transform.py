@@ -182,7 +182,9 @@ def main():
     if not args.quiet:
         report = {
             "aggressive_warning": (
-                "激进模式(-a)会改写破折号与空泛开场，可能改变语气节奏——发布前请人工复核全文"
+                "激进模式(-a)适用场景：非正式文本的破折号堆叠、空泛开场白（如 in today's world）。"
+                "不适用：学术方法段（破折号可能是插入语）、数值范围（守卫已跳过）、"
+                "任何将直接提交的文本——改写后请人工复核全文再使用。"
                 if args.aggressive else None),
             "input_chars": len(text),
             "output_chars": len(out),

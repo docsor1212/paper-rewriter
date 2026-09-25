@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 
 import json
 import os
@@ -46,6 +46,88 @@ def read_text(path, max_mb=5.0):
             "输入文件解码后乱码占比过高（疑似 GBK/UTF-16 等非 UTF-8 编码）——"
             "请转存为 UTF-8 纯文本后重试")
     return text
+
+
+def chunk_text(text, max_chars=800_000):
+    """超大文本按段落边界分块（v1.4.0 stability 处方）。
+
+    分块使扫描内存峰值恒定（O(max_chars)）；合并去重由 scan_chunked 完成。
+    verify.py 守卫不可分块（红线语义要求整文比对），此处只服务诊断扫描。
+    """
+    if len(text) <= max_chars:
+        return [text]
+    blocks = []
+    start = 0
+    n = len(text)
+    while start < n:
+        end = min(start + max_chars, n)
+        if end < n:
+            # 回退到最近的段落边界（\n\n 或 \n），找不到就硬切
+            cut = text.rfind("\n\n", start, end)
+            if cut <= start:
+                cut = text.rfind("\n", start, end)
+            if cut > start:
+                end = cut + 1
+        blocks.append(text[start:end])
+        start = end
+    return blocks
+
+
+def scan_chunked(text, lang=None, profile="academic"):
+    """分块扫描：各块独立 scan，类别计数合并、样本去重合并。
+
+    返回结构同 scan()；score 按合并后的总命中/总单元重算（权重逐类加权平均），
+    与整文扫描同口径。分块边界切断的跨行信号（如排比正则跨段）可能少量漏检
+    ——这是分块口径的已知边界，报告会标注。
+    """
+    blocks = chunk_text(text)
+    if len(blocks) == 1:
+        return scan(text, lang=lang, profile=profile)
+    merged = {}
+    total_units = 0.0
+    weighted = {}
+    all_guards = []
+    all_sug = {}
+    for b in blocks:
+        r = scan(b, lang=lang, profile=profile)
+        total_units += r["units"]
+        for cid, c in r["categories"].items():
+            m = merged.setdefault(cid, {"label": c["label"], "count": 0,
+                                        "weight": 0.0, "samples": [],
+                                        "auto_fixable": c["auto_fixable"]})
+            m["count"] += c["count"]
+            m["weight"] = c["weight"]  # 同类同权
+            for smp in c["samples"]:
+                if smp not in m["samples"]:
+                    m["samples"] = (m["samples"] + [smp])[:6]
+            weighted[cid] = weighted.get(cid, 0.0) + c["weight"] * c["count"]
+        for g in r["guards_applied"]:
+            all_guards.append(g)
+        for s in r["suggestions"]:
+            all_sug[s["from"]] = s
+    pts = sum(weighted.values())
+    critical = any(k.startswith(("model_artifact", "chatbot", "cutoff")) and c["count"]
+                   for k, c in merged.items())
+    stats = {"burstiness_cv": None,
+             "notes": ["超大文本已自动分块（%d 块）——跨块边界的结构信号可能少量漏检，"
+                       "这是分块口径的已知边界" % len(blocks)]}
+    score, level, _ = _score(pts, stats, total_units, merged, lang or "zh")
+    return {
+        "lang_detected": lang or "zh",
+        "lang": lang or "zh",
+        "profile": profile,
+        "score": score,
+        "level": level,
+        "critical_hit": critical,
+        "units": round(total_units, 1),
+        "sentences": None,
+        "categories": merged,
+        "guards_applied": all_guards,
+        "stats": stats,
+        "suggestions": list(all_sug.values())[:12],
+        "chunked": len(blocks),
+        "honest_note": "本地启发式风格特征评分，非任何官方检测分数",
+    }
 
 
 def _extract_docx(path):

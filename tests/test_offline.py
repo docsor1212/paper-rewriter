@@ -610,7 +610,7 @@ class TestV11(unittest.TestCase):
 
 class TestV12(unittest.TestCase):
     def test_version_120(self):
-        self.assertIn(hxt_core.__version__, ("1.2.0", "1.3.0"))
+        self.assertGreaterEqual(hxt_core.__version__, "1.2.0")
 
     def test_profile_general_downweights_boilerplate(self):
         """general 模式降低八股/公文过渡信号（权重 0.4→0.16），词表命中不受影响。"""
@@ -700,7 +700,7 @@ class TestV12(unittest.TestCase):
 
 class TestV13(unittest.TestCase):
     def test_version_130(self):
-        self.assertEqual(hxt_core.__version__, "1.3.0")
+        self.assertGreaterEqual(hxt_core.__version__, "1.3.0")
 
     @staticmethod
     def _make_docx(path, xml_body):
@@ -820,6 +820,70 @@ class TestV13(unittest.TestCase):
                 else:
                     self.assertNotIn(": ", val,
                                      "%s 键 %s 单行值含「冒号+空格」: %r" % (f, key, ln))
+
+# ===========================================================================
+# v1.4.0 新增特性（分块引擎 / 错误码文档 / API 参考）
+# ============================================================================
+
+class TestV14(unittest.TestCase):
+    def test_version_140(self):
+        self.assertEqual(hxt_core.__version__, "1.4.0")
+
+    def test_chunk_text_paragraph_boundary(self):
+        text = "段落一。\n\n段落二。\n\n段落三。"
+        blocks = hxt_core.chunk_text(text, max_chars=12)
+        self.assertGreater(len(blocks), 1)
+        self.assertEqual("".join(blocks), text, "分块不得丢字符")
+
+    def test_chunk_scan_merges_counts(self):
+        big = ("综上所述，该方案具有重要意义。" * 100 + "\n\n") * 700
+        self.assertGreater(len(big), 800_000)
+        r = hxt_core.scan_chunked(big)
+        self.assertGreater(r.get("chunked", 1), 1)
+        self.assertGreater(r["categories"].get("zh_eightleg", {}).get("count", 0), 100)
+        self.assertTrue(any("分块" in x for x in r["stats"]["notes"]))
+
+    def test_scan_single_block_passthrough(self):
+        small = "正常短文本。"
+        r = hxt_core.scan_chunked(small)
+        self.assertNotIn("chunked", r, "小块应直接走整文扫描")
+
+    def test_cli_big_file_auto_chunk(self):
+        big_path = os.path.join(tempfile.mkdtemp(prefix="hxt_v14_"), "big.txt")
+        with open(big_path, "w", encoding="utf-8") as f:
+            f.write("综上所述，具有重要意义。" * 100 + "\n" * 60000)
+        p = run_cli(["scripts/detect.py", "-s", big_path])
+        self.assertEqual(p.returncode, 0, p.stderr)
+
+    def test_errors_doc_consistency(self):
+        """errors.md 的退出码声明必须与代码一致（机制层防线）。"""
+        doc = open(os.path.join(ROOT, "references/errors.md"), encoding="utf-8").read()
+        self.assertIn("仅 verify.py", doc)
+        # 代码事实：transform/compare/pipeline 无 exit 1 路径
+        for f in ("transform.py", "compare.py", "pipeline.py"):
+            src = open(os.path.join(ROOT, "scripts", f), encoding="utf-8").read()
+            self.assertNotIn("sys.exit(1)", src,
+                             "%s 出现 exit 1，与 errors.md 契约冲突" % f)
+        src = open(os.path.join(ROOT, "scripts", "verify.py"), encoding="utf-8").read()
+        self.assertRegex(src, r"sys\.exit\([^)]*1[^)]*\)",
+                         "verify.py 必须保留 exit 1 路径（契约方）")
+
+    def test_api_doc_examples_run(self):
+        """api.md 中的最小示例必须真实可跑（文档即测试）。"""
+        import subprocess
+        code = (
+            "import sys; sys.path.insert(0, %r)\n"
+            "import hxt_core\n"
+            "r = hxt_core.scan('这个方案为业务赋能，打法清晰。')\n"
+            "assert isinstance(r['score'], int)\n"
+            "t = hxt_core.read_text(%r)\n"
+            "md = hxt_core.build_suggestions(t, r, 'references/style_guide_zh.md')\n"
+            "assert '修订建议工作单' in md\n"
+        ) % (os.path.join(ROOT, "scripts"),
+             os.path.join(os.path.dirname(__file__), "corpus_ai_zh.txt"))
+        p = subprocess.run([sys.executable, "-c", code], capture_output=True,
+                           text=True, timeout=60)
+        self.assertEqual(p.returncode, 0, p.stderr)
 
 # ===========================================================================
 # 文档与发布自检（frontmatter 纪律）

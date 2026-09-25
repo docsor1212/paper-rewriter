@@ -76,8 +76,9 @@ def main():
                 print("错误: 无法写入 %s（%s）" % (args.output, e), file=sys.stderr)
                 sys.exit(2)
 
-    ro = hxt_core.scan(orig, profile=profile)
-    rn = hxt_core.scan(new, profile=profile)
+    scan_fn = hxt_core.scan_chunked if max(len(orig), len(new)) > 1_000_000 else hxt_core.scan
+    ro = scan_fn(orig, profile=profile)
+    rn = scan_fn(new, profile=profile)
     vr = vf.verify(orig, new, terms, args.max_length_change)
 
     lang = rn["lang"]

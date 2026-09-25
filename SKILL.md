@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 1.3.0
+version: 1.4.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: AI flavor scan and style-pattern
   self-check reports (scan reports are detection only), deterministic text cleanup
@@ -53,7 +53,7 @@ and natural register — with integrity guardrails on every step.
 | Layer | Who does it | What |
 |---|---|---|
 | Style self-check | `scripts/detect.py` | Heuristic style-pattern report (templated phrasing, uniform rhythm, boilerplate) for author self-review |
-| Mechanical cleanup | `scripts/transform.py` | Model artifacts, chatbot filler, punctuation normalization, safe filler swaps — grammar-safe only |
+| Mechanical cleanup | `scripts/transform.py` | Model artifacts, chatbot filler, punctuation normalization, safe filler swaps — grammar-safe only. **When to use directly**: you only need residue/filler cleanup without any stylistic diagnosis (fast, deterministic). |
 | **Quality revision** | **you (the agent)** | Follow `references/style_guide_zh.md` / `_en.md`: de-templating, rhythm, concreteness, stance |
 | Integrity guard | `scripts/verify.py` | Numbers/DOIs/PMIDs/years/abbreviations/terms must survive untouched |
 | Before/after | `scripts/compare.py` | Pattern-score delta + integrity verdict |
@@ -88,8 +88,9 @@ python scripts/verify.py draft.txt step2.txt --terms terms.txt
 python scripts/compare.py draft.txt step2.txt
 ```
 
-Worked end-to-end examples with real command output: `references/examples.md`.
-Frequently asked questions: `references/faq.md`.
+Worked end-to-end examples: `references/examples.md`. Unified exit codes,
+violation categories and remedies: `references/errors.md`. Python API reference
+for programmatic integration: `references/api.md`. FAQ: `references/faq.md`.
 
 ### Agent invocation protocol
 
@@ -158,7 +159,13 @@ When invoked, decide the path first, then run it:
 For reviewers, security scanners and cautious users:
 
 - Reads **only** the file paths you pass as arguments (plus stdin) and its own
-  bundled wordlist files (`scripts/patterns_*.json`).
+  bundled wordlist files (`scripts/patterns_*json`). Verify it yourself:
+
+  ```bash
+  grep -rnE "urllib|requests|socket|subprocess|os\.environ" scripts/ || echo "clean"
+  ```
+
+  (runs clean as of this release — the claim is reproducible, not rhetorical).
 - Writes **only** to the `-o`/`--output`/`--suggestions` paths you specify.
 - **Zero network access** — no HTTP calls, no downloads, no API keys.
 - **Zero third-party dependencies** — Python standard library only.
