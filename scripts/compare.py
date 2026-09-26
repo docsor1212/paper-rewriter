@@ -43,6 +43,7 @@ def main():
     ap.add_argument("--terms", help="术语表")
     ap.add_argument("--profile", choices=["academic", "general"], default="academic",
                     help="academic=论文口径（默认）；general=非学术文本")
+    ap.add_argument("--html", help="生成单文件 HTML 对照报告（含逐句 diff）到此路径")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
@@ -72,6 +73,12 @@ def main():
     rn = hxt_core.scan(new, profile=args.profile)
     vr = vf.verify(orig, new,
                    vf.load_terms(args.terms) if args.terms else None)
+
+    if args.html:
+        import reporter
+        with open(args.html, "w", encoding="utf-8") as hf:
+            hf.write(reporter.render_compare(orig, new, ro, rn, vr))
+        print("HTML 对照报告已写入 %s" % args.html, file=sys.stderr)
 
     if args.json:
         print(json.dumps({

@@ -24,15 +24,65 @@ LEVELS = {"低": "基本无模板腔特征", "中": "有一定模板腔特征", 
 
 def main():
     ap = argparse.ArgumentParser(description="写作风格特征自查（本地启发式）")
-    ap.add_argument("file", nargs="?", help="文本文件；缺省读 stdin")
+    ap.add_argument("file", nargs="?", help="文本文件；缺省读 stdin（--batch 模式下传目录）")
     ap.add_argument("-j", "--json", action="store_true", help="JSON 输出")
     ap.add_argument("-s", "--score", action="store_true", help="只输出分数与档位")
     ap.add_argument("--lang", choices=["zh", "en", "mix", "auto"], default="auto")
     ap.add_argument("--profile", choices=["academic", "general"], default="academic",
                     help="academic=论文口径（默认）；general=非学术文本，八股/公文信号降权")
     ap.add_argument("--suggestions", help="输出修订建议工作单（markdown 侧车）到此路径")
+    ap.add_argument("--html", help="生成单文件 HTML 报告到此路径")
+    ap.add_argument("--batch", help="批量模式：扫描目录内全部 .txt/.md/.docx，输出汇总 CSV 到此路径（与 --html 可同用）")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
+
+    if args.batch:
+        root = args.batch
+        if not os.path.isdir(root):
+            print("错误: --batch 需要目录（%s）" % root, file=sys.stderr)
+            sys.exit(2)
+        rows_out = []
+        for fn in sorted(os.listdir(root)):
+            if not fn.lower().endswith((".txt", ".md", ".docx")):
+                continue
+            fp = os.path.join(root, fn)
+            try:
+                t = hxt_core.read_text(fp)
+                if not t.strip():
+                    rows_out.append((fn, -1, "空文件", False, "-"))
+                    continue
+                rr = (hxt_core.scan_chunked(t, lang=None if args.lang == "auto" else args.lang,
+                                            profile=args.profile)
+                      if len(t) > 1_000_000 else
+                      hxt_core.scan(t, lang=None if args.lang == "auto" else args.lang,
+                                    profile=args.profile))
+                rows_out.append((fn, rr["score"], rr["level"], rr["critical_hit"], rr["lang"]))
+            except (OSError, ValueError) as e:
+                rows_out.append((fn, -1, "错误: %s" % str(e)[:40], False, "-"))
+        if args.json:
+            print(json.dumps([{"file": f, "score": s, "level": l, "critical": c, "lang": g}
+                              for f, s, l, c, g in rows_out], ensure_ascii=False, indent=2))
+        else:
+            print("批量扫描 %d 个文件：" % len(rows_out))
+            for f, s, l, c, g in rows_out:
+                mark = (" %s/%s%s" % (s, l, " ⚠残留" if c else "")) if s >= 0 else (" %s" % l)
+                print("  %-36s%s" % (f, mark))
+        if args.html:
+            import reporter
+            trs = "".join("<tr><td>%s</td><td>%s</td></tr>" % (
+                reporter.esc(f),
+                ("%d [%s]%s" % (s, reporter.esc(l), " ⚠残留" if c else "")) if s >= 0
+                else "<span class='bad'>%s</span>" % reporter.esc(l))
+                for f, s, l, c, g in rows_out)
+            body = ("<div class='card'><h1>批量扫描汇总</h1><p class='meta'>%d 个文件 · %s · "
+                    "%s 模式</p></div>" % (len(rows_out), reporter.esc(root),
+                                           "academic" if args.profile == "academic" else "general"))
+            body += ("<div class='card'><table><tr><th>文件</th><th>结果</th></tr>%s</table></div>"
+                     % trs) + reporter._FOOT.format(ts=reporter._now())
+            with open(args.html, "w", encoding="utf-8") as hf:
+                hf.write(reporter._page("批量扫描汇总", body))
+            print("HTML 汇总已写入 %s" % args.html, file=sys.stderr)
+        sys.exit(0)
 
     if args.file:
         try:
@@ -68,6 +118,12 @@ def main():
         except OSError as e:
             print("错误: 无法写入 %s（%s）" % (args.suggestions, e), file=sys.stderr)
             sys.exit(2)
+
+    if args.html:
+        import reporter
+        with open(args.html, "w", encoding="utf-8") as hf:
+            hf.write(reporter.render_detect(text, r, source=args.file or "(stdin)"))
+        print("HTML 报告已写入 %s" % args.html, file=sys.stderr)
 
     if args.score:
         print("%d/%s" % (r["score"], r["level"]))

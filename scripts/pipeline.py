@@ -41,7 +41,7 @@ def _read(path):
 
 def main():
     ap = argparse.ArgumentParser(description="一键管线：自查→清理→深改简报→守卫")
-    ap.add_argument("file", help="原稿")
+    ap.add_argument("file", nargs="?", help="原稿（--batch 模式下传目录）")
     ap.add_argument("-o", "--output", help="清理结果落盘文件（建议必填）")
     ap.add_argument("--rewrite", help="已有改稿（提供则跳过机械清理，直接守卫+对比）")
     ap.add_argument("--terms", help="术语表文件（每行一个）")
@@ -50,10 +50,61 @@ def main():
                     help="academic=论文口径（默认）；general=非学术文本")
     ap.add_argument("--max-length-change", type=float, default=25.0)
     ap.add_argument("--suggestions", help="输出修订建议工作单（markdown 侧车）到此路径")
+    ap.add_argument("--html", help="生成单文件 HTML 报告到此路径")
+    ap.add_argument("--batch", help="批量模式：目录内全部 .txt/.md/.docx 逐个「清理+守卫」，汇总 CSV 输出到 stdout/此路径")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
 
+    # ── 批量模式：逐文件 清理+守卫 汇总 ──
+    if args.batch:
+        import csv as _csv
+        root = args.batch
+        if not os.path.isdir(root):
+            print("错误: --batch 需要目录（%s）" % root, file=sys.stderr)
+            sys.exit(2)
+        rows_out = []
+        for fn in sorted(os.listdir(root)):
+            if not fn.lower().endswith((".txt", ".md", ".docx")):
+                continue
+            fp = os.path.join(root, fn)
+            try:
+                o = hxt_core.read_text(fp)
+                if not o.strip():
+                    rows_out.append((fn, "-", "-", "空文件", "-"))
+                    continue
+                fx = tf.load_fixes(None, False)
+                n, _ap = tf.apply_auto_fixes(o, fx)
+                n, _rm = tf.drop_flagged_sentences(n)
+                n, _nq = tf.normalize_quotes(n)
+                v = vf.verify(o, n)
+                before = hxt_core.scan(o)
+                after = hxt_core.scan(n)
+                rows_out.append((fn, "%d[%s]" % (before["score"], before["level"]),
+                                 "%d[%s]" % (after["score"], after["level"]),
+                                 "PASS" if v["ok"] else "FAIL(%d)" % len(v["violations"]),
+                                 "%+d%%" % v["stats"]["length_delta_pct"]))
+            except (OSError, ValueError) as e:
+                rows_out.append((fn, "-", "-", "错误", str(e)[:40]))
+        writer = _csv.writer(sys.stdout)
+        writer.writerow(["file", "before", "after", "integrity", "len_delta"])
+        for row in rows_out:
+            writer.writerow(row)
+        if args.output:
+            try:
+                with open(args.output, "w", encoding="utf-8", newline="") as cf:
+                    cw = _csv.writer(cf)
+                    cw.writerow(["file", "before", "after", "integrity", "len_delta"])
+                    cw.writerows(rows_out)
+                print("汇总 CSV 已写入 %s" % args.output, file=sys.stderr)
+            except OSError as e:
+                print("错误: 无法写入 %s（%s）" % (args.output, e), file=sys.stderr)
+                sys.exit(2)
+        sys.exit(0)
+
+    if not args.file:
+        print("错误: 需要 原稿 参数（或使用 --batch 目录模式）", file=sys.stderr)
+        sys.exit(2)
     orig = _read(args.file)
     profile = args.profile
     terms = vf.load_terms(args.terms) if args.terms else None
@@ -136,6 +187,12 @@ def main():
         print("  下一步: " + brief["next_action"])
         if getattr(args, "suggestions", None):
             print("修订建议工作单: " + args.suggestions)
+        if getattr(args, "html", None):
+            import reporter
+            with open(args.html, "w", encoding="utf-8") as hf:
+                hf.write(reporter.render_pipeline(orig, new, ro, rn, vr, brief,
+                                                  chunked=getattr(rn, "get", lambda k: None)("chunked")))
+            print("HTML 报告: " + args.html)
         print("口径: " + report["honest_note"])
     sys.exit(0)
 

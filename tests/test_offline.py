@@ -18,6 +18,7 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 
 import hxt_core  # noqa: E402
+import reporter  # noqa: E402
 import transform as tf  # noqa: E402
 import verify as vf  # noqa: E402
 
@@ -827,7 +828,7 @@ class TestV13(unittest.TestCase):
 
 class TestV14(unittest.TestCase):
     def test_version_140(self):
-        self.assertEqual(hxt_core.__version__, "1.4.0")
+        self.assertGreaterEqual(hxt_core.__version__, "1.4.0")
 
     def test_chunk_text_paragraph_boundary(self):
         text = "段落一。\n\n段落二。\n\n段落三。"
@@ -884,6 +885,97 @@ class TestV14(unittest.TestCase):
         p = subprocess.run([sys.executable, "-c", code], capture_output=True,
                            text=True, timeout=60)
         self.assertEqual(p.returncode, 0, p.stderr)
+
+# ===========================================================================
+# v1.5.0 新增特性（HTML 报告 / 逐句 diff / 批量模式）
+# ============================================================================
+
+class TestV15(unittest.TestCase):
+    def test_version_150(self):
+        self.assertEqual(hxt_core.__version__, "1.5.0")
+
+    def test_render_detect_escapes_html(self):
+        self.assertEqual(reporter.esc("<script>alert(1)</script>"),
+                         "&lt;script&gt;alert(1)&lt;/script&gt;")
+        r = hxt_core.scan('这个方案为业务赋能，打法清晰。')
+        h = reporter.render_detect("unused text", r,
+                                   source="源文件<img src=x onerror=alert(2)>.txt")
+        self.assertIn("<!DOCTYPE html>", h)
+        self.assertNotIn("<script>alert", h, "HTML 注入未转义")
+        self.assertIn("&lt;img src=x", h, "source 字段未转义")
+        self.assertNotIn("unused text", h, "text 形参不参与渲染（仅诊断数据入报告）")
+
+    def test_sentence_diff_alignment(self):
+        rows = reporter.sentence_diff("甲句。乙句。丙句。", "甲句。修改后的乙句。丙句。")
+        tags = [t for t, _, _ in rows]
+        self.assertIn("replace", tags)
+        self.assertIn("equal", tags)
+        joined_del = "".join(o for t, o, _ in rows if t in ("replace", "delete"))
+        self.assertIn("乙句", joined_del)
+
+    def test_detect_html_report(self):
+        out = os.path.join(tempfile.mkdtemp(prefix="hxt_v15_"), "r.html")
+        p = run_cli(["scripts/detect.py",
+                     os.path.join(os.path.dirname(__file__), "corpus_ai_zh.txt"),
+                     "--html", out])
+        self.assertEqual(p.returncode, 0, p.stderr)
+        h = open(out, encoding="utf-8").read()
+        self.assertIn("风格自查报告", h)
+        self.assertIn("风格特征分", h)
+
+    def test_compare_html_diff_report(self):
+        d = tempfile.mkdtemp(prefix="hxt_v15_")
+        a = os.path.join(d, "a.txt")
+        b = os.path.join(d, "b.txt")
+        open(a, "w", encoding="utf-8").write("第一句保持不变。这个方案为业务赋能，打法清晰。第二句也在。")
+        open(b, "w", encoding="utf-8").write("第一句保持不变。这个方案支持业务推进，思路清楚。第二句也在。")
+        out = os.path.join(d, "c.html")
+        p = run_cli(["scripts/compare.py", a, b, "--html", out])
+        self.assertEqual(p.returncode, 0, p.stderr)
+        h = open(out, encoding="utf-8").read()
+        self.assertIn("逐句对照", h)
+        self.assertIn("del", h)  # 增删样式
+
+    def test_detect_batch(self):
+        d = tempfile.mkdtemp(prefix="hxt_v15_")
+        open(os.path.join(d, "a.txt"), "w", encoding="utf-8").write(
+            "这个方案为业务赋能，打法清晰，形成商业闭环。" * 3)
+        open(os.path.join(d, "b.md"), "w", encoding="utf-8").write("正常的一句话。")
+        open(os.path.join(d, "skip.exe"), "wb").write(b"MZ")
+        p = run_cli(["scripts/detect.py", "--batch", d, "--json"])
+        self.assertEqual(p.returncode, 0, p.stderr)
+        rows = json.loads(p.stdout)
+        self.assertEqual(len(rows), 2, "应跳过非文本文件")
+        by = {x["file"]: x for x in rows}
+        self.assertGreater(by["a.txt"]["score"], by["b.md"]["score"])
+
+    def test_detect_batch_requires_dir(self):
+        p = run_cli(["scripts/detect.py", "--batch", "/nonexistent_dir_xyz"])
+        self.assertEqual(p.returncode, 2)
+
+    def test_pipeline_batch_csv(self):
+        d = tempfile.mkdtemp(prefix="hxt_v15_")
+        open(os.path.join(d, "a.txt"), "w", encoding="utf-8").write(
+            "希望以上内容对您有所帮助！这个方案为业务赋能，打法清晰。" * 2)
+        csvp = os.path.join(d, "sum.csv")
+        p = run_cli(["scripts/pipeline.py", "--batch", d, "--output", csvp])
+        self.assertEqual(p.returncode, 0, p.stderr)
+        body = open(csvp, encoding="utf-8").read()
+        self.assertIn("a.txt", body)
+        self.assertIn("before", body)
+
+    def test_pipeline_html_report(self):
+        d = tempfile.mkdtemp(prefix="hxt_v15_")
+        outp = os.path.join(d, "o.txt")
+        hpath = os.path.join(d, "r.html")
+        p = run_cli(["scripts/pipeline.py",
+                     os.path.join(os.path.dirname(__file__), "corpus_ai_zh.txt"),
+                     "-o", outp, "--html", hpath])
+        self.assertEqual(p.returncode, 0, p.stderr)
+        h = open(hpath, encoding="utf-8").read()
+        self.assertIn("一键管线报告", h)
+        self.assertIn("完整性守卫", h)
+
 
 # ===========================================================================
 # 文档与发布自检（frontmatter 纪律）

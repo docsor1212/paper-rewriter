@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 1.4.0
+version: 1.5.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: AI flavor scan and style-pattern
   self-check reports (scan reports are detection only), deterministic text cleanup
@@ -65,6 +65,12 @@ One command (self-check → cleanup → revision brief → integrity guard):
 ```bash
 python scripts/pipeline.py draft.txt -o out.txt --terms terms.txt
 ```
+
+Visualization & batch (v1.5.0): add `--html report.html` to any of
+detect/pipeline/compare for a self-contained HTML report (score cards, category
+tables, revision worksheet, integrity verdict; compare adds sentence-level
+add/delete diff). Scan a whole directory with `--batch dir` (detect: per-file
+score summary; pipeline: per-file cleanup+integrity CSV).
 
 Preparing the term list: `python scripts/extract_terms.py draft.txt -o terms.txt`
 auto-extracts candidates (abbreviations, quoted terms) into a draft you confirm
