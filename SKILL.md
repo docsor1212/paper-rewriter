@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 1.5.0
+version: 1.6.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: AI flavor scan and style-pattern
   self-check reports (scan reports are detection only), deterministic text cleanup
@@ -13,7 +13,7 @@ description: >
   rules) and academic-integrity guardrails: this tool improves writing quality for
   self-review; it does not help misrepresent authorship, conceal required AI
   disclosure, or defeat integrity review. 100% local, zero upload, Python stdlib
-  only. Family: paper-polisher (broad polishing), pubmed-verifier, cite-holmes,
+  only. Family: paper-polisher-pro (broad polishing), pubmed-verifier, cite-holmes,
   academic-figures, cn-med-oa, doc-holmes.
 allowed-tools:
   - Read
@@ -95,8 +95,23 @@ python scripts/compare.py draft.txt step2.txt
 ```
 
 Worked end-to-end examples: `references/examples.md`. Unified exit codes,
-violation categories and remedies: `references/errors.md`. Python API reference
-for programmatic integration: `references/api.md`. FAQ: `references/faq.md`.
+violation categories and remedies: `references/errors.md`. **Centralized
+common-mistakes list (20 items): `references/pitfalls.md`** — read it before
+your first real run. Python API reference: `references/api.md`. FAQ:
+`references/faq.md`.
+
+**Revision tracking** (`--track base` on transform/pipeline): every change the
+mechanical layer makes is recorded to `base.md` + `base.json` — an auditable
+list of what the tool touched (rule, count, deleted sentences,
+flagged-for-review).
+
+**PDF input (experimental, v1.6.0)**: English text PDFs (FlateDecode/WinAnsi,
+unencrypted) are extracted with the standard library only. PDFs with embedded
+font encodings (ToUnicode CMaps, typical for CJK) are rejected when detected —
+detection is best-effort: if one slips through, the output may be garbled, so
+**review extracted PDF text before relying on it**. When in doubt, export to
+UTF-8 text. Chunk threshold for oversized files: 800,000 characters per chunk
+(5MB file cap).
 
 ### Agent invocation protocol
 
@@ -164,15 +179,17 @@ When invoked, decide the path first, then run it:
 
 For reviewers, security scanners and cautious users:
 
-- Reads **only** the file paths you pass as arguments (plus stdin) and its own
-  bundled wordlist files (`scripts/patterns_*json`). Verify it yourself:
+- Reads **only** the file paths you pass as arguments (plus stdin, including the
+  `.txt`/`.md`/`.docx`/`.pdf` files inside a `--batch` directory) and its own
+  bundled wordlist files (`scripts/patterns_*.json`). Verify it yourself:
 
   ```bash
   grep -rnE "urllib|requests|socket|subprocess|os\.environ" scripts/ || echo "clean"
   ```
 
   (runs clean as of this release — the claim is reproducible, not rhetorical).
-- Writes **only** to the `-o`/`--output`/`--suggestions` paths you specify.
+- Writes **only** to the `-o`/`--output`/`--suggestions`/`--html`/`--track`
+  paths you specify (`--track` writes `base.md` + `base.json`).
 - **Zero network access** — no HTTP calls, no downloads, no API keys.
 - **Zero third-party dependencies** — Python standard library only.
 - Reads **no environment variables**; spawns **no subprocesses**; creates **no
@@ -192,7 +209,7 @@ For reviewers, security scanners and cautious users:
 
 ## Related skills (Paper Toolbox family)
 
-- **paper-polisher** — comprehensive polishing: terminology, translationese,
+- **paper-polisher-pro** — comprehensive polishing: terminology, translationese,
   metaphor audit, AIGC-label check, journal precheck (safe to use together)
 - **pubmed-verifier** — verify PMID/DOI references before submission
 - **cite-holmes** — deep research with hallucination-free citations

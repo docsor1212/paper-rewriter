@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "1.5.0"
+__version__ = "1.6.0"
 
 import json
 import os
@@ -33,6 +33,8 @@ def read_text(path, max_mb=5.0):
             % (size / 1048576.0, max_mb))
     if path.lower().endswith(".docx"):
         return _extract_docx(path)
+    if path.lower().endswith(".pdf"):
+        return _extract_pdf(path)
     with open(path, "rb") as f:
         data = f.read()
     if 0 in data:
@@ -128,6 +130,207 @@ def scan_chunked(text, lang=None, profile="academic"):
         "chunked": len(blocks),
         "honest_note": "本地启发式风格特征评分，非任何官方检测分数",
     }
+
+
+def _pdf_literal_string(data, i):
+    """从 data[i]=='(' 起字符级走查字面串（嵌套括号深度计数+全转义还原）。
+
+    返回 (bytes 内容, 串后位置)。处理 \\n 行续接、\\(\\)\\\\、八进制、
+    以及两位数字的未定义转义跳过。"""
+    depth = 1
+    out = bytearray()
+    i += 1
+    n = len(data)
+    while i < n and depth > 0:
+        c = data[i]
+        if c == 0x5C:  # backslash
+            if i + 1 >= n:
+                break
+            nxt = data[i + 1]
+            if nxt == 0x0A:  # 行续接 \<LF>
+                i += 2
+                continue
+            if nxt == 0x0D:
+                i += 2
+                if i < n and data[i] == 0x0A:
+                    i += 1
+                continue
+            esc = {0x6E: 0x0A, 0x72: 0x0D, 0x74: 0x09, 0x62: 0x08, 0x66: 0x0C,
+                   0x28: 0x28, 0x29: 0x29, 0x5C: 0x5C}
+            if nxt in esc:
+                out.append(esc[nxt])
+                i += 2
+                continue
+            if 0x30 <= nxt <= 0x37:  # 八进制 \ooo
+                j = i + 1
+                val = 0
+                k = 0
+                while j < n and k < 3 and 0x30 <= data[j] <= 0x37:
+                    val = val * 8 + (data[j] - 0x30)
+                    j += 1
+                    k += 1
+                out.append(val & 0xFF)
+                i = j
+                continue
+            i += 2  # \8 \9 未定义转义：PDF 规范=忽略反斜杠、字符保留
+            out.append(nxt)
+            continue
+        if c == 0x28:  # 嵌套 (
+            depth += 1
+            out.append(c)
+            i += 1
+            continue
+        if c == 0x29:  # )
+            depth -= 1
+            if depth == 0:
+                return bytes(out), i + 1
+            out.append(c)
+            i += 1
+            continue
+        out.append(c)
+        i += 1
+    return bytes(out), i
+
+
+def _pdf_walk_text(data):
+    """走查内容流：抽字面串与 hex 串（跟随 Tj/'/"/TJ 或 TJ 数组内），
+    操作符间插空格、BT/ET/T*/Td/TD 处插换行。"""
+    out = []
+    i = 0
+    n = len(data)
+    while i < n:
+        c = data[i]
+        if c == 0x28:  # ( 字面串
+            s, j = _pdf_literal_string(data, i)
+            k = j
+            while k < n and data[k:k+1].isspace():
+                k += 1
+            op2 = data[k:k+2]
+            if op2[:2] in (b"Tj", b"' ", b'" ') or (n > k and data[k:k+1] in (b"'", b'"')):
+                out.append(s)
+                out.append(b" ")
+                i = k + (1 if data[k:k+1] in (b"'", b'"') else 2)
+                continue
+            # TJ 数组内或紧随 ]：也收集（数组元素间插空格）
+            out.append(s)
+            out.append(b" ")
+            i = j
+            continue
+        if c == 0x3C and data[i:i+2] != b"<<":  # < hex 串（非字典）
+            j = data.find(b">", i)
+            if j == -1:
+                break
+            hx = re.sub(rb"[^0-9A-Fa-f]", b"", data[i+1:j])
+            if len(hx) % 2 == 1:
+                hx += b"0"
+            try:
+                out.append(bytes.fromhex(hx.decode("ascii")))
+                out.append(b" ")
+            except Exception:
+                pass
+            i = j + 1
+            continue
+        if data[i:i+2] in (b"BT", b"ET") or data[i:i+3] in (b"T* ", b"Td ", b"TD "):
+            out.append(b"\n")
+        i += 1
+    return b"".join(out)
+
+
+def _extract_pdf(path):
+    """PDF 文本直读（v1.6.0 实验性，纯标准库，字符级状态机）。
+
+    能力：未加密、FlateDecode/未压缩、英文文本型 PDF。
+    明确拒绝：加密 PDF；含 ToUnicode CMap（CJK/嵌入字体强标记）的 PDF；
+    抽取结果乱码/控制字符超阈的 PDF（最坏失败态=乱码静默放行，三重探针设防）。
+    尽力探测可漏网：抽取结果请人工检查。"""
+    import zlib
+    with open(path, "rb") as f:
+        raw = f.read()
+    if not raw.startswith(b"%PDF"):
+        raise ValueError("输入 .pdf 缺少 PDF 头——文件可能损坏或只是改了扩展名")
+    if b"/Encrypt" in raw:
+        raise ValueError("输入 PDF 受密码保护——请解除密码或导出为 UTF-8 文本")
+    if b"/ToUnicode" in raw:
+        raise ValueError(
+            "该 PDF 含 ToUnicode CMap（CJK/嵌入字体文档的强标记）——本工具的"
+            "实验性 PDF 直读无法可靠解码，请导出为 UTF-8 文本后重试")
+    parts = []
+    for m in re.finditer(rb"stream\r?\n(.*?)endstream", raw, re.S):
+        comp = m.group(1).rstrip(b"\r\n")
+        try:
+            d = zlib.decompressobj()
+            data = d.decompress(comp, 20 * 1024 * 1024 + 1)
+            if d.unconsumed_tail:
+                raise ValueError("PDF 内容流解压后超过 20MB 上限——请拆分或导出文本")
+        except zlib.error:
+            data = comp  # 未压缩内容流（合法 PDF）直接使用
+        if b"Tj" not in data and b"TJ" not in data:
+            continue
+        parts.append(_pdf_walk_text(data))
+    if not parts:
+        raise ValueError(
+            "PDF 中未找到可抽取的文本流（可能是扫描件/纯图片 PDF）——"
+            "请用 OCR 或导出为 UTF-8 文本")
+    text = "".join(p.decode("latin-1") for p in parts)
+    # 三重乱码探针（最坏失败态=乱码静默放行）
+    ctrl = sum(1 for c in text if ord(c) < 32 and c not in "\n\t\r")
+    if ctrl / max(1, len(text)) > 0.005:
+        raise ValueError(
+            "PDF 抽取文本含大量控制字符（疑 CJK/嵌入字体编码）——"
+            "请导出为 UTF-8 文本后重试")
+    try:
+        gbk = text.encode("latin-1", errors="strict").decode("gbk", errors="strict")
+        cjk = sum(1 for ch in gbk if "\u4e00" <= ch <= "\u9fff")
+        if cjk / max(1, len(gbk)) > 0.2:
+            raise ValueError(
+                "PDF 抽取文本经 GBK 回程探测命中 CJK（疑中文嵌入字体编码）——"
+                "请导出为 UTF-8 文本后重试")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        pass
+    if text.count(chr(0xFFFD)) / max(1, len(text)) > 0.02:
+        raise ValueError("PDF 抽取文本乱码占比过高——请导出为 UTF-8 文本")
+    return re.sub(r"\n{3,}", "\n\n", text).strip() + "\n"
+
+
+def build_revision_log(applied, removed, source=""):
+    """修订记录构建（v1.6.0 --track）：机械清理层做过的每一处修改。
+
+    返回 (markdown_str, json_obj)。与 compare 的 diff 互补：
+    diff 对比任意两稿；本记录审计工具自身的修改行为。
+    """
+    import datetime as _dt
+    entries = []
+    for note, n in (applied or {}).items():
+        entries.append({"kind": "replace", "rule": note, "count": n})
+    for x in (removed or []):
+        entries.append({"kind": "delete" if not x.get("kept") else "flag",
+                        "text": x.get("text", ""), "reason": x.get("reason", "")})
+    md = ["# 修订记录（paper-rewriter v%s）" % __version__, ""]
+    if source:
+        md.append("来源: %s" % source)
+    md.append("生成时间: %s" % _dt.datetime.now().strftime("%Y-%m-%d %H:%M"))
+    md.append("")
+    rep = [e for e in entries if e["kind"] == "replace"]
+    dele = [e for e in entries if e["kind"] == "delete"]
+    flag = [e for e in entries if e["kind"] == "flag"]
+    if rep:
+        md.append("## 替换类修复")
+        for e in rep:
+            md.append("- %s ×%d" % (e["rule"], e["count"]))
+    if dele:
+        md.append("## 整句删除")
+        for e in dele:
+            md.append("- [%s] %s" % (e["reason"], e["text"]))
+    if flag:
+        md.append("## 标记待审（未自动删除）")
+        for e in flag:
+            md.append("- [%s] %s" % (e["reason"], e["text"]))
+    if not entries:
+        md.append("无修改（原稿通过机械清理层逐字节保留）。")
+    md.append("")
+    md.append("口径: 机械清理层仅做语法安全修复；黑话/八股/节奏由 agent 按指南深改，"
+              "不在本记录范围内。")
+    return "\n".join(md), {"entries": entries, "generated": _dt.datetime.now().isoformat(timespec="seconds")}
 
 
 def _extract_docx(path):

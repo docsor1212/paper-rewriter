@@ -138,6 +138,7 @@ def main():
     ap.add_argument("file", nargs="?", help="输入文件；缺省读 stdin")
     ap.add_argument("-o", "--output", help="输出文件（缺省 stdout）")
     ap.add_argument("-a", "--aggressive", action="store_true", help="激进档")
+    ap.add_argument("--track", help="输出修订记录到此路径（同时生成 .md 与 .json）")
     ap.add_argument("-q", "--quiet", action="store_true", help="只写文件不打印报告")
     ap.add_argument("--lang", choices=["zh", "en", "auto"], default="auto")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
@@ -178,6 +179,20 @@ def main():
         except OSError as e:
             print("错误: 无法写入 %s（%s）" % (args.output, e), file=sys.stderr)
             sys.exit(2)
+
+    if getattr(args, "track", None):
+        md, jobj = hxt_core.build_revision_log(applied, removed,
+                                               source=args.file or "(stdin)")
+        base = args.track
+        try:
+            with open(base + ".md", "w", encoding="utf-8") as f:
+                f.write(md + "\n")
+            with open(base + ".json", "w", encoding="utf-8") as f:
+                json.dump(jobj, f, ensure_ascii=False, indent=2)
+        except OSError as e:
+            print("错误: 无法写入修订记录（%s）" % e, file=sys.stderr)
+            sys.exit(2)
+        print("修订记录已写入 %s.md / %s.json" % (base, base), file=sys.stderr)
 
     if not args.quiet:
         report = {

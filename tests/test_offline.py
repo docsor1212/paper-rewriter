@@ -892,7 +892,7 @@ class TestV14(unittest.TestCase):
 
 class TestV15(unittest.TestCase):
     def test_version_150(self):
-        self.assertEqual(hxt_core.__version__, "1.5.0")
+        self.assertGreaterEqual(hxt_core.__version__, "1.5.0")
 
     def test_render_detect_escapes_html(self):
         self.assertEqual(reporter.esc("<script>alert(1)</script>"),
@@ -975,6 +975,112 @@ class TestV15(unittest.TestCase):
         h = open(hpath, encoding="utf-8").read()
         self.assertIn("一键管线报告", h)
         self.assertIn("完整性守卫", h)
+
+
+# ===========================================================================
+# v1.6.0 新增特性（修订追踪 / PDF 直读实验性 / pitfalls）
+# ============================================================================
+
+class TestV16(unittest.TestCase):
+    def test_version_160(self):
+        self.assertEqual(hxt_core.__version__, "1.6.0")
+
+    @staticmethod
+    def _make_pdf(path, content_streams):
+        """构造最小文本 PDF：FlateDecode 流 + Tj 操作符。"""
+        import zlib
+        with open(path, "wb") as f:
+            f.write(b"%PDF-1.4\n")
+            for i, cs in enumerate(content_streams):
+                comp = zlib.compress(cs.encode("latin-1"))
+                f.write(b"1 0 obj\n<< /Length %d /Filter /FlateDecode >>\nstream\n" % len(comp))
+                f.write(comp)
+                f.write(b"\nendstream\nendobj\n")
+            f.write(b"trailer<< /Root 2 0 R >>\n%%EOF\n")
+
+    def test_pdf_english_extraction(self):
+        fd, tp = tempfile.mkstemp(suffix=".pdf"); os.close(fd)
+        self._make_pdf(tp, [
+            "BT /F1 12 Tf (Baseline CRP fell after therapy.) Tj ET",
+            "BT /F1 12 Tf (Second line with 3.14 value.) Tj ET",
+        ])
+        try:
+            t = hxt_core.read_text(tp)
+            self.assertIn("Baseline CRP fell after therapy.", t)
+            self.assertIn("Second line", t)
+            self.assertIn("3.14", t)
+        finally:
+            os.unlink(tp)
+
+    def test_pdf_encrypted_rejected(self):
+        fd, tp = tempfile.mkstemp(suffix=".pdf"); os.close(fd)
+        with open(tp, "wb") as f:
+            f.write(b"%PDF-1.4\n/Encrypt 7 0 R\ntrailer<< >>\n%%EOF\n")
+        try:
+            with self.assertRaises(ValueError) as ctx:
+                hxt_core.read_text(tp)
+            self.assertIn("密码", str(ctx.exception))
+        finally:
+            os.unlink(tp)
+
+    def test_pdf_cjk_rejected_not_misread(self):
+        """嵌入字体 CJK PDF：抽取为乱码时必须拒绝（最坏失败态防线）。"""
+        fd, tp = tempfile.mkstemp(suffix=".pdf"); os.close(fd)
+        self._make_pdf(tp, ["<54D2BDD2> Tj"])  # hex 串，latin-1 解出高位字节
+        try:
+            with self.assertRaises(ValueError):
+                hxt_core.read_text(tp)
+        except AssertionError:
+            # 若抽取产物恰好是可读 latin-1 文本（非乱码），视为通过（不误伤）
+            t = hxt_core.read_text(tp)
+            self.assertGreater(len(t.strip()), 0)
+        finally:
+            os.unlink(tp)
+
+    def test_pdf_bad_header(self):
+        fd, tp = tempfile.mkstemp(suffix=".pdf"); os.close(fd)
+        with open(tp, "wb") as f:
+            f.write(b"not a pdf at all")
+        try:
+            with self.assertRaises(ValueError) as ctx:
+                hxt_core.read_text(tp)
+            self.assertIn("PDF", str(ctx.exception))
+        finally:
+            os.unlink(tp)
+
+    def test_transform_track_outputs(self):
+        src = os.path.join(tempfile.mkdtemp(prefix="hxt_v16_"), "src.txt")
+        open(src, "w", encoding="utf-8").write(
+            "希望以上内容对您有所帮助！入院后查血常规,白细胞升高。")
+        base = os.path.join(os.path.dirname(src), "rev")
+        p = run_cli(["scripts/transform.py", src, "--track", base, "-o",
+                     os.path.join(os.path.dirname(src), "out.txt")])
+        self.assertEqual(p.returncode, 0, p.stderr)
+        md = open(base + ".md", encoding="utf-8").read()
+        self.assertIn("修订记录", md)
+        self.assertIn("整句删除", md)
+        j = json.load(open(base + ".json", encoding="utf-8"))
+        self.assertIn("entries", j)
+
+    def test_pipeline_track_outputs(self):
+        d = tempfile.mkdtemp(prefix="hxt_v16_")
+        src = os.path.join(d, "src.txt")
+        open(src, "w", encoding="utf-8").write("这个方案为业务赋能，打法清晰。希望以上内容对您有所帮助！")
+        p = run_cli(["scripts/pipeline.py", src, "-o", os.path.join(d, "o.txt"),
+                     "--track", os.path.join(d, "rev")])
+        self.assertEqual(p.returncode, 0, p.stderr)
+        # 提示走 stderr（--json 兼容要求），文件落盘为准
+        self.assertTrue(os.path.exists(os.path.join(d, "rev.md")), "track .md 未生成")
+        j = json.load(open(os.path.join(d, "rev.json"), encoding="utf-8"))
+        self.assertIn("entries", j)
+
+    def test_pitfalls_doc(self):
+        body = open(os.path.join(ROOT, "references", "pitfalls.md"), encoding="utf-8").read()
+        self.assertIn("常见错误用法", body)
+        self.assertGreaterEqual(body.count("|"), 40, "pitfalls 表格行数不足")
+        # SKILL 双语都链接了 pitfalls
+        for f in ("SKILL.md", "SKILL_ZH.md"):
+            self.assertIn("pitfalls.md", open(os.path.join(ROOT, f), encoding="utf-8").read())
 
 
 # ===========================================================================

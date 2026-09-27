@@ -51,6 +51,7 @@ def main():
     ap.add_argument("--max-length-change", type=float, default=25.0)
     ap.add_argument("--suggestions", help="输出修订建议工作单（markdown 侧车）到此路径")
     ap.add_argument("--html", help="生成单文件 HTML 报告到此路径")
+    ap.add_argument("--track", help="输出修订记录（.md+.json）到此路径基名")
     ap.add_argument("--batch", help="批量模式：目录内全部 .txt/.md/.docx 逐个「清理+守卫」，汇总 CSV 输出到 stdout/此路径")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
@@ -86,6 +87,12 @@ def main():
                                  "%+d%%" % v["stats"]["length_delta_pct"]))
             except (OSError, ValueError) as e:
                 rows_out.append((fn, "-", "-", "错误", str(e)[:40]))
+        if getattr(args, "html", None):
+            print("[提示] pipeline --batch 暂不生成 --html（可用 detect --batch --html）", file=sys.stderr)
+        if getattr(args, "track", None):
+            print("[提示] pipeline --batch 暂不生成 --track 修订记录", file=sys.stderr)
+        if getattr(args, "suggestions", None):
+            print("[提示] pipeline --batch 暂不生成 --suggestions 工作单", file=sys.stderr)
         writer = _csv.writer(sys.stdout)
         writer.writerow(["file", "before", "after", "integrity", "len_delta"])
         for row in rows_out:
@@ -106,6 +113,7 @@ def main():
         print("错误: 需要 原稿 参数（或使用 --batch 目录模式）", file=sys.stderr)
         sys.exit(2)
     orig = _read(args.file)
+    track_base = getattr(args, "track", None)
     profile = args.profile
     terms = vf.load_terms(args.terms) if args.terms else None
 
@@ -165,6 +173,18 @@ def main():
         "agent_brief": brief,
         "honest_note": "本地启发式风格特征评分，非任何官方检测分数",
     }
+
+    if track_base:
+        md, jobj = hxt_core.build_revision_log(applied, removed, source=args.file)
+        try:
+            with open(track_base + ".md", "w", encoding="utf-8") as f:
+                f.write(md + "\n")
+            with open(track_base + ".json", "w", encoding="utf-8") as f:
+                json.dump(jobj, f, ensure_ascii=False, indent=2)
+        except OSError as e:
+            print("错误: 无法写入修订记录（%s）" % e, file=sys.stderr)
+            sys.exit(2)
+        print("修订记录: " + track_base + ".md/.json", file=sys.stderr)
 
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
