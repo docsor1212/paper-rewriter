@@ -9,12 +9,14 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "1.6.0"
+__version__ = "1.7.0"
 
 import json
 import os
 import re
 import unicodedata
+
+from _sections_block import _SECTION_PATTERNS, _is_heading_line  # noqa: F401
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -22,14 +24,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # 模式加载
 # ---------------------------------------------------------------------------
 
-def read_text(path, max_mb=5.0):
+def read_text(path, max_mb=50.0):
     """共享文本读取（v1.2.0 输入健壮性三重守卫）：大小上限 / 二进制识别 /
     UTF-8 BOM 剥离。错误信息均带处置建议。只读调用方显式指定的路径；
     本工具不访问网络、不读其他位置、不需要任何环境变量。"""
     size = os.path.getsize(path)
     if size > max_mb * 1024 * 1024:
         raise ValueError(
-            "文件 %.1fMB 超过 %.0fMB 上限——请按章节切分后分批处理，报告也会更可读"
+            "文件 %.1fMB 超过 %.0fMB 上限（约为常规论文数十倍体量）——"
+            "扫描路径支持任意大小自动分块，此上限仅为内存保护；确需处理请拆分文件"
             % (size / 1048576.0, max_mb))
     if path.lower().endswith(".docx"):
         return _extract_docx(path)
@@ -326,12 +329,128 @@ def build_revision_log(applied, removed, source=""):
         for e in flag:
             md.append("- [%s] %s" % (e["reason"], e["text"]))
     if not entries:
-        md.append("无修改（原稿通过机械清理层逐字节保留）。")
+        md.append("无修改记录。" + ("（--rewrite 模式：机械清理层未参与，仅守卫复核）"
+                                   if "rewrite" in (source or "") else ""))
     md.append("")
     md.append("口径: 机械清理层仅做语法安全修复；黑话/八股/节奏由 agent 按指南深改，"
               "不在本记录范围内。")
     return "\n".join(md), {"entries": entries, "generated": _dt.datetime.now().isoformat(timespec="seconds")}
 
+
+# 论文章节标题模式（中英双语；行首匹配，标题行 ≤40 字符）
+# 标题行加严（v1.7.0）：行内不得含句末标点/句中冒号带内容——排除
+# 「方法：回顾性分析…」结构式摘要标签行与「Results are shown in Table 1.」
+# 这类以句号结尾的正文句；编号前缀支持「1 引言」「2. Methods」「3.1 数据」。
+def detect_sections(text):
+    """识别学术论文结构（IMRaD 及中文学位论文常见章节）。
+
+    返回 [(section_key, start, end)]；无法识别的部分归入 "body"。
+    标题行判定：模式命中且该行较短（≤40 字符，排除正文句）。
+    口径（v1.7.0）：同名章节只取首现区间；支持编号式标题（1 引言/2. Methods）；
+    """
+    sections = []
+    lines = text.split("\n")
+    offset = 0
+    marks = []
+    for ln in lines:
+        stripped = ln.strip()
+        if not _is_heading_line(stripped):
+            continue
+        for key, rx in _SECTION_PATTERNS:
+            if rx.match(stripped):
+                marks.append((key, offset))
+                break
+        offset += len(ln) + 1
+    if not marks:
+        return [("body", 0, len(text))]
+    seen = {}
+    for key, pos in marks:
+        if key not in seen:
+            seen[key] = pos
+    order = sorted(seen.items(), key=lambda kv: kv[1])
+    result = []
+    if order[0][1] > 0:
+        result.append(("preamble", 0, order[0][1]))
+    for i, (key, pos) in enumerate(order):
+        end = order[i + 1][1] if i + 1 < len(order) else len(text)
+        if end > pos:
+            result.append((key, pos, end))
+    return result
+
+
+def scan_sections(text, lang=None, profile="academic"):
+    """章节感知扫描：分章节独立 scan，按章节性质加权。
+
+    方法/结果段的固定句式是文体常态，特征分降权（方法 ×0.5、结果 ×0.7）；
+    摘要/引言/讨论全权重；参考文献不扫描。"""
+    SECTION_LABEL = {"abstract": "摘要", "introduction": "引言", "methods": "方法",
+                     "results": "结果", "discussion": "讨论", "conclusion": "结论",
+                     "references": "参考文献", "preamble": "题引", "body": "正文"}
+    SECTION_W = {"methods": 0.5, "results": 0.7}
+    secs = detect_sections(text)
+    out_sections = []
+    wsum, ssum = 0.0, 0.0
+    for key, start, end in secs:
+        if key == "references":
+            out_sections.append({"key": key, "label": SECTION_LABEL.get(key, key),
+                                 "score": None, "level": "-", "chars": end - start})
+            continue
+        seg = text[start:end]
+        if not seg.strip():
+            continue
+        w = SECTION_W.get(key, 1.0)
+        r = scan(seg, lang=lang, profile=profile)
+        out_sections.append({"key": key, "label": SECTION_LABEL.get(key, key),
+                             "score": r["score"], "level": r["level"],
+                             "chars": end - start})
+        wsum += w
+        ssum += r["score"] * w
+    overall_score = int(round(ssum / wsum)) if wsum else 0
+    if overall_score >= 75:
+        level = "极高"
+    elif overall_score >= 50:
+        level = "高"
+    elif overall_score >= 28:
+        level = "中"
+    else:
+        level = "低"
+    present = {k for k, _, _ in secs}
+    missing = [k for k in ("abstract", "introduction", "methods", "results", "discussion")
+               if k not in present]
+    return {"overall_score": overall_score, "overall_level": level,
+            "sections": out_sections, "missing_sections": missing}
+
+
+def _num_prefix():
+    return r"(?:\d+(?:[.．、]\d+)*[.．、]?\s*)?"
+
+
+# 论文章节标题模式（中英双语；行首匹配，标题行 ≤40 字符；
+# 支持编号式标题「1 引言 / 2. Methods」；标题行不得含句末/分句标点）
+def _is_heading_line(stripped):
+    if not stripped or len(stripped) > 40:
+        return False
+    if re.search(r"[。．！？!?]", stripped):
+        return False
+    cm = re.match(r"^[^：:]{1,12}[：:](.+)", stripped)
+    if cm and len(cm.group(1).strip()) > 0:
+        return False
+    return True
+
+
+def _num_prefix():
+    return r"(?:\d+(?:[.．、]\d+)*[.．、]?\s*)?"
+
+
+_SECTION_PATTERNS = [
+    ("abstract", re.compile(_num_prefix() + r"^(摘\s*要|abstract)\b[:：]?", re.I)),
+    ("introduction", re.compile(_num_prefix() + r"^(引\s*言|绪\s*论|introduction)\b[:：]?", re.I)),
+    ("methods", re.compile(_num_prefix() + r"^(方\s*法|材料与方法|方法与材料|对象与方法|materials? and methods|patients? and methods|methods?)\b[:：]?", re.I)),
+    ("results", re.compile(_num_prefix() + r"^(结\s*果|results?)\b[:：]?", re.I)),
+    ("discussion", re.compile(_num_prefix() + r"^(讨\s*论|discussion)\b[:：]?", re.I)),
+    ("conclusion", re.compile(_num_prefix() + r"^(结\s*论|conclusions?)\b[:：]?", re.I)),
+    ("references", re.compile(_num_prefix() + r"^(参\s*考\s*文\s*献|references?)\b[:：]?", re.I)),
+]
 
 def _extract_docx(path):
     """docx 纯文本抽取（v1.3.0，纯标准库）：zipfile 读 word/document.xml，

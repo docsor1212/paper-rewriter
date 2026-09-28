@@ -111,13 +111,13 @@ def verify(orig, new, terms=None, max_len_change=25.0, max_cjk_shift=0.12):
 
     miss = _missing(multiset(NUM_RE, orig_s, _num_key), multiset(NUM_RE, new_s, _num_key))
     if miss:
-        violations.append({"check": "numbers",
+        violations.append({"check": "numbers", "code": "E_NUM_LOST",
                            "detail": "数字丢失/被改: %s" % ", ".join(fmt(k) for k in miss[:12]) +
                                      ("…" if len(miss) > 12 else "")})
     # 1b) 新增数字（多重集反方向）：深改时凭空出现的数字=编造风险，立即警示
     added = _missing(multiset(NUM_RE, new_s, _num_key), multiset(NUM_RE, orig_s, _num_key))
     if added:
-        warnings.append({"check": "numbers_added",
+        warnings.append({"check": "numbers_added", "code": "W_NUM_ADDED",
                          "detail": "出现原稿没有的数字: %s——若非原文数据立即删除（防编造）"
                                    % ", ".join(fmt(k) for k in added[:8])})
     # 1c) 数字上下文指纹：多集一致但上下文变化 → 两臂互换/方位错位类静默改写
@@ -125,7 +125,7 @@ def verify(orig, new, terms=None, max_len_change=25.0, max_cjk_shift=0.12):
     ctx_n = multiset(NUM_CTX_RE, new_s, lambda s: re.sub(r"\s+", "", s))
     ctx_miss = _missing(ctx_o, ctx_n)
     if ctx_miss and not miss:
-        warnings.append({"check": "number_context",
+        warnings.append({"check": "number_context", "code": "W_CTX_SWAP",
                          "detail": "数字上下文/顺序变化（如两臂互换）: %s——人工核对方向"
                                    % " | ".join(ctx_miss[:4])})
     # 1d) 比较方向（P < 0.05 改成 P > 0.05 是结论反转，直接红线）
@@ -133,22 +133,22 @@ def verify(orig, new, terms=None, max_len_change=25.0, max_cjk_shift=0.12):
     cmp_n = multiset(CMP_RE, new_s, lambda s: re.sub(r"\s+", "", s))
     cmp_miss = _missing(cmp_o, cmp_n)
     if cmp_miss:
-        violations.append({"check": "comparison",
+        violations.append({"check": "comparison", "code": "E_CMP_FLIP",
                            "detail": "比较方向/比较数字被改: %s" % ", ".join(cmp_miss[:8])})
     # 2) DOI / PMID / 年份
     miss_doi = _missing(multiset(DOI_RE, orig, lambda s: s.lower()), multiset(DOI_RE, new, lambda s: s.lower()))
     if miss_doi:
-        violations.append({"check": "doi", "detail": "DOI 丢失: %s" % ", ".join(miss_doi[:5])})
+        violations.append({"check": "doi", "code": "E_DOI_LOST", "detail": "DOI 丢失: %s" % ", ".join(miss_doi[:5])})
     miss_pm = _missing(multiset(PMID_RE, orig), multiset(PMID_RE, new))
     if miss_pm:
-        violations.append({"check": "pmid", "detail": "PMID 丢失: %s" % ", ".join(miss_pm[:5])})
+        violations.append({"check": "pmid", "code": "E_PMID_LOST", "detail": "PMID 丢失: %s" % ", ".join(miss_pm[:5])})
     miss_y = _missing(multiset(YEAR_RE, orig), multiset(YEAR_RE, new))
     if miss_y:
-        warnings.append({"check": "years", "detail": "年份数量变化: 减少 %s" % ", ".join(miss_y[:8])})
+        warnings.append({"check": "years", "code": "W_YEARS", "detail": "年份数量变化: 减少 %s" % ", ".join(miss_y[:8])})
     # 3) 拉丁缩写
     miss_ab = _missing(multiset(LATIN_ABBR_RE, orig), multiset(LATIN_ABBR_RE, new))
     if miss_ab:
-        violations.append({"check": "latin_abbr",
+        violations.append({"check": "latin_abbr", "code": "E_ABBR_LOST",
                            "detail": "大写缩写丢失（DNA/PCR/MRI 类）: %s" % ", ".join(sorted(set(miss_ab))[:10])})
     # 4) 用户术语表
     if terms:
@@ -160,7 +160,7 @@ def verify(orig, new, terms=None, max_len_change=25.0, max_cjk_shift=0.12):
             if orig.count(t) > new.count(t):
                 miss_t.append("%s(%d→%d)" % (t, orig.count(t), new.count(t)))
         if miss_t:
-            violations.append({"check": "terms", "detail": "术语表缺失/减少: %s" % "; ".join(miss_t[:10])})
+            violations.append({"check": "terms", "code": "E_TERMS_LOST", "detail": "术语表缺失/减少: %s" % "; ".join(miss_t[:10])})
     # 5) CJK 占比漂移（短文本容忍度放宽：年月日这类写法转换会推高占比；
     #    整段被删或被译的漂移远超阈值，长文维持严格线）
     def cjk_ratio(t):
@@ -168,17 +168,17 @@ def verify(orig, new, terms=None, max_len_change=25.0, max_cjk_shift=0.12):
     shift = abs(cjk_ratio(orig) - cjk_ratio(new))
     eff_shift = max_cjk_shift if len(orig) >= 500 else max(max_cjk_shift, 0.25)
     if shift > eff_shift:
-        violations.append({"check": "cjk_ratio",
+        violations.append({"check": "cjk_ratio", "code": "E_CJK_SHIFT",
                            "detail": "中英占比漂移 %.2f > %.2f（可能整段被删或被译）" % (shift, eff_shift)})
     # 6) 长度变化（短文本阈值放宽：删一两句客套话就能占小文本的 30%+；
     #    论文级长文本维持 ±25% 严格线。--max-length-change 可显式覆盖）
     eff_max = max_len_change if len(orig) >= 500 else max(max_len_change, 50.0)
     delta = (len(new) - len(orig)) / max(1, len(orig)) * 100.0
     if abs(delta) > eff_max:
-        violations.append({"check": "length",
+        violations.append({"check": "length", "code": "E_LEN_DRIFT",
                            "detail": "长度变化 %.1f%% 超过警戒线 ±%.0f%%" % (delta, eff_max)})
     elif abs(delta) > eff_max * 0.7:
-        warnings.append({"check": "length", "detail": "长度变化 %.1f%%，接近警戒线" % delta})
+        warnings.append({"check": "length", "code": "E_LEN_DRIFT", "detail": "长度变化 %.1f%%，接近警戒线" % delta})
 
     return {"ok": not violations,
             "violations": violations,

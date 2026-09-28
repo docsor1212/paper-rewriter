@@ -34,7 +34,7 @@ print(r["score"], r["level"], r["categories"].get("zh_jargon", {}).get("count"))
 超大文本分块扫描（>1MB 自动启用；CLI 的 detect/pipeline 对 >1MB 输入自动走本函数）。
 返回结构同 scan，额外带 `"chunked": 块数`；跨块边界的结构信号可能少量漏检（报告标注）。
 
-### hxt_core.read_text(path, max_mb=5.0) → str
+### hxt_core.read_text(path, max_mb=50.0) → str
 
 健壮文本读取：大小上限 / 二进制 NUL 检测 / BOM 剥离 / 乱码占比守卫 / .docx 直读。
 失败抛 `ValueError`（消息含处置建议）或 `OSError`。

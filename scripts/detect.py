@@ -33,6 +33,8 @@ def main():
     ap.add_argument("--suggestions", help="输出修订建议工作单（markdown 侧车）到此路径")
     ap.add_argument("--html", help="生成单文件 HTML 报告到此路径")
     ap.add_argument("--batch", help="批量模式：扫描目录内全部 .txt/.md/.docx，输出汇总 CSV 到此路径（与 --html 可同用）")
+    ap.add_argument("--structure", action="store_true",
+                    help="章节感知：识别论文结构（摘要/引言/方法/结果/讨论），分章节评分（方法/结果自动降权）")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
 
@@ -99,6 +101,32 @@ def main():
     if not text.strip():
         print("错误: 输入为空", file=sys.stderr)
         sys.exit(2)
+
+    if args.structure:
+        rs = hxt_core.scan_sections(text, lang=None if args.lang == "auto" else args.lang,
+                                    profile=args.profile)
+        if args.html:
+            import reporter
+            with open(args.html, "w", encoding="utf-8") as hf:
+                hf.write(reporter.render_sections(rs, source=args.file or "(stdin)"))
+            print("章节报告已写入 %s" % args.html, file=sys.stderr)
+        if args.suggestions:
+            print("[提示] --structure 模式暂不生成 --suggestions 工作单（工作单面向整文诊断）",
+                  file=sys.stderr)
+        if args.json:
+            print(json.dumps(rs, ensure_ascii=False, indent=2))
+            sys.exit(0)
+        print("=" * 62)
+        print("章节感知扫描（论文结构模式）")
+        print("=" * 62)
+        print("综合: %d [%s]" % (rs["overall_score"], rs["overall_level"]))
+        for x in rs["sections"]:
+            sc = ("%d [%s]" % (x["score"], x["level"])) if x["score"] is not None else "不扫描（引用列表）"
+            print("  %-10s %s（%d 字符）" % (x["label"], sc, x["chars"]))
+        if rs["missing_sections"]:
+            print("  ⚠ 未识别到章节: %s（非 IMRaD 结构可忽略）" % "/".join(rs["missing_sections"]))
+        print("口径: 方法/结果段已自动降权（文体常态）；本地启发式，非官方分数")
+        sys.exit(0)
 
     if len(text) > 1_000_000:
         r = hxt_core.scan_chunked(text, lang=None if args.lang == "auto" else args.lang,

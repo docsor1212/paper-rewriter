@@ -983,7 +983,7 @@ class TestV15(unittest.TestCase):
 
 class TestV16(unittest.TestCase):
     def test_version_160(self):
-        self.assertEqual(hxt_core.__version__, "1.6.0")
+        self.assertGreaterEqual(hxt_core.__version__, "1.6.0")
 
     @staticmethod
     def _make_pdf(path, content_streams):
@@ -1081,6 +1081,90 @@ class TestV16(unittest.TestCase):
         # SKILL 双语都链接了 pitfalls
         for f in ("SKILL.md", "SKILL_ZH.md"):
             self.assertIn("pitfalls.md", open(os.path.join(ROOT, f), encoding="utf-8").read())
+
+
+# ===========================================================================
+# v1.7.0 新增特性（章节感知扫描 / 大文件全自动 / 错误码）
+# ============================================================================
+
+class TestV17(unittest.TestCase):
+    def test_version_170(self):
+        self.assertEqual(hxt_core.__version__, "1.7.0")
+
+    IMRAD = ("基于深度学习的影像研究\n\n"
+             "摘 要\n目的：探讨应用价值。\n\n"
+             "引 言\n影像分析是临床支撑。\n\n"
+             "方 法\n纳入 1200 例数据，统一硬件训练，规范执行。\n\n"
+             "结 果\n准确率与指标详见表格。\n\n"
+             "讨 论\n存在局限性，综上所述有意义。\n\n"
+             "参考文献\n[1] 某某. 研究[J]. 杂志, 2023.")
+
+    def test_detect_sections_imrad(self):
+        secs = hxt_core.detect_sections(self.IMRAD)
+        keys = [k for k, _, _ in secs]
+        for k in ("abstract", "introduction", "methods", "results", "discussion", "references"):
+            self.assertIn(k, keys)
+
+    def test_scan_sections_weighting(self):
+        """方法/结果段降权：同样的问题段落，放在方法段对综合分的影响应小于讨论段。"""
+        seg = "综上所述，该方案具有重要意义，为临床提供了新的思路与依据，值得深入推广应用。"
+        paper_m = ("摘 要\n背景。\n\n引 言\n背景。\n\n方 法\n" + seg +
+                   "\n\n结 果\n指标见表。\n\n讨 论\n局限性与意义的示例段落。\n\n参考文献\n[1] x.")
+        paper_d = ("摘 要\n背景。\n\n引 言\n背景。\n\n方 法\n纳入数据并统一流程执行。\n\n"
+                   "结 果\n指标见表。\n\n讨 论\n" + seg + "\n\n参考文献\n[1] x.")
+        rm = hxt_core.scan_sections(paper_m)
+        rd = hxt_core.scan_sections(paper_d)
+        self.assertLessEqual(rm["overall_score"], rd["overall_score"],
+                        "方法段问题未降权: %s vs %s" % (rm["overall_score"], rd["overall_score"]))
+
+    def test_scan_sections_missing_flagged(self):
+        rs = hxt_core.scan_sections("只有一段普通文字，无任何论文结构标记。")
+        self.assertIn("body", [x["key"] for x in rs["sections"]])
+
+    def test_detect_structure_cli(self):
+        fd, tp = tempfile.mkstemp(suffix=".txt"); os.close(fd)
+        with open(tp, "w", encoding="utf-8") as f:
+            f.write(self.IMRAD)
+        try:
+            p = run_cli(["scripts/detect.py", "--structure", tp])
+            self.assertEqual(p.returncode, 0, p.stderr)
+            self.assertIn("章节感知", p.stdout)
+            self.assertIn("方法", p.stdout)
+            pj = run_cli(["scripts/detect.py", "--structure", "--json", tp])
+            d = json.loads(pj.stdout)
+            self.assertIn("overall_score", d)
+            self.assertIn("sections", d)
+        finally:
+            os.unlink(tp)
+
+    def test_detect_structure_html(self):
+        out = os.path.join(tempfile.mkdtemp(prefix="hxt_v17_"), "s.html")
+        fd, tp = tempfile.mkstemp(suffix=".txt"); os.close(fd)
+        with open(tp, "w", encoding="utf-8") as f:
+            f.write(self.IMRAD)
+        try:
+            p = run_cli(["scripts/detect.py", "--structure", "--html", out, tp])
+            self.assertEqual(p.returncode, 0, p.stderr)
+            self.assertIn("章节感知扫描", open(out, encoding="utf-8").read())
+        finally:
+            os.unlink(tp)
+
+    def test_verify_error_codes(self):
+        a = os.path.join(tempfile.mkdtemp(prefix="hxt_v17_"), "a.txt")
+        b = os.path.join(tempfile.mkdtemp(prefix="hxt_v17_"), "b.txt")
+        open(a, "w", encoding="utf-8").write("血沉 62mm/h，P < 0.05。")
+        open(b, "w", encoding="utf-8").write("血沉 58mm/h，P > 0.05。")
+        p = run_cli(["scripts/verify.py", a, b, "--json"])
+        d = json.loads(p.stdout)
+        codes = {v.get("code") for v in d["violations"]}
+        self.assertIn("E_NUM_LOST", codes)
+        self.assertIn("E_CMP_FLIP", codes)
+
+    def test_read_text_50mb_cap_message(self):
+        """上限文案不再指向「章节切分」（已全自动分块）。"""
+        import inspect
+        src = inspect.getsource(hxt_core.read_text)
+        self.assertNotIn("按章节切分", src)
 
 
 # ===========================================================================

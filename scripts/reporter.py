@@ -130,6 +130,32 @@ def render_detect(text, r, source=""):
     return _page("风格自查报告", body)
 
 
+def render_sections(rs, source=""):
+    """章节感知报告：综合+分章节表+缺失章节提示。"""
+    color = _LEVEL_COLOR.get(rs.get("overall_level", ""), "#57606a")
+    body = ("<div class='card'><h1>章节感知扫描（论文结构模式）</h1>"
+            "<p class='meta'>%s</p></div>" % esc(source))
+    body += ("<div class='card'><h2>综合</h2>"
+             "<span class='score' style='color:%s'>%d</span>"
+             "<span class='badge' style='background:%s'>%s</span></div>"
+             % (color, rs["overall_score"], color, esc(rs["overall_level"])))
+    rows = []
+    for x in rs.get("sections", []):
+        sc = ("%d [%s]" % (x["score"], x["level"])) if x.get("score") is not None else "不扫描"
+        rows.append("<tr><td>%s</td><td>%s</td><td>%d</td></tr>"
+                    % (esc(x["label"]), esc(sc), x.get("chars", 0)))
+    body += ("<div class='card'><h2>分章节</h2><table>"
+             "<tr><th>章节</th><th>特征分</th><th>字符</th></tr>%s</table></div>"
+             % "".join(rows))
+    if rs.get("missing_sections"):
+        body += ("<div class='card'><span class='warn'>⚠ 未识别到章节: %s"
+                 "（非 IMRaD 结构可忽略）</span></div>" % esc("/".join(rs["missing_sections"])))
+    body += ("<div class='card'>方法/结果段已自动降权（文体常态）；"
+             "本地启发式，非官方分数。</div>")
+    body += _FOOT.format(ts=_now())
+    return _page("章节感知扫描", body)
+
+
 def render_pipeline(orig, new, ro, rn, verify_result, brief, chunked=None):
     """pipeline 报告：前后对比+完整性+工作单。"""
     body = ("<div class='card'><h1>一键管线报告</h1>"

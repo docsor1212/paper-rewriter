@@ -94,7 +94,8 @@ If a revision requires changing a number, the revision is wrong.
 
 ## 5. Do not
 
-- **Do not invent specificity.** The claims in this manual's worked example
+- **Do not invent specificity.** (Alternative: draw specificity only from facts
+  already in the source — quote the original data, hedges and limitations.) The claims in this manual's worked example
   demonstrate format only. In a real revision, specificity must come from facts
   **already in the source text** — adding a number, proportion, or conclusion to
   make prose look concrete is fabrication. verify.py warns on numbers absent from

@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 1.6.0
+version: 1.7.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: AI flavor scan and style-pattern
   self-check reports (scan reports are detection only), deterministic text cleanup
@@ -72,6 +72,13 @@ tables, revision worksheet, integrity verdict; compare adds sentence-level
 add/delete diff). Scan a whole directory with `--batch dir` (detect: per-file
 score summary; pipeline: per-file cleanup+integrity CSV).
 
+**Structure-aware scanning** (`detect --structure`, v1.7.0): detects paper
+sections (abstract/introduction/methods/results/discussion/conclusion/
+references, bilingual) and scores each separately. Methods/results weights
+normalize the aggregate only — raw per-section scores are always reported in
+full; the fixed phrasing of a Methods section is genre convention, not a
+machine signal. Missing-section hints included.
+
 Preparing the term list: `python scripts/extract_terms.py draft.txt -o terms.txt`
 auto-extracts candidates (abbreviations, quoted terms) into a draft you confirm
 by hand. Input formats: `.txt`/`.md` directly, **`.docx` (Word) directly** since
@@ -110,8 +117,8 @@ unencrypted) are extracted with the standard library only. PDFs with embedded
 font encodings (ToUnicode CMaps, typical for CJK) are rejected when detected —
 detection is best-effort: if one slips through, the output may be garbled, so
 **review extracted PDF text before relying on it**. When in doubt, export to
-UTF-8 text. Chunk threshold for oversized files: 800,000 characters per chunk
-(5MB file cap).
+UTF-8 text. Chunk threshold: 800,000 characters per chunk; file-size guard 50MB (scans
+auto-chunk at any size within the cap; the integrity guard is whole-document).
 
 ### Agent invocation protocol
 
@@ -180,7 +187,7 @@ When invoked, decide the path first, then run it:
 For reviewers, security scanners and cautious users:
 
 - Reads **only** the file paths you pass as arguments (plus stdin, including the
-  `.txt`/`.md`/`.docx`/`.pdf` files inside a `--batch` directory) and its own
+  `.txt`/`.md`/`.docx` files inside a `--batch` directory) and its own
   bundled wordlist files (`scripts/patterns_*.json`). Verify it yourself:
 
   ```bash
