@@ -33,7 +33,7 @@ YEAR_RE = re.compile(r"\b(19|20)\d{2}\b")
 NUM_RE = re.compile(r"(?<!\d)-?\d+(?:\.\d+)?%?")  # 负号仅在前面不是数字时成立（2024-01-15 是日期不是减法）
 CMP_RE = re.compile(r"[<>≤≥]\s*-?\d+(?:\.\d+)?%?")
 NUM_CTX_RE = re.compile(r"-?\d+(?:\.\d+)?%?[^，。；;（）()]{0,20}")
-LATIN_ABBR_RE = re.compile(r"\b[A-Z]{2,8}\b")
+LATIN_ABBR_RE = re.compile(r"(?<![A-Za-z])([A-Z][A-Za-z0-9]*[A-Z][A-Za-z0-9]*)(?![a-z])")
 CJK_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
 
 

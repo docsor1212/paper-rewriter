@@ -14,7 +14,7 @@ def _is_heading_line(stripped):
 
 
 def _num_prefix():
-    return r"^(?:\d+(?:[.．、]\d+)*[.．、]?\s*)?"
+    return r"^#{0,3}\s*(?:\d+(?:[.．、]\d+)*[.．、]?\s*)?"
 
 
 _SECTION_PATTERNS = [

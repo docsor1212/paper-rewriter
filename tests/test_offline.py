@@ -1168,6 +1168,58 @@ class TestV17(unittest.TestCase):
 
 
 # ===========================================================================
+# v1.9.0 新增特性（术语一致性检查器 / extract_terms 去噪）
+# ============================================================================
+
+class TestV19(unittest.TestCase):
+    def test_version_190(self):
+        self.assertEqual(hxt_core.__version__, "2.0.0")
+
+    def test_check_terms_zh_pairs(self):
+        from check_terms import find_inconsistencies
+        t = "患者张某主诉头痛。病人同意参与研究。患者既往体健。病人知情同意。"
+        r = find_inconsistencies(t, [("患者", "病人")])
+        self.assertEqual(len(r), 1)
+        self.assertEqual(r[0]["a_count"], 2)
+        self.assertEqual(r[0]["b_count"], 2)
+
+    def test_check_terms_no_inconsistency(self):
+        from check_terms import find_inconsistencies
+        t = "患者张某主诉头痛。患者同意参与研究。"
+        r = find_inconsistencies(t, [("患者", "病人")])
+        self.assertEqual(len(r), 0)
+
+    def test_check_terms_user_pairs(self):
+        from check_terms import find_inconsistencies
+        t = "The study used a unique identifier for each participant. The ID was stored securely."
+        r = find_inconsistencies(t, [("identifier", "ID")])
+        self.assertEqual(len(r), 1)
+
+    def test_check_terms_cli(self):
+        import subprocess, tempfile, os
+        d = tempfile.mkdtemp(prefix="hxt_v19_")
+        src = os.path.join(d, "doc.txt")
+        open(src, "w", encoding="utf-8").write("患者主诉头痛。病人知情同意。")
+        p = run_cli(["scripts/check_terms.py", src, "--json"])
+        self.assertEqual(p.returncode, 0, p.stderr)
+        d2 = json.loads(p.stdout)
+        self.assertIn("inconsistencies", d2)
+
+    def test_extract_terms_denoise(self):
+        """extract_terms 自动去噪：剔除单字符/纯数字/子串重复。"""
+        from extract_terms import extract
+        t = ("The IL-6 and IL-10 levels were measured. PCR confirmed the diagnosis. "
+             "PCR was repeated. The IL-6 receptor was studied. The model uses a "
+             "transformer architecture with 12 layers and 768 hidden dimensions.")
+        r = extract(t, min_count=2)
+        terms = [w for w, n, k in r]
+        self.assertIn("IL-6", terms)
+        self.assertIn("PCR", terms)
+        self.assertNotIn("IL", [t for t in terms if t == "IL"], "子串 IL 不应单独出现")
+        self.assertNotIn("6", terms)
+
+
+# ===========================================================================
 # 文档与发布自检（frontmatter 纪律）
 # ============================================================================
 

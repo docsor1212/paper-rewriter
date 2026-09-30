@@ -54,11 +54,12 @@ def main():
                 if not t.strip():
                     rows_out.append((fn, -1, "空文件", False, "-"))
                     continue
+                _ext = os.path.splitext(fn)[1].lower()
                 rr = (hxt_core.scan_chunked(t, lang=None if args.lang == "auto" else args.lang,
-                                            profile=args.profile)
+                                            profile=args.profile, source_ext=_ext)
                       if len(t) > 1_000_000 else
                       hxt_core.scan(t, lang=None if args.lang == "auto" else args.lang,
-                                    profile=args.profile))
+                                    profile=args.profile, source_ext=_ext))
                 rows_out.append((fn, rr["score"], rr["level"], rr["critical_hit"], rr["lang"]))
             except (OSError, ValueError) as e:
                 rows_out.append((fn, -1, "错误: %s" % str(e)[:40], False, "-"))
@@ -104,8 +105,15 @@ def main():
         sys.exit(2)
 
     if args.structure:
-        rs = hxt_core.scan_sections(text, lang=None if args.lang == "auto" else args.lang,
-                                    profile=args.profile)
+        _ext = os.path.splitext(args.file or "")[1].lower()
+        _stext = text
+        if _ext == ".md":
+            # markdown 输入：剥掉 # / ## / ** 语法标记后再做章节识别
+            import re as _re
+            _stext = _re.sub(r"^#{1,6}\s+", "", text, flags=_re.M)
+            _stext = _re.sub(r"\*\*([^*\n]+)\*\*", r"\1", _stext)
+        rs = hxt_core.scan_sections(_stext, lang=None if args.lang == "auto" else args.lang,
+                                    profile=args.profile, source_ext=_ext)
         if args.html:
             import reporter
             with open(args.html, "w", encoding="utf-8") as hf:
@@ -131,9 +139,10 @@ def main():
 
     if len(text) > 1_000_000:
         r = hxt_core.scan_chunked(text, lang=None if args.lang == "auto" else args.lang,
-                                  profile=args.profile)
+                                  profile=args.profile,
+                                  source_ext=os.path.splitext(args.file or "")[1].lower())
     else:
-        r = hxt_core.scan(text, lang=None if args.lang == "auto" else args.lang,
+        r = hxt_core.scan(text, source_ext=os.path.splitext(args.file or "")[1].lower(), lang=None if args.lang == "auto" else args.lang,
                           profile=args.profile)
 
     if args.suggestions:

@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "1.8.0"
+__version__ = "2.0.0"
 
 import json
 import os
@@ -92,7 +92,7 @@ def chunk_text(text, max_chars=800_000):
     return blocks
 
 
-def scan_chunked(text, lang=None, profile="academic"):
+def scan_chunked(text, lang=None, profile="academic", source_ext=""):
     """分块扫描：各块独立 scan，类别计数合并、样本去重合并。
 
     返回结构同 scan()；score 按合并后的总命中/总单元重算（权重逐类加权平均），
@@ -392,7 +392,7 @@ def detect_sections(text):
     return result
 
 
-def scan_sections(text, lang=None, profile="academic"):
+def scan_sections(text, lang=None, profile="academic", source_ext=""):
     """章节感知扫描：分章节独立 scan，按章节性质加权。
 
     方法/结果段的固定句式是文体常态，特征分降权（方法 ×0.5、结果 ×0.7）；
@@ -655,7 +655,7 @@ _EN_CONNECTORS = ["however", "moreover", "furthermore", "additionally", "in addi
                   "in conclusion", "firstly", "secondly", "finally", "meanwhile"]
 
 
-def scan(text, lang=None, profile="academic"):
+def scan(text, lang=None, profile="academic", source_ext=""):
     """全量扫描。返回结构化 dict：
     {
       lang, score, level, critical_hit, units, sentences,
@@ -743,6 +743,9 @@ def scan(text, lang=None, profile="academic"):
         if not pats:
             continue
         for item in pats.get("regex_signals", []):
+            # .md 输入：原生 markdown 语法是合法标记，跳过 markdown 残留类
+            if item.get("cat") == "markdown" and source_ext == ".md":
+                continue
             n = len(item["_re"].findall(text))
             if n:
                 w0 = float(item.get("weight", 0.6))

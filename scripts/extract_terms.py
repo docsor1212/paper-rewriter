@@ -36,6 +36,16 @@ def extract(orig, min_count=2, cap=40):
     """返回 [(term, count, kind)]，按频次降序。kind: abbr/quoted/title。"""
     cands = Counter()
     kinds = {}
+    # 缩写+数字/连字符组合术语（IL-6/CD4/BRCA1/H1N1 等完整医学缩写）
+    for m in re.finditer(r"(?<![A-Za-z])\b([A-Z]{1,6}[-]?[0-9]{1,4}[A-Za-z]{0,3})\b(?![0-9])", orig):
+        w = m.group(1)
+        if w in _EN_STOP or len(w) < 2:
+            continue
+        # 排除纯数字/年份
+        if re.match(r"^\d+$", w):
+            continue
+        cands[w] += 1
+        kinds.setdefault(w, "abbr")
     # 连续大写缩写：允许内嵌数字（BRCA1/TP53/H1N1），但整体不得与连字符/数字
     # 相邻（防 PD-L1→PD、IL-6→IL 截断形进候选）
     for m in re.finditer(r"(?<![A-Za-z0-9\-])([A-Z][A-Z0-9]{1,7})(?![A-Za-z0-9\-])", orig):
@@ -57,6 +67,22 @@ def extract(orig, min_count=2, cap=40):
         cands[w] += 1
         kinds.setdefault(w, "title")
     rows = [(w, n, kinds[w]) for w, n in cands.most_common() if n >= min_count]
+    # 自动去噪（v1.9.0）：剔除单字符/纯数字/已被更长候选包含的子串
+    seen_set = set()
+    denoised = []
+    for w, n, k in sorted(rows, key=lambda x: (-len(x[0]), -x[1])):
+        if len(w) <= 1 or w.isdigit():
+            continue
+        # 含连字符或数字的术语（IL-6/BRCA1）是完整术语，不做子串剔除
+        if re.search(r"[-0-9]", w):
+            denoised.append((w, n, k))
+            seen_set.add(w)
+            continue
+        if any(w in longer for longer in seen_set):
+            continue
+        seen_set.add(w)
+        denoised.append((w, n, k))
+    rows = denoised[:cap]
     return rows[:cap]
 
 
