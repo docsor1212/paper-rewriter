@@ -52,6 +52,7 @@ def main():
     ap.add_argument("--suggestions", help="输出修订建议工作单（markdown 侧车）到此路径")
     ap.add_argument("--html", help="生成单文件 HTML 报告到此路径")
     ap.add_argument("--track", help="输出修订记录（.md+.json）到此路径基名")
+    ap.add_argument("--review", help="生成结构化审稿报告（markdown）到此路径")
     ap.add_argument("--batch", help="批量模式：目录内全部 .txt/.md/.docx 逐个「清理+守卫」，汇总 CSV 输出到 stdout/此路径")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)

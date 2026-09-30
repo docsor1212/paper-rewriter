@@ -9,11 +9,12 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "1.7.0"
+__version__ = "1.8.0"
 
 import json
 import os
 import re
+import time
 import unicodedata
 
 from _sections_block import _SECTION_PATTERNS, _is_heading_line  # noqa: F401
@@ -24,10 +25,23 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # 模式加载
 # ---------------------------------------------------------------------------
 
-def read_text(path, max_mb=50.0):
-    """共享文本读取（v1.2.0 输入健壮性三重守卫）：大小上限 / 二进制识别 /
-    UTF-8 BOM 剥离。错误信息均带处置建议。只读调用方显式指定的路径；
-    本工具不访问网络、不读其他位置、不需要任何环境变量。"""
+def read_text(path, max_mb=50.0, retries=2):
+    """共享文本读取（v1.8.0 加重试）：三重守卫 + 重试退避。
+
+    只读调用方显式指定的路径；本工具不访问网络、不读其他位置。
+    """
+    last_err = None
+    for attempt in range(1 + max(0, retries)):
+        try:
+            return _read_text_impl(path, max_mb)
+        except OSError as e:
+            last_err = e
+            if attempt < retries:
+                time.sleep(0.1 * (attempt + 1))
+    raise last_err
+
+
+def _read_text_impl(path, max_mb):
     size = os.path.getsize(path)
     if size > max_mb * 1024 * 1024:
         raise ValueError(
@@ -855,3 +869,9 @@ def _score(pts, stats, units, cats, lang):
     if units < 15 and not critical:
         stats["notes"].append("文本过短（<15 单元），评分仅供参考")
     return score, level, critical
+
+
+def build_review_md(text, scan_result, verify_result=None, source=""):
+    """转发到 reporter.build_review_md（审稿报告 markdown 生成器）。"""
+    from reporter import build_review_md as _gen
+    return _gen(text, scan_result, verify_result, source)

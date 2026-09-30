@@ -213,3 +213,91 @@ def render_compare(orig, new, ro, rn, verify_result):
              "</table></div>" % (len(rows), sum(1 for t, _, _ in rows if t != "equal"), "".join(trs)))
     body += _FOOT.format(ts=_now())
     return _page("改写前后对照", body)
+
+
+# ---------------------------------------------------------------------------
+# v1.8.0 审稿报告（markdown 交付文档）
+# ---------------------------------------------------------------------------
+
+def build_review_md(text, scan_result, verify_result=None, source=""):
+    """审稿报告（markdown 交付文档）：模仿人类编辑审稿格式。
+
+    总评 → 分层修改建议（确定性/建议性/风格优化）→ 逐句引用 →
+    修订流程 → 合规提示。报告可直接交付给作者或导师。
+    """
+    import datetime as _dt
+    r = scan_result
+    score, level = r["score"], r["level"]
+    cats = r.get("categories", {})
+    now = _dt.datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    lines = ["# 审稿报告：%s" % (source or "未命名文稿"), ""]
+    lines.append("> 本报告由 paper-rewriter 自动生成（%s）。" % now)
+    lines.append("> 本地启发式风格诊断，非任何官方 AI 检测分数；不代写原文。")
+    lines.append("")
+
+    # 总评（定性段落）
+    lines.append("## 总评")
+    lines.append("")
+    if level == "极高":
+        lines.append("文本存在大量模板化行文和/或模型残留痕迹（风格特征分 %d/100，"
+                     "严重度：极高）。建议优先清理硬残留，再逐段深改。" % score)
+    elif level == "高":
+        lines.append("文本风格特征密度较高（%d/100，严重度：高），主要问题集中在"
+                     "模板化句式和 AI 高频词。建议按修订建议逐段深改。" % score)
+    elif level == "中":
+        lines.append("文本风格特征密度中等（%d/100），有改进空间但非紧急。" % score)
+    else:
+        lines.append("文本未检出明显模板化行文（%d/100）。" % score)
+    lines.append("")
+
+    # 分层修改建议
+    lines.append("## 修改建议（按优先级）")
+    lines.append("")
+    tier1, tier2, tier3 = [], [], []
+    for cid, c in sorted(cats.items(), key=lambda kv: -kv[1]["count"] * kv[1]["weight"]):
+        label, count = c["label"], c["count"]
+        for smp in c.get("samples", [])[:3]:
+            if c.get("auto_fixable"):
+                tier1.append({"label": label, "sample": smp, "count": count,
+                              "action": "transform.py 可自动修复"})
+            else:
+                tier2.append({"label": label, "sample": smp, "count": count,
+                              "action": "按 style_guide 深改"})
+    if tier1:
+        lines.append("### 优先级 1：确定性修复（transform.py 自动处理）")
+        lines.append("")
+        for e in tier1:
+            lines.append("- [%s] %s（×%d）" % (e["label"], e["sample"], e["count"]))
+        lines.append("")
+    if tier2:
+        lines.append("### 优先级 2：建议性深改")
+        lines.append("")
+        for e in tier2:
+            lines.append("- [%s] %s（×%d）→ 按 style_guide 对应条目处理" % (e["label"], e["sample"], e["count"]))
+        lines.append("")
+
+    # 完整性
+    if verify_result:
+        v = verify_result
+        verdict = "PASS" if v.get("ok") else "FAIL"
+        lines.append("## 完整性守卫：%s" % verdict)
+        lines.append("")
+        for x in v.get("violations", []):
+            lines.append("- ✗ [%s] %s" % (x.get("code", x["check"]), x["detail"]))
+        for x in v.get("warnings", []):
+            lines.append("- ⚠ [%s] %s" % (x.get("code", x["check"]), x["detail"]))
+        if not v.get("violations") and not v.get("warnings"):
+            lines.append("数字/引用/术语完整性：全部保全。")
+        lines.append("")
+
+    # 合规
+    lines.append("## 合规提醒")
+    lines.append("")
+    lines.append("- 本报告为本地启发式风格诊断，非任何官方 AI 检测分数。")
+    lines.append("- 如目标期刊/学校要求披露 AI 使用，披露义务在作者本人。")
+    lines.append("- 深度改写请配合 style_guide 执行，改后务必 verify.py 守卫完整性。")
+    lines.append("")
+    lines.append("---")
+    lines.append("*审稿报告由 paper-rewriter 自动生成 · 仅供写作质量参考 · 不构成任何检测结论*")
+    return "\n".join(lines)

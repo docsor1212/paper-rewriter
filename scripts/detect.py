@@ -33,6 +33,7 @@ def main():
     ap.add_argument("--suggestions", help="输出修订建议工作单（markdown 侧车）到此路径")
     ap.add_argument("--html", help="生成单文件 HTML 报告到此路径")
     ap.add_argument("--batch", help="批量模式：扫描目录内全部 .txt/.md/.docx，输出汇总 CSV 到此路径（与 --html 可同用）")
+    ap.add_argument("--review", help="生成结构化审稿报告（markdown）到此路径")
     ap.add_argument("--structure", action="store_true",
                     help="章节感知：识别论文结构（摘要/引言/方法/结果/讨论），分章节评分（方法/结果自动降权）")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
@@ -152,6 +153,17 @@ def main():
         with open(args.html, "w", encoding="utf-8") as hf:
             hf.write(reporter.render_detect(text, r, source=args.file or "(stdin)"))
         print("HTML 报告已写入 %s" % args.html, file=sys.stderr)
+
+    if getattr(args, "review", None):
+        import reporter
+        md = reporter.build_review_md(text, r, source=args.file or "(stdin)")
+        try:
+            with open(args.review, "w", encoding="utf-8") as rf:
+                rf.write(md + "\n")
+            print("审稿报告已写入 %s" % args.review, file=sys.stderr)
+        except OSError as e:
+            print("错误: 无法写入审稿报告（%s）" % e, file=sys.stderr)
+            sys.exit(2)
 
     if args.score:
         print("%d/%s" % (r["score"], r["level"]))

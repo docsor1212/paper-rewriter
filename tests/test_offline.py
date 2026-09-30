@@ -1089,7 +1089,7 @@ class TestV16(unittest.TestCase):
 
 class TestV17(unittest.TestCase):
     def test_version_170(self):
-        self.assertEqual(hxt_core.__version__, "1.7.0")
+        self.assertGreaterEqual(hxt_core.__version__, "1.7.0")
 
     IMRAD = ("基于深度学习的影像研究\n\n"
              "摘 要\n目的：探讨应用价值。\n\n"

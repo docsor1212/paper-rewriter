@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 1.7.0
+version: 1.9.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: AI flavor scan and style-pattern
   self-check reports (scan reports are detection only), deterministic text cleanup
@@ -13,7 +13,7 @@ description: >
   rules) and academic-integrity guardrails: this tool improves writing quality for
   self-review; it does not help misrepresent authorship, conceal required AI
   disclosure, or defeat integrity review. 100% local, zero upload, Python stdlib
-  only. Family: paper-polisher-pro (broad polishing), pubmed-verifier, cite-holmes,
+  only. Related: paper-polisher-pro (broad polishing), pubmed-verifier, cite-holmes,
   academic-figures, cn-med-oa, doc-holmes.
 allowed-tools:
   - Read
@@ -214,13 +214,10 @@ For reviewers, security scanners and cautious users:
   test corpora in the development repo's `tests/` (not shipped in the package)
   document the intended separation.
 
-## Related skills (Paper Toolbox family)
+## Related tools
 
-- **paper-polisher-pro** — comprehensive polishing: terminology, translationese,
-  metaphor audit, AIGC-label check, journal precheck (safe to use together)
-- **pubmed-verifier** — verify PMID/DOI references before submission
-- **cite-holmes** — deep research with hallucination-free citations
-- **academic-figures** — publication-ready scientific figures in one command
-- **cn-med-oa** — free Chinese medical literature OA download & metadata
-- **doc-holmes** — layout-preserving PDF translation
-- Medical knowledge base: docsor.cn
+- pubmed-verifier — verify PMID/DOI references before submission
+- cite-holmes — deep research with hallucination-free citations
+- paper-polisher-pro — comprehensive polishing & plagiarism reduction
+- academic-figures — publication-ready scientific figures
+- doc-holmes — layout-preserving PDF translation
