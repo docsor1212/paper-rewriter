@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "2.0.0"
+__version__ = "2.1.1"
 
 import json
 import os
@@ -444,9 +444,14 @@ def _num_prefix():
 def _is_heading_line(stripped):
     if not stripped or len(stripped) > 40:
         return False
-    if re.search(r"[。．！？!?]", stripped):
+    # 剥离 markdown 语法（# 前缀、** 加粗包裹）后再判定
+    stripped2 = re.sub(r"^#{1,6}\s*", "", stripped)
+    stripped2 = re.sub(r"\*\*([^*\n]+)\*\*", r"\1", stripped2)
+    if not stripped2 or len(stripped2) > 40:
         return False
-    cm = re.match(r"^[^：:]{1,12}[：:](.+)", stripped)
+    if re.search(r"[。．！？!?]", stripped2):
+        return False
+    cm = re.match(r"^[^：:]{1,12}[：:](.+)", stripped2)
     if cm and len(cm.group(1).strip()) > 0:
         return False
     return True

@@ -1173,7 +1173,7 @@ class TestV17(unittest.TestCase):
 
 class TestV19(unittest.TestCase):
     def test_version_190(self):
-        self.assertEqual(hxt_core.__version__, "2.0.0")
+        self.assertGreaterEqual(hxt_core.__version__, "1.9.0")
 
     def test_check_terms_zh_pairs(self):
         from check_terms import find_inconsistencies

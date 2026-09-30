@@ -30,8 +30,8 @@ def _read(path):
         sys.exit(2)
 
 
-def _score(text):
-    return hxt_core.scan(text)
+def _score(text, ext=""):
+    return hxt_core.scan(text, source_ext=ext)
 
 
 def main():
@@ -44,6 +44,7 @@ def main():
     ap.add_argument("--profile", choices=["academic", "general"], default="academic",
                     help="academic=论文口径（默认）；general=非学术文本")
     ap.add_argument("--html", help="生成单文件 HTML 对照报告（含逐句 diff）到此路径")
+    ap.add_argument("--batch", help="批量模式：扫描目录内全部 .txt/.md/.docx 逐对对比（orig 改稿由 --suffix 推导）")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
@@ -69,8 +70,10 @@ def main():
                 sys.exit(2)
         mode = "机械清洗（%d 类修复；深度改写请 agent 按 references 指南执行后重跑本命令）" % len(applied)
 
-    ro = hxt_core.scan(orig, profile=args.profile)
-    rn = hxt_core.scan(new, profile=args.profile)
+    ext_orig = os.path.splitext(args.orig or "")[1].lower()
+    ext_new = os.path.splitext(args.new or "")[1].lower() if args.new else ext_orig
+    ro = hxt_core.scan(orig, profile=args.profile, source_ext=ext_orig)
+    rn = hxt_core.scan(new, profile=args.profile, source_ext=ext_new)
     vr = vf.verify(orig, new,
                    vf.load_terms(args.terms) if args.terms else None)
 
