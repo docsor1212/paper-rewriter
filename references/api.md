@@ -68,3 +68,17 @@ max_cjk_shift=0.12) -> {"ok": bool, "violations": [...], "warnings": [...], "sta
 | `verify.load_terms(path)` | 术语表加载（BOM/守卫内建） |
 
 所有函数零网络、零环境变量、只读写调用方显式传入的路径。
+
+## plan / learn_guards（v2.2.0 新增）
+
+| 函数/入口 | 说明 |
+|---|---|
+| `hxt_core._chunk_spans(text, max_chars=800_000, overlap=2000)` | 分块切点（含重叠窗起点），scan_chunked 缝合的底层 |
+| `hxt_core.scan_chunked(text, ..., max_chars, overlap)` | 分块扫描（重叠缝合口径）；小分块参数便于测试 |
+| `hxt_core.clear_pattern_cache()` | 清词表缓存（learn_guards 写守卫后同进程生效用） |
+| `hxt_core._load_user_guards()` | 读 `scripts/user_guards.json`（损坏降级为空并 stderr 提示） |
+| `plan.py <file> --json / -o plan.md --top N` | 句级改写优先级计划：P0 队列+章节归属+线性预算投影 |
+| `learn_guards.py add/from-text/list/remove/test` | 误报→守卫固化；语义同内置 term_guards（±30 字符窗口豁免） |
+
+plan 的逐句贡献与投影均为近似口径（同类同权线性近似）；learn_guards 只写
+`scripts/user_guards.json` 一个文件，原子替换（tmp+rename）。

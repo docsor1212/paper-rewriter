@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 1.9.0
+version: 2.2.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: AI flavor scan and style-pattern
   self-check reports (scan reports are detection only), deterministic text cleanup
@@ -28,6 +28,22 @@ allowed-tools:
 Bilingual (CN/EN) style naturalization for academic & medical writing: find stiff,
 templated or machine-flavored patterns, clean mechanical debris, revise for clarity
 and natural register — with integrity guardrails on every step.
+
+## Feature status (v2.2.0)
+
+| Feature | Status | Since |
+|---|---|---|
+| detect / transform / verify / compare / pipeline | Stable | v1.0 |
+| Section-aware scanning (`--structure`) | Stable | v1.7 |
+| `.docx` direct input; 50MB file guard; read retry | Stable | v1.3–1.8 |
+| Sentence-level rewrite plan (`plan.py`) | Stable | v2.2 |
+| User-learned term guards (`learn_guards.py`) | Stable | v2.2 |
+| HTML reports, `--batch`, `--track` audit trail | Stable | v1.5–1.6 |
+| PDF text extraction (English text-type only) | **Experimental** | v1.6 |
+
+Anything marked **Experimental** can reject valid files or need manual review of
+its output — export to UTF-8 text when in doubt. Everything else is
+regression-tested offline on every release.
 
 ## Integrity guardrails — read first
 
@@ -77,7 +93,15 @@ sections (abstract/introduction/methods/results/discussion/conclusion/
 references, bilingual) and scores each separately. Methods/results weights
 normalize the aggregate only — raw per-section scores are always reported in
 full; the fixed phrasing of a Methods section is genre convention, not a
-machine signal. Missing-section hints included.
+machine signal. Missing-section hints included. Markdown headings are
+recognized since v2.2.0 (`## 摘要`, `**方法**`, numbered `2. Methods`).
+
+**Sentence-level rewrite plan** (`plan.py`, v2.2.0): ranks sentences by their
+weighted pattern contribution and produces a P0 rewrite queue with section
+attribution, per-sentence category hits, handling advice and a linear budget
+projection (fix the top-K offenders → projected score). `--json` for agent
+consumption. The projection is a local approximation for prioritization — not a
+promise, and not any external detector's score.
 
 Preparing the term list: `python scripts/extract_terms.py draft.txt -o terms.txt`
 auto-extracts candidates (abbreviations, quoted terms) into a draft you confirm
@@ -117,7 +141,10 @@ unencrypted) are extracted with the standard library only. PDFs with embedded
 font encodings (ToUnicode CMaps, typical for CJK) are rejected when detected —
 detection is best-effort: if one slips through, the output may be garbled, so
 **review extracted PDF text before relying on it**. When in doubt, export to
-UTF-8 text. Chunk threshold: 800,000 characters per chunk; file-size guard 50MB (scans
+UTF-8 text. Chunk threshold: 800,000 characters per chunk — since v2.2.0
+adjacent chunks share a 2,000-character overlap window, so patterns spanning a
+chunk boundary are captured and double-counts are reconciled (v2.1.x and
+earlier could miss boundary-spanning signals). File-size guard 50MB (scans
 auto-chunk at any size within the cap; the integrity guard is whole-document).
 
 ### Agent invocation protocol
@@ -126,6 +153,17 @@ When invoked, decide the path first, then run it:
 
 - **Trigger words**: 写作风格自查 / 论文改写润色 / 去模板腔 / 翻译腔清理 / style self-check,
   naturalize academic writing, de-templating → run the pipeline above.
+- **Disambiguation (this tool vs a polisher)**: 「论文改写润色」 here means
+  style naturalization / de-templating (removing the machine flavor from
+  academic prose). If the user only wants
+  language polish — grammar, wording, fluency, journal-style phrasing — that is
+  a polishing tool's job (e.g. paper-polisher-pro), not this toolkit; route
+  accordingly instead of running a style pipeline on a polish request.
+- **User wants to know what to fix first** → `plan.py draft.txt -o plan.md`
+  (P0 sentence queue + budget projection) before deep revision.
+- **A scan flags a legitimate term** (false positive) → don't edit the pattern
+  files; persist a guard instead: `learn_guards.py from-text 术语 样本.txt`
+  (or `add`) — the guard survives upgrades and applies to every later scan.
 - **User only wants a verdict on an existing rewrite** → `pipeline.py draft.txt
   --rewrite rewritten.txt --terms terms.txt` (skip cleanup).
 - **User asks to conceal AI use, misrepresent authorship, or defeat integrity
@@ -149,7 +187,10 @@ When invoked, decide the path first, then run it:
    list of filler phrases; CN halfwidth punctuation is normalized to fullwidth
    (decimals protected). `-a` adds em-dash reduction and empty-opener removal.
    Clean human-written text passes through byte-identical.
-3. **Quality revision** (the real work): read the guide for the text's language —
+3. **Quality revision** (the real work): optionally rank the work first —
+   `python scripts/plan.py draft.txt -o plan.md` gives a sentence-level P0
+   queue (worst offenders with section, category and advice) so deep effort
+   lands where the score lives. Then read the guide for the text's language —
    - CN: `references/style_guide_zh.md` — structural de-templating → jargon
      cleanup → rhythm → concreteness → stance → integrity red lines
    - EN: `references/style_guide_en.md` — smaller words → fewer significance
@@ -188,19 +229,27 @@ For reviewers, security scanners and cautious users:
 
 - Reads **only** the file paths you pass as arguments (plus stdin, including the
   `.txt`/`.md`/`.docx` files inside a `--batch` directory) and its own
-  bundled wordlist files (`scripts/patterns_*.json`). Verify it yourself:
+  bundled wordlist files (`scripts/patterns_*.json`, plus
+  `scripts/user_guards.json` if you have created one with `learn_guards.py`).
+  Verify it yourself:
 
   ```bash
   grep -rnE "urllib|requests|socket|subprocess|os\.environ" scripts/ || echo "clean"
   ```
 
   (runs clean as of this release — the claim is reproducible, not rhetorical).
-- Writes **only** to the `-o`/`--output`/`--suggestions`/`--html`/`--track`
-  paths you specify (`--track` writes `base.md` + `base.json`).
+- Writes **only** to output paths you pass explicitly: `-o`/`--output` on
+  transform/compare/pipeline/plan, `--suggestions`, `--html`, `--review`
+  (detect.py's markdown report), `--report` (check_terms.py), and `--track`
+  (`base.md` + `base.json`). One tool-owned data file on top of that:
+  `learn_guards.py add`/`from-text`/`remove` writes
+  `scripts/user_guards.json` (your learned term guards, via a transient
+  `.tmp` + atomic rename). No other writes.
 - **Zero network access** — no HTTP calls, no downloads, no API keys.
 - **Zero third-party dependencies** — Python standard library only.
 - Reads **no environment variables**; spawns **no subprocesses**; creates **no
-  scheduled tasks**; uses **no temp files** beyond what Python's own I/O buffers do.
+  scheduled tasks**; the only temp file ever written is the
+  `user_guards.json.tmp` rename target described above.
 - Test corpora and dev notes live in the development repo only, not in the
   distributed package.
 
@@ -210,6 +259,10 @@ For reviewers, security scanners and cautious users:
   suggestions), regex signals, term_guards (legitimate academic collocations that
   must not be flagged, e.g. "mutational landscape", "pivotal trial", CJK
   "sequence alignment" and "precipitation reaction"), auto_fixes.
+- **User-learned guards** live in `scripts/user_guards.json` (managed by
+  `learn_guards.py` — do not hand-edit; `list` prints, `remove` deletes).
+  Keep them there rather than editing `patterns_*.json`: pattern files are
+  replaced on upgrade, your guards file is not.
 - Score calibration constants live in `scripts/hxt_core.py` (`_LANG_K`); the four
   test corpora in the development repo's `tests/` (not shipped in the package)
   document the intended separation.

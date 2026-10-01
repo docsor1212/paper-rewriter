@@ -73,7 +73,10 @@ def build_report(results, source=""):
 
 
 def main():
+    import hxt_core
     ap = argparse.ArgumentParser(description="术语一致性检查器")
+    ap.add_argument("--version", action="version",
+                    version="%(prog)s " + hxt_core.__version__)
     ap.add_argument("file", help="待检文档（.txt/.md/.docx）")
     ap.add_argument("--pairs", help="用户自定义术语对文件（每行 A|B）")
     ap.add_argument("--json", action="store_true")

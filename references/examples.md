@@ -108,3 +108,81 @@ The mutational landscape was profiled in this pivotal trial; robust regression c
 ```
 
 mutational landscape / pivotal trial / robust regression 全部豁免；换成 "the startup landscape ... plays a pivotal role" 这类非学术语境则正常计分。
+
+## 样例 5：markdown 稿件全链路（v2.2.0：章节感知 + 句级计划 + 守卫拦截）
+
+**输入** `case_medical.md`（markdown 医学综述，模板腔密度中等）。v2.2.0 起
+`## 摘要`/`## 方法` 等 markdown 标题直接进章节感知，.md 语法残留自动豁免。
+
+**Step 1 自查 + 章节感知**：
+
+```console
+$ python scripts/detect.py case_medical.md --structure
+章节: 题引 / 摘要 / 引言 / 方法 / 讨论 / 结论（markdown 标题逐一识别）
+综合评分: 23/100  [低]
+  · 学术八股（人写也有，看密度）      9 处   （综上所述 / 值得注意的是 / 众所周知…）
+  · 排比/对仗结构（一方面…另一方面）   1 处
+节奏统计: 句长变异系数 0.62 | 连接词 0.41/句
+```
+
+**Step 2 改写优先级计划**（v2.2.0 新增，先定位再动手）：
+
+```console
+$ python scripts/plan.py case_medical.md --json
+P1 [结论] 2.2点  「…从而为临床决策的落地保驾护航。」
+P2 [引言] 0.9点  「众所周知，IRAK4在Toll样受体…」
+P3 [摘要] 0.8点  「取得了显著进展，为新型治疗策略的开发…」
+预算投影: 改完前5句→11 | 前10句→4 | 全部→2   （线性近似，仅供排序）
+```
+
+**Step 3 agent 深改**（按 style_guide 改 P0 队列，事实全保留：1/250000、
+48 篇、2005-2026、8 例/12 个月）。
+
+**Step 4 守卫拦截过度删减**——第一版深改把 IRAK4 从 12 次引述压到 11 次：
+
+```console
+$ python scripts/verify.py case_medical.md case_medical_v2.md
+  ✗ [numbers] 数字丢失/被改: 4        ← IRAK4 里的 4 连带丢失
+  ✗ [latin_abbr] 大写缩写丢失: IRAK4
+判定: 未通过——请修复改稿后重跑（exit 1）
+```
+
+补回自然引述（「IRAK4抑制剂的耐药机制」）后重跑：
+
+```console
+$ python scripts/verify.py case_medical.md case_medical_v2.md
+判定: 通过（exit 0）| 规模 694 → 609 字符
+
+$ python scripts/compare.py case_medical.md case_medical_v2.md
+  学术八股          已清除 9 处
+  翻译腔/空泛过渡    已清除 4 处
+  中文 AI 黑话      已清除 2 处
+  排比/对仗结构      已清除 1 处
+完整性守卫: PASS ✓
+```
+
+**要点**：markdown 章节直接被识别；plan 把深改力气指向贡献最大的句子；
+verify 连「缩写次数被压低」都能抓到——守卫拦的是内容损失，不是措辞。
+
+## 样例 6：误报 → 守卫固化（v2.2.0 learn_guards）
+
+「抓手」在词表里是营销黑话，但机械工程语境的「机械抓手」是正当术语——
+守卫按上下文豁免，不是整词洗白：
+
+```console
+$ echo "装配平台的机械抓手采用气驱动设计，抓取力可调。" | python scripts/detect.py -s
+46/中                                  ← 误报
+
+$ python scripts/learn_guards.py add 抓手 --before "机械,装置" --after "采用,夹持"
+已保存守卫：抓手（lang=zh，前文 2 项 / 后文 2 项）
+
+$ echo "装配平台的机械抓手采用气驱动设计，抓取力可调。" | python scripts/detect.py -s
+0/低                                   ← 机械语境豁免
+
+$ echo "以创新为抓手，全面赋能业务增长。" | python scripts/detect.py -s
+35/中                                  ← 营销语境照常计分（对照）
+```
+
+守卫存进 `scripts/user_guards.json`（升级词表不丢）；`list` 查看、
+`remove 抓手` 撤销、`from-text 术语 样本.txt` 从真实语料自动提取上下文
+（中英双语口径）。强制要求 `--before/--after` 上下文——纯词白名单会被拒绝。

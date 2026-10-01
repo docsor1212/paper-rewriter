@@ -32,7 +32,7 @@ def main():
                     help="academic=论文口径（默认）；general=非学术文本，八股/公文信号降权")
     ap.add_argument("--suggestions", help="输出修订建议工作单（markdown 侧车）到此路径")
     ap.add_argument("--html", help="生成单文件 HTML 报告到此路径")
-    ap.add_argument("--batch", help="批量模式：扫描目录内全部 .txt/.md/.docx，输出汇总 CSV 到此路径（与 --html 可同用）")
+    ap.add_argument("--batch", help="批量模式：扫描目录内全部 .txt/.md/.docx，输出逐文件评分汇总（stdout；--json/--html 可同用）")
     ap.add_argument("--review", help="生成结构化审稿报告（markdown）到此路径")
     ap.add_argument("--structure", action="store_true",
                     help="章节感知：识别论文结构（摘要/引言/方法/结果/讨论），分章节评分（方法/结果自动降权）")

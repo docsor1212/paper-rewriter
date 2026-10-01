@@ -9,15 +9,17 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "2.1.1"
+__version__ = "2.2.0"
 
 import json
 import os
 import re
+import sys
 import time
 import unicodedata
 
-from _sections_block import _SECTION_PATTERNS, _is_heading_line  # noqa: F401
+from _sections_block import (_SECTION_PATTERNS, _is_heading_line,  # noqa: F401
+                             _normalize_heading)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -67,69 +69,110 @@ def _read_text_impl(path, max_mb):
     return text
 
 
+def _chunk_spans(text, max_chars=800_000, overlap=2000):
+    """与 chunk_text 同一切点，返回 (start, end, ov_start) 三元组列表。
+
+    ov_start 是本块与上一块之间 2000 字符重叠窗的起点（首块为 None，起点对齐
+    到最近的段边界）。重叠窗让跨块边界的结构信号（排比正则、跨段句式）在下一块
+    里完整重现——v2.2.0 分块口径的核心修正；scan_chunked 借此做总量守恒。"""
+    if len(text) <= max_chars:
+        return [(0, len(text), None)]
+    spans = []
+    start = 0
+    n = len(text)
+    while start < n:
+        end = min(start + max_chars, n)
+        if end < n:
+            # 回退到最近的段落边界（\n\n 或 \n），找不到就硬切；
+            # cut 须给本块留 ≥1000 字符，防「每行 1 字符」退化输入裂成海量小块
+            cut = text.rfind("\n\n", start, end)
+            if cut <= start + 1000:
+                cut = text.rfind("\n", start + 1000, end)
+            if cut > start + 1000:
+                end = cut + 1
+        ov_start = None
+        if spans and start > 0:
+            ov_start = max(start - overlap, 0)
+            nl = text.find("\n", ov_start, start)
+            if nl != -1 and nl + 1 < start:
+                ov_start = nl + 1  # 对齐段边界，重叠窗落在自然段落语境里
+            if ov_start >= start:
+                ov_start = max(start - overlap, 0)
+        spans.append((start, end, ov_start))
+        start = end
+    return spans
+
+
 def chunk_text(text, max_chars=800_000):
     """超大文本按段落边界分块（v1.4.0 stability 处方）。
 
     分块使扫描内存峰值恒定（O(max_chars)）；合并去重由 scan_chunked 完成。
     verify.py 守卫不可分块（红线语义要求整文比对），此处只服务诊断扫描。
     """
-    if len(text) <= max_chars:
-        return [text]
-    blocks = []
-    start = 0
-    n = len(text)
-    while start < n:
-        end = min(start + max_chars, n)
-        if end < n:
-            # 回退到最近的段落边界（\n\n 或 \n），找不到就硬切
-            cut = text.rfind("\n\n", start, end)
-            if cut <= start:
-                cut = text.rfind("\n", start, end)
-            if cut > start:
-                end = cut + 1
-        blocks.append(text[start:end])
-        start = end
-    return blocks
+    return [text[s:e] for s, e, _ in _chunk_spans(text, max_chars)]
 
 
-def scan_chunked(text, lang=None, profile="academic", source_ext=""):
-    """分块扫描：各块独立 scan，类别计数合并、样本去重合并。
+def _merge_cat_counts(r, merged, weighted, sign=1):
+    """把一次 scan 结果的类别计数并入 merged/weighted；sign=-1 用于重叠窗扣减。
 
-    返回结构同 scan()；score 按合并后的总命中/总单元重算（权重逐类加权平均），
-    与整文扫描同口径。分块边界切断的跨行信号（如排比正则跨段）可能少量漏检
-    ——这是分块口径的已知边界，报告会标注。
+    计数下探到 0 为止：重叠窗两端的骑缝信号可能造成极小负差，钳位防负数。"""
+    for cid, c in r["categories"].items():
+        m = merged.setdefault(cid, {"label": c["label"], "count": 0,
+                                    "weight": 0.0, "samples": [],
+                                    "auto_fixable": c["auto_fixable"]})
+        m["count"] = max(0, m["count"] + sign * c["count"])
+        m["weight"] = c["weight"]  # 同类同权
+        if sign > 0:
+            for smp in c["samples"]:
+                if smp not in m["samples"]:
+                    m["samples"] = (m["samples"] + [smp])[:6]
+        weighted[cid] = max(0.0, weighted.get(cid, 0.0)
+                            + sign * c["weight"] * c["count"])
+
+
+def scan_chunked(text, lang=None, profile="academic", source_ext="",
+                 max_chars=800_000, overlap=2000):
+    """分块扫描（v2.2.0 重叠缝合口径）：各块独立 scan 后合并。
+
+    块间 2000 字符重叠窗让跨块边界的结构信号完整进入下一块；完全落在重叠窗内
+    的命中会被相邻两块各计一次，通过「对重叠窗单独扫描一次并扣减」保持总量
+    守恒（公式：合并 = Σ块 − Σ重叠窗）。节奏统计（句长变异系数等）改为在
+    整文上直接计算，与整文扫描同口径。
+
+    残余边界：恰好骑在重叠窗两端的信号仍可能少量偏差，报告会标注；
+    这已比 v2.1.x 的无重叠口径（跨块信号整段漏检）显著改善。
     """
-    blocks = chunk_text(text)
-    if len(blocks) == 1:
-        return scan(text, lang=lang, profile=profile)
+    spans = _chunk_spans(text, max_chars=max_chars, overlap=overlap)
+    if len(spans) == 1:
+        return scan(text, lang=lang, profile=profile, source_ext=source_ext)
     merged = {}
     total_units = 0.0
     weighted = {}
     all_guards = []
     all_sug = {}
-    for b in blocks:
-        r = scan(b, lang=lang, profile=profile)
+    for s, e, ov in spans:
+        # 带重叠头扫描（v2.2.0 缝合核心）：块 i>0 从重叠窗起点开始，
+        # 跨块骑缝信号在块内完整重现；随后对重叠窗 [ov:s] 单独扫描一次并扣减，
+        # 抵消重叠区被相邻两块各计一次的重复量（公式：合并 = Σ(带重叠块) − Σ重叠窗）。
+        r = scan(text[ov if ov is not None else s:e], lang=lang,
+                 profile=profile, source_ext=source_ext)
         total_units += r["units"]
-        for cid, c in r["categories"].items():
-            m = merged.setdefault(cid, {"label": c["label"], "count": 0,
-                                        "weight": 0.0, "samples": [],
-                                        "auto_fixable": c["auto_fixable"]})
-            m["count"] += c["count"]
-            m["weight"] = c["weight"]  # 同类同权
-            for smp in c["samples"]:
-                if smp not in m["samples"]:
-                    m["samples"] = (m["samples"] + [smp])[:6]
-            weighted[cid] = weighted.get(cid, 0.0) + c["weight"] * c["count"]
+        _merge_cat_counts(r, merged, weighted, sign=1)
         for g in r["guards_applied"]:
             all_guards.append(g)
-        for s in r["suggestions"]:
-            all_sug[s["from"]] = s
+        for su in r["suggestions"]:
+            all_sug[su["from"]] = su
+        if ov is not None:
+            ro = scan(text[ov:s], lang=lang, profile=profile, source_ext=source_ext)
+            total_units = max(0.0, total_units - ro["units"])
+            _merge_cat_counts(ro, merged, weighted, sign=-1)
     pts = sum(weighted.values())
     critical = any(k.startswith(("model_artifact", "chatbot", "cutoff")) and c["count"]
                    for k, c in merged.items())
-    stats = {"burstiness_cv": None,
-             "notes": ["超大文本已自动分块（%d 块）——跨块边界的结构信号可能少量漏检，"
-                       "这是分块口径的已知边界" % len(blocks)]}
+    stats = _structural_stats(text, split_sentences(text), lang or "zh")
+    stats["notes"].append(
+        "超大文本已自动分块（%d 块，块间 2000 字符重叠缝合）——跨块边界信号已缝合，"
+        "恰骑重叠窗两端的极端信号仍可能少量偏差" % len(spans))
     score, level, _ = _score(pts, stats, total_units, merged, lang or "zh")
     return {
         "lang_detected": lang or "zh",
@@ -144,7 +187,7 @@ def scan_chunked(text, lang=None, profile="academic", source_ext=""):
         "guards_applied": all_guards,
         "stats": stats,
         "suggestions": list(all_sug.values())[:12],
-        "chunked": len(blocks),
+        "chunked": len(spans),
         "honest_note": "本地启发式风格特征评分，非任何官方检测分数",
     }
 
@@ -209,9 +252,24 @@ def _pdf_literal_string(data, i):
     return bytes(out), i
 
 
+def _pdf_at_operator(data, i, op):
+    """判断 data[i:i+len(op)] 是否为内容流操作符（v2.2.0 无空格形态支持）。
+
+    生成器常省略操作符前空格（`72 720Td`）。判定：前一字节是数字/空白
+    （操作数收尾）且后一字节是空白/分隔符/串首。字面串与 hex 串内部已被
+    状态机整串消费，不会走到这里。"""
+    ln = len(op)
+    if data[i:i + ln] != op:
+        return False
+    if i > 0 and data[i - 1:i] not in b" \t\r\n0123456789)]":
+        return False
+    nxt = data[i + ln:i + ln + 1]
+    return nxt in (b"", b" ", b"\t", b"\r", b"\n", b"(", b"[", b"<", b"/")
+
+
 def _pdf_walk_text(data):
     """走查内容流：抽字面串与 hex 串（跟随 Tj/'/"/TJ 或 TJ 数组内），
-    操作符间插空格、BT/ET/T*/Td/TD 处插换行。"""
+    操作符间插空格、BT/ET/T*/Td/TD 处插换行（v2.2.0 起含无空格形态）。"""
     out = []
     i = 0
     n = len(data)
@@ -219,6 +277,16 @@ def _pdf_walk_text(data):
         c = data[i]
         if c == 0x28:  # ( 字面串
             s, j = _pdf_literal_string(data, i)
+            if s.startswith(b"\xfe\xff"):
+                # UTF-16BE 字符串（v2.2.0）：英文 PDF 的生成器有时用 UTF-16BE 存
+                # 纯 ASCII 文本——解码后可用；含非 ASCII 视为嵌入字体信号，
+                # 保留原字节交由下游控制字符/GBK 探针拦截。
+                try:
+                    dec = s[2:].decode("utf-16-be")
+                    if dec.isascii():
+                        s = dec.encode("ascii")
+                except (UnicodeDecodeError, UnicodeEncodeError):
+                    pass
             k = j
             while k < n and data[k:k+1].isspace():
                 k += 1
@@ -247,7 +315,10 @@ def _pdf_walk_text(data):
                 pass
             i = j + 1
             continue
-        if data[i:i+2] in (b"BT", b"ET") or data[i:i+3] in (b"T* ", b"Td ", b"TD "):
+        if (data[i:i+2] in (b"BT", b"ET")
+                or _pdf_at_operator(data, i, b"T*")
+                or _pdf_at_operator(data, i, b"Td")
+                or _pdf_at_operator(data, i, b"TD")):
             out.append(b"\n")
         i += 1
     return b"".join(out)
@@ -272,6 +343,7 @@ def _extract_pdf(path):
             "该 PDF 含 ToUnicode CMap（CJK/嵌入字体文档的强标记）——本工具的"
             "实验性 PDF 直读无法可靠解码，请导出为 UTF-8 文本后重试")
     parts = []
+    total_unc = 0  # v2.2.0 累计解压预算：单流 20MB + 全文 50MB，防多流炸弹
     for m in re.finditer(rb"stream\r?\n(.*?)endstream", raw, re.S):
         comp = m.group(1).rstrip(b"\r\n")
         try:
@@ -281,6 +353,11 @@ def _extract_pdf(path):
                 raise ValueError("PDF 内容流解压后超过 20MB 上限——请拆分或导出文本")
         except zlib.error:
             data = comp  # 未压缩内容流（合法 PDF）直接使用
+        total_unc += len(data)
+        if total_unc > 50 * 1024 * 1024:
+            raise ValueError(
+                "PDF 内容流累计解压超过 50MB 上限（与 read_text 的 50MB 文件上限"
+                "同口径）——请拆分或导出为 UTF-8 文本")
         if b"Tj" not in data and b"TJ" not in data:
             continue
         parts.append(_pdf_walk_text(data))
@@ -361,20 +438,24 @@ def detect_sections(text):
     返回 [(section_key, start, end)]；无法识别的部分归入 "body"。
     标题行判定：模式命中且该行较短（≤40 字符，排除正文句）。
     口径（v1.7.0）：同名章节只取首现区间；支持编号式标题（1 引言/2. Methods）；
+    口径（v2.2.0）：支持 markdown 标题（## 摘要）与整行加粗标题（**方法**）。
     """
     sections = []
     lines = text.split("\n")
     offset = 0
     marks = []
     for ln in lines:
+        # 偏移逐行推进（v2.2.0 修正：原实现把 += 放在 continue 之后，
+        # 非标题行不推进 → 章节切点整体漂移，scan_sections 错位切分）
+        offset += len(ln) + 1
         stripped = ln.strip()
         if not _is_heading_line(stripped):
             continue
+        norm, _ = _normalize_heading(stripped)
         for key, rx in _SECTION_PATTERNS:
-            if rx.match(stripped):
-                marks.append((key, offset))
+            if rx.match(norm):
+                marks.append((key, offset - len(ln) - 1))
                 break
-        offset += len(ln) + 1
     if not marks:
         return [("body", 0, len(text))]
     seen = {}
@@ -434,42 +515,6 @@ def scan_sections(text, lang=None, profile="academic", source_ext=""):
     return {"overall_score": overall_score, "overall_level": level,
             "sections": out_sections, "missing_sections": missing}
 
-
-def _num_prefix():
-    return r"(?:\d+(?:[.．、]\d+)*[.．、]?\s*)?"
-
-
-# 论文章节标题模式（中英双语；行首匹配，标题行 ≤40 字符；
-# 支持编号式标题「1 引言 / 2. Methods」；标题行不得含句末/分句标点）
-def _is_heading_line(stripped):
-    if not stripped or len(stripped) > 40:
-        return False
-    # 剥离 markdown 语法（# 前缀、** 加粗包裹）后再判定
-    stripped2 = re.sub(r"^#{1,6}\s*", "", stripped)
-    stripped2 = re.sub(r"\*\*([^*\n]+)\*\*", r"\1", stripped2)
-    if not stripped2 or len(stripped2) > 40:
-        return False
-    if re.search(r"[。．！？!?]", stripped2):
-        return False
-    cm = re.match(r"^[^：:]{1,12}[：:](.+)", stripped2)
-    if cm and len(cm.group(1).strip()) > 0:
-        return False
-    return True
-
-
-def _num_prefix():
-    return r"(?:\d+(?:[.．、]\d+)*[.．、]?\s*)?"
-
-
-_SECTION_PATTERNS = [
-    ("abstract", re.compile(_num_prefix() + r"^(摘\s*要|abstract)\b[:：]?", re.I)),
-    ("introduction", re.compile(_num_prefix() + r"^(引\s*言|绪\s*论|introduction)\b[:：]?", re.I)),
-    ("methods", re.compile(_num_prefix() + r"^(方\s*法|材料与方法|方法与材料|对象与方法|materials? and methods|patients? and methods|methods?)\b[:：]?", re.I)),
-    ("results", re.compile(_num_prefix() + r"^(结\s*果|results?)\b[:：]?", re.I)),
-    ("discussion", re.compile(_num_prefix() + r"^(讨\s*论|discussion)\b[:：]?", re.I)),
-    ("conclusion", re.compile(_num_prefix() + r"^(结\s*论|conclusions?)\b[:：]?", re.I)),
-    ("references", re.compile(_num_prefix() + r"^(参\s*考\s*文\s*献|references?)\b[:：]?", re.I)),
-]
 
 def _extract_docx(path):
     """docx 纯文本抽取（v1.3.0，纯标准库）：zipfile 读 word/document.xml，
@@ -565,8 +610,38 @@ def build_suggestions(orig, r, guide):
 
 _PATTERN_CACHE = {}
 
+
+def _load_user_guards():
+    """用户自定义术语守卫（v2.2.0，learn_guards.py 生成，scripts/user_guards.json）。
+
+    文件不存在 → 空列表；文件损坏 → stderr 提示后忽略（扫描永不因守卫文件失败
+    而中断）。每项 {"term", "allow_before", "allow_after", "lang"}，lang 为
+    zh/en；缺省 = 两种词库都生效。"""
+    path = os.path.join(HERE, "user_guards.json")
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        gs = data.get("term_guards", [])
+        return gs if isinstance(gs, list) else []
+    except (OSError, ValueError) as e:
+        sys.stderr.write("警告: user_guards.json 无法解析（%s），已忽略——"
+                         "可用 learn_guards.py list 检查或直接删除该文件\n" % e)
+        return []
+
+
+def clear_pattern_cache():
+    """清空模式缓存（learn_guards.py 同进程测试新守卫时用）。"""
+    _PATTERN_CACHE.clear()
+
+
 def load_patterns(lang):
-    """lang: 'en' | 'zh' -> dict。带缓存。"""
+    """lang: 'en' | 'zh' -> dict。带缓存，并合并用户自定义守卫（v2.2.0）。
+
+    用户守卫追加在内置 term_guards 之后（guard_hit 任一命中即豁免，顺序无关）；
+    内置同名词守卫优先，用户同名条目不重复并入。learn_guards.py 修改文件后
+    同进程内需调 clear_pattern_cache() 使缓存失效。"""
     if lang in _PATTERN_CACHE:
         return _PATTERN_CACHE[lang]
     path = os.path.join(HERE, "patterns_%s.json" % lang)
@@ -578,6 +653,20 @@ def load_patterns(lang):
             item["_re"] = re.compile(item["pattern"], re.IGNORECASE if lang == "en" else 0)
     for item in data.get("regex_signals", []):
         item["_re"] = re.compile(item["pattern"], re.IGNORECASE if lang == "en" else 0)
+    user_gs = [g for g in _load_user_guards() if g.get("lang") in (None, "", lang)]
+    if user_gs:
+        # 同名词守卫：用户上下文并入内置（非静默丢弃）——生态学用户为内置
+        # 已有守卫的 ecosystem 补 forest 前文时，合并后才真正生效。
+        merged = {g.get("term", "").lower(): g for g in data.get("term_guards", [])}
+        for g in user_gs:
+            t = g.get("term", "").lower()
+            if t in merged:
+                for k in ("allow_before", "allow_after"):
+                    merged[t][k] = list(dict.fromkeys(
+                        list(merged[t].get(k, []))
+                        + [w.lower() for w in g.get(k, [])]))
+            else:
+                data["term_guards"].append(g)
     _PATTERN_CACHE[lang] = data
     return data
 
@@ -750,6 +839,16 @@ def scan(text, lang=None, profile="academic", source_ext=""):
         for item in pats.get("regex_signals", []):
             # .md 输入：原生 markdown 语法是合法标记，跳过 markdown 残留类
             if item.get("cat") == "markdown" and source_ext == ".md":
+                continue
+            # 参考文献行豁免：zh_punct 类跳过含 PMID/DOI/文献编号模式的行
+            if item.get("cat") == "zh_punct" and re.search(r"(?m)^\[?\d+\]?\s", text):
+                # 只对参考文献样式的行跳过半角标点检测（文献著录的半角标点合法）
+                lines_to_check = [ln for ln in text.split("\n")
+                                  if not re.match(r"^\[?\d+\]?\s", ln.strip())]
+                n = sum(len(item["_re"].findall(ln)) for ln in lines_to_check)
+                if n:
+                    w0 = float(item.get("weight", 0.6))
+                    add_cat(item["cat"], item["label"], w0, n, [item["label"]])
                 continue
             n = len(item["_re"].findall(text))
             if n:

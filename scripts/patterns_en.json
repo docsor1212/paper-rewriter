@@ -397,6 +397,21 @@
       "w": "game changer",
       "alt": "major advance",
       "weight": 1.2
+    },
+    {
+      "w": "ecosystem",
+      "alt": "system / community (guarded for ecology)",
+      "weight": 1.0
+    },
+    {
+      "w": "cornerstone",
+      "alt": "basis / foundation (guarded for medicine)",
+      "weight": 1.0
+    },
+    {
+      "w": "paradigm shift",
+      "alt": "a new approach (name what actually changed)",
+      "weight": 1.2
     }
   ],
   "term_guards": [
@@ -485,6 +500,80 @@
         "safety",
         "horse",
         "climbing"
+      ]
+    },
+    {
+      "term": "ecosystem",
+      "allow_before": [
+        "gut",
+        "soil",
+        "marine",
+        "rumen",
+        "oral",
+        "microbial",
+        "coral",
+        "vaginal",
+        "aquatic",
+        "reef",
+        "intestinal",
+        "forest",
+        "grassland",
+        "wetland",
+        "terrestrial",
+        "freshwater",
+        "benthic",
+        "pelagic",
+        "estuarine",
+        "riverine",
+        "tundra",
+        "savanna",
+        "stream"
+      ],
+      "allow_after": [
+        "services",
+        "dynamics",
+        "modelling",
+        "modeling",
+        "health",
+        "ecology",
+        "samples",
+        "data",
+        "function",
+        "functions",
+        "structure",
+        "structures",
+        "respiration",
+        "productivity",
+        "stability",
+        "processes",
+        "properties",
+        "restoration",
+        "conservation",
+        "management"
+      ]
+    },
+    {
+      "term": "cornerstone",
+      "allow_before": [
+        "the",
+        "a",
+        "remains",
+        "remained",
+        "is",
+        "was",
+        "as"
+      ],
+      "allow_after": [
+        "of treatment",
+        "of therapy",
+        "of management",
+        "of care",
+        "of prevention",
+        "of diagnosis",
+        "of modern",
+        "of clinical",
+        "of evidence",
+        "of the"
       ]
     }
   ],
