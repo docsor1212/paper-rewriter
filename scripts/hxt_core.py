@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "2.3.0"
+__version__ = "2.4.0"
 
 import json
 import os
@@ -131,7 +131,7 @@ def _merge_cat_counts(r, merged, weighted, sign=1):
 
 
 def scan_chunked(text, lang=None, profile="academic", source_ext="",
-                 max_chars=800_000, overlap=2000):
+                 max_chars=800_000, overlap=2000, time_budget=None):
     """分块扫描（v2.2.0 重叠缝合口径）：各块独立 scan 后合并。
 
     块间 2000 字符重叠窗让跨块边界的结构信号完整进入下一块；完全落在重叠窗内
@@ -139,12 +139,16 @@ def scan_chunked(text, lang=None, profile="academic", source_ext="",
     守恒（公式：合并 = Σ块 − Σ重叠窗）。节奏统计（句长变异系数等）改为在
     整文上直接计算，与整文扫描同口径。
 
+    time_budget 为每块独立预算（k 块最坏 k×budget）；重叠窗扫描共用同预算。
+
     残余边界：恰好骑在重叠窗两端的信号仍可能少量偏差，报告会标注；
     这已比 v2.1.x 的无重叠口径（跨块信号整段漏检）显著改善。
     """
+    time_budget = time_budget or SCAN_TIME_BUDGET
     spans = _chunk_spans(text, max_chars=max_chars, overlap=overlap)
     if len(spans) == 1:
-        return scan(text, lang=lang, profile=profile, source_ext=source_ext)
+        return scan(text, lang=lang, profile=profile, source_ext=source_ext,
+                    time_budget=time_budget)
     merged = {}
     total_units = 0.0
     weighted = {}
@@ -155,7 +159,7 @@ def scan_chunked(text, lang=None, profile="academic", source_ext="",
         # 跨块骑缝信号在块内完整重现；随后对重叠窗 [ov:s] 单独扫描一次并扣减，
         # 抵消重叠区被相邻两块各计一次的重复量（公式：合并 = Σ(带重叠块) − Σ重叠窗）。
         r = scan(text[ov if ov is not None else s:e], lang=lang,
-                 profile=profile, source_ext=source_ext)
+                 profile=profile, source_ext=source_ext, time_budget=time_budget)
         total_units += r["units"]
         _merge_cat_counts(r, merged, weighted, sign=1)
         for g in r["guards_applied"]:
@@ -163,7 +167,8 @@ def scan_chunked(text, lang=None, profile="academic", source_ext="",
         for su in r["suggestions"]:
             all_sug[su["from"]] = su
         if ov is not None:
-            ro = scan(text[ov:s], lang=lang, profile=profile, source_ext=source_ext)
+            ro = scan(text[ov:s], lang=lang, profile=profile, source_ext=source_ext,
+                      time_budget=time_budget)
             total_units = max(0.0, total_units - ro["units"])
             _merge_cat_counts(ro, merged, weighted, sign=-1)
     pts = sum(weighted.values())
@@ -423,8 +428,11 @@ def build_revision_log(applied, removed, source=""):
         md.append("无修改记录。" + ("（--rewrite 模式：机械清理层未参与，仅守卫复核）"
                                    if "rewrite" in (source or "") else ""))
     md.append("")
-    md.append("口径: 机械清理层仅做语法安全修复；黑话/八股/节奏由 agent 按指南深改，"
-              "不在本记录范围内。")
+    if any(str(e.get("rule", "")).startswith("深改档:") for e in entries):
+        md.append("口径: 含 --deep 深改档确定性句式转换（见上）；其余黑话/节奏仍由 agent 深改。")
+    else:
+        md.append("口径: 机械清理层仅做语法安全修复；黑话/八股/节奏由 agent 按指南深改，"
+                  "不在本记录范围内。")
     return "\n".join(md), {"entries": entries, "generated": _dt.datetime.now().isoformat(timespec="seconds")}
 
 
@@ -758,18 +766,34 @@ _EN_CONNECTORS = ["however", "moreover", "furthermore", "additionally", "in addi
                   "in conclusion", "firstly", "secondly", "finally", "meanwhile"]
 
 
-def scan(text, lang=None, profile="academic", source_ext=""):
+# 单次 scan 的墙钟预算（v2.4.0，stability 处方「显式超时」）：扫描内部在
+# 词表/正则/统计三类阶段后检查时钟，超预算立即中止并给处置建议——
+# 正常 50MB 上限内文件远用不满（78KB≈0.06s），预算只兜未知 pathological 输入。
+SCAN_TIME_BUDGET = 120.0  # 秒
+
+
+def scan(text, lang=None, profile="academic", source_ext="",
+         time_budget=SCAN_TIME_BUDGET):
     """全量扫描。返回结构化 dict：
     {
       lang, score, level, critical_hit, units, sentences,
       categories: {cat_id: {label, count, weight, samples: [...]}},
-      guards_applied: [...], stats: {...}, suggestions: [...]
+      guards_applied, stats, suggestions, hints?
     }
+    time_budget: 墙钟预算秒（v2.4.0）；超时抛 ValueError 带处置建议。
     """
     if lang not in ("zh", "en", "mix", None):
         raise ValueError("lang must be zh/en/mix/None")
     if profile not in ("academic", "general"):
         raise ValueError("profile 必须是 academic（默认，论文口径）或 general（非学术文本）")
+    t0 = time.monotonic()
+
+    def _tick(stage):
+        if time_budget and (time.monotonic() - t0) > time_budget:
+            raise ValueError(
+                "扫描超时（预算 %.0f 秒，阶段：%s）——文件可能过大或内容病态，"
+                "请拆分后分节处理" % (time_budget, stage))
+
     detected = detect_language(text)
     lang = lang if lang in ("zh", "en") else detected
 
@@ -868,10 +892,12 @@ def scan(text, lang=None, profile="academic", source_ext=""):
                 add_cat(item["cat"], item["label"], w0,
                         n, [item["label"]] if not item.get("show_hits") else
                         [m.group(0)[:40] for m in item["_re"].finditer(text)][:4])
+    _tick("词表/正则信号")
 
     # --- 统计特征 ---
     sentences = split_sentences(text)
     units = count_units(text, lang)
+    _tick("统计特征")
     stats = _structural_stats(text, sentences, lang)
     pts = pts_acc[0]
 
@@ -970,6 +996,31 @@ def verdict_exit_code(score, critical_hit=False, verify_ok=None):
     if score >= VERDICT_WORK_THRESHOLD:
         return 3
     return 0
+
+
+def build_hints(text, r, profile="academic"):
+    """处置建议引擎（v2.4.0，errorHandling 处方）：按本次扫描结果给 1-3 条
+    「下一步怎么做」的具体建议（至多 4 条）——每条都指向本工具箱内的可执行命令。
+
+    只做提示（报告尾部「处置提示」+ JSON hints 字段），不改变任何判定。"""
+    hints = []
+    if r.get("critical_hit"):
+        hints.append("命中模型残留硬特征——先跑 transform.py <文件> -o 清理稿.txt，再复核清理稿")
+    if r.get("score", 0) >= LEVEL_MID_THRESHOLD:
+        hints.append("深改排序：python scripts/plan.py <文件> -o plan.md 生成句级优先级计划（先改贡献最大的句子）")
+    guards = r.get("guards_applied") or []
+    if guards:
+        hints.append("守卫已豁免正当用法 %d 处；若仍有领域术语误报：learn_guards.py from-text 术语 样本.txt 固化守卫（升级不丢）" % len(guards))
+    if profile == "academic" and not r.get("chunked") \
+            and r.get("score", 0) >= LEVEL_MID_THRESHOLD:
+        kinds = {k for k, _, _ in detect_sections(text)}
+        soft = sum(c["count"] for cid, c in r.get("categories", {}).items()
+                   if cid in ("zh_punct", "markdown", "zh_trans"))
+        hard = sum(c["count"] for cid, c in r.get("categories", {}).items()
+                   if cid in ("zh_eightleg", "zh_jargon", "zh_jargon_struct", "en_vocab"))
+        if kinds == {"body"} and soft > hard:
+            hints.append("未识别到论文章节且特征以标点/翻译腔为主——非论文文体（博客/公文/通知）可加 --profile general 降权八股/翻译腔信号（半角标点/排版残留请先 transform.py 清理）")
+    return hints
 
 
 def _score(pts, stats, units, cats, lang):

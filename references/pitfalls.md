@@ -44,3 +44,4 @@
 | 20 | 深改后不跑 verify 直接提交 | 数字/引用可能已坏 | 深改→verify→compare 三连是固定流程 |
 | 21 | 手改 `scripts/user_guards.json` 格式出错，扫描报警告 | 守卫被整体忽略（扫描不中断） | 用 `learn_guards.py list` 检查/`add` 重建；损坏严重就删掉该文件重来 |
 | 22 | 把 `plan.py` 的预算投影当承诺分数 | 投影是线性近似，不是外部检测分数 | 投影只用于排序与分工；最终以 verify+compare 结果为准 |
+| 23 | 把 `--deep` 当成完整深改，跑完直接提交 | --deep 只删零信息损失成分（句首八股/排除式连接），黑话与节奏不在射程 | --deep 后仍按 style_guide 深改；每笔操作看 --track 记录，最终 verify+compare 收口 |

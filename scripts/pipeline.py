@@ -61,6 +61,10 @@ def main():
     ap.add_argument("--exit-verdict", action="store_true",
                     help="自动化集成（CI/agent 门禁）：按判定设退出码——0=干净，"
                          "1=完整性 FAIL，3=风格特征中及以上，4=模型残留。缺省恒 0")
+    ap.add_argument("--deep", action="store_true",
+                    help="深改档（v2.4.0）：清理阶段追加句式级确定性转换"
+                         "（句首八股删除/排除式连接合并），操作进 --track 可审计。"
+                         "--rewrite/--batch 下不生效")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
 
@@ -100,6 +104,8 @@ def main():
             print("[提示] pipeline --batch 暂不生成 --track 修订记录", file=sys.stderr)
         if getattr(args, "suggestions", None):
             print("[提示] pipeline --batch 暂不生成 --suggestions 工作单", file=sys.stderr)
+        if getattr(args, "deep", False):
+            print("[提示] --deep 在 --batch 下暂不生效（逐文件请单跑 pipeline --deep）", file=sys.stderr)
         writer = _csv.writer(sys.stdout)
         writer.writerow(["file", "before", "after", "integrity", "len_delta"])
         for row in rows_out:
@@ -137,6 +143,8 @@ def main():
     terms = vf.load_terms(args.terms) if args.terms else None
 
     if args.rewrite:
+        if getattr(args, "deep", False):
+            print("[提示] --deep 在 --rewrite 下不生效（无清理阶段）", file=sys.stderr)
         new = _read(args.rewrite)
         mode = "对已有改稿守卫"
         applied, removed = {}, []
@@ -145,7 +153,12 @@ def main():
         new, applied = tf.apply_auto_fixes(orig, fixes)
         new, removed = tf.drop_flagged_sentences(new)
         new, _ = tf.normalize_quotes(new)
-        mode = "机械清理"
+        deep_ops = []
+        if getattr(args, "deep", False):
+            new, deep_ops = tf.deep_polish(new)
+            for op in deep_ops:
+                applied["深改档:%s" % op["op"]] = op["count"]
+        mode = "机械清理" + ("+深改档" if deep_ops else "")
         if args.output:
             try:
                 with open(args.output, "w", encoding="utf-8") as f:
@@ -155,8 +168,12 @@ def main():
                 sys.exit(2)
 
     scan_fn = hxt_core.scan_chunked if max(len(orig), len(new)) > 1_000_000 else hxt_core.scan
-    ro = scan_fn(orig, profile=profile)
-    rn = scan_fn(new, profile=profile)
+    try:
+        ro = scan_fn(orig, profile=profile)
+        rn = scan_fn(new, profile=profile)
+    except ValueError as e:
+        print("错误: %s" % e, file=sys.stderr)
+        sys.exit(2)
     vr = vf.verify(orig, new, terms, args.max_length_change)
 
     lang = rn["lang"]
@@ -192,6 +209,7 @@ def main():
         "agent_brief": brief,
         "exit_verdict": hxt_core.verdict_exit_code(rn["score"], rn["critical_hit"],
                                                    verify_ok=vr["ok"]),
+        "hints": hxt_core.build_hints(new, rn, profile=profile),
         "honest_note": "本地启发式风格特征评分，非任何官方检测分数",
     }
 
@@ -241,6 +259,10 @@ def main():
                 print("错误: 无法写入 %s（%s）" % (args.html, e), file=sys.stderr)
                 sys.exit(2)
             print("HTML 报告: " + args.html)
+        if report["hints"]:
+            print("处置提示:")
+            for h in report["hints"]:
+                print("  → " + h)
         print("口径: " + report["honest_note"])
     if args.exit_verdict:
         sys.exit(report["exit_verdict"])

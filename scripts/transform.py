@@ -133,11 +133,51 @@ def normalize_quotes(text):
     return text, n
 
 
+# ---------------------------------------------------------------------------
+# 确定性深改档（v2.4.0 --deep）：句式级安全转换。
+# 口径：只做「零信息损失」操作——删除纯套话标记、把排除式连接改成平铺连接；
+# 不做同义改写、不碰数字/引用/术语（verify 仍整文守卫）。英文套腔在
+# auto_fixes 已覆盖（如 It is important to note that → 删），此处不重复。
+# ---------------------------------------------------------------------------
+
+_ZH_DEEP_OPENERS = ["综上所述", "值得注意的是", "值得一提的是", "众所周知",
+                    "不难发现", "由此可见", "总而言之", "总的来说"]
+_ZH_OPENER_RX = re.compile(
+    r"(^|[。！？!?]|\n)([ \t]*)(%s)[，,]\s*" % "|".join(_ZH_DEEP_OPENERS))
+_ZH_NOT_ONLY_RX = re.compile(r"不仅([^，。；\n]{1,60})，而且")
+_ZH_NOT_ALSO_RX = re.compile(r"不仅([^，。；\n]{1,60})，(还|也)")
+
+def deep_polish(text):
+    """确定性深改（v2.4.0）：句式级转换，返回 (text, ops)。
+
+    ops 为 [{"op": 名称, "count": 处数}]，进 --track 修订记录可审计。
+    两类操作：
+      1. 句首八股删除——「综上所述，」「值得注意的是，」等纯套话标记
+         （仅在句首/行首匹配，句中出现的「值得注意的是」不动，防误删）；
+      2. 排除式连接合并——「不仅X，而且Y」→「X，且Y」（「还/也」→「也」），
+         去掉宣言式框架、保留并列信息。
+    """
+    ops = []
+    text, n1 = _ZH_OPENER_RX.subn(lambda m: m.group(1) + m.group(2), text)
+    if n1:
+        ops.append({"op": "句首八股删除", "count": n1})
+    text, n2 = _ZH_NOT_ONLY_RX.subn(r"\1，且", text)
+    # 「还」脱离「不仅」框架后改「也」，学术散文语感更平（「也」原样保留）
+    text, n3 = _ZH_NOT_ALSO_RX.subn(lambda m: "%s，%s" % (m.group(1), "也"), text)
+    if n2 + n3:
+        ops.append({"op": "排除式连接合并", "count": n2 + n3})
+    return text, ops
+
+
 def main():
     ap = argparse.ArgumentParser(description="确定性机械清洗（不改数据/引用/术语）")
     ap.add_argument("file", nargs="?", help="输入文件；缺省读 stdin")
     ap.add_argument("-o", "--output", help="输出文件（缺省 stdout）")
     ap.add_argument("-a", "--aggressive", action="store_true", help="激进档")
+    ap.add_argument("--deep", action="store_true",
+                    help="深改档（v2.4.0）：句式级确定性转换——句首八股删除、"
+                         "「不仅X而且Y」→「X，且Y」。零信息损失；不替代 agent 深改，"
+                         "操作全部进 --track 可审计")
     ap.add_argument("--track", help="输出修订记录到此路径（同时生成 .md 与 .json）")
     ap.add_argument("-q", "--quiet", action="store_true", help="只写文件不打印报告")
     ap.add_argument("--lang", choices=["zh", "en", "auto"], default="auto")
@@ -171,6 +211,14 @@ def main():
     out, applied = apply_auto_fixes(text, fixes)
     out, removed = drop_flagged_sentences(out)
     out, n_quotes = normalize_quotes(out)
+    deep_ops = []
+    if args.deep:
+        out, deep_ops = deep_polish(out)
+        for op in deep_ops:
+            applied["深改档:%s" % op["op"]] = op["count"]
+        if not args.quiet:
+            for op in deep_ops:
+                print("深改档: %s ×%d" % (op["op"], op["count"]), file=sys.stderr)
 
     if args.output:
         try:

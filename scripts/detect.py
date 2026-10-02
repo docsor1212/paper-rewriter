@@ -127,8 +127,12 @@ def main():
             import re as _re
             _stext = _re.sub(r"^#{1,6}(?:\s+|(?=[\u4e00-\u9fff]))", "", text, flags=_re.M)
             _stext = _re.sub(r"\*\*([^*\n]+)\*\*", r"\1", _stext)
-        rs = hxt_core.scan_sections(_stext, lang=None if args.lang == "auto" else args.lang,
-                                    profile=args.profile, source_ext=_ext)
+        try:
+            rs = hxt_core.scan_sections(_stext, lang=None if args.lang == "auto" else args.lang,
+                                        profile=args.profile, source_ext=_ext)
+        except ValueError as e:
+            print("错误: %s" % e, file=sys.stderr)
+            sys.exit(2)
         if args.html:
             import reporter
             try:
@@ -163,13 +167,19 @@ def main():
                 rs["overall_score"], rs.get("critical_hit", False)))
         sys.exit(0)
 
-    if len(text) > 1_000_000:
-        r = hxt_core.scan_chunked(text, lang=None if args.lang == "auto" else args.lang,
-                                  profile=args.profile,
-                                  source_ext=os.path.splitext(args.file or "")[1].lower())
-    else:
-        r = hxt_core.scan(text, source_ext=os.path.splitext(args.file or "")[1].lower(), lang=None if args.lang == "auto" else args.lang,
-                          profile=args.profile)
+    try:
+        if len(text) > 1_000_000:
+            r = hxt_core.scan_chunked(text, lang=None if args.lang == "auto" else args.lang,
+                                      profile=args.profile,
+                                      source_ext=os.path.splitext(args.file or "")[1].lower())
+        else:
+            r = hxt_core.scan(text, source_ext=os.path.splitext(args.file or "")[1].lower(), lang=None if args.lang == "auto" else args.lang,
+                              profile=args.profile)
+    except ValueError as e:
+        print("错误: %s" % e, file=sys.stderr)
+        sys.exit(2)
+
+    r["hints"] = hxt_core.build_hints(text, r, profile=args.profile)
 
     if args.suggestions:
         guide = {"zh": "references/style_guide_zh.md",
@@ -262,6 +272,11 @@ def main():
         print("改写建议(前%d条): " % len(r["suggestions"]))
         for s in r["suggestions"][:6]:
             print("  · 「%s」→ 「%s」" % (s["from"], s["to"]))
+    if r["hints"]:
+        print("处置提示:")
+        for h in r["hints"]:
+            print("  → %s" % h)
+        print()
     print()
     print("下一步: python scripts/transform.py <文件> -o out.txt   # 机械清洗")
     print("       深度改写按 SKILL.md 工作流（agent 依指南执行）")

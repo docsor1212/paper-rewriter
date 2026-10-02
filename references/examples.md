@@ -211,3 +211,45 @@ $ python scripts/pipeline.py draft.txt --rewrite draft.txt --json | jq .exit_ver
 退出码全表（0/1/3/4/2 两套口径）：`references/errors.md` 第一节。
 `detect --exit-verdict` / `compare --exit-verdict` 只出 0/3/4——完整性 FAIL
 的 exit 1 契约专属 verify.py 与 pipeline。
+
+## 样例 8：确定性深改档（v2.4.0 --deep）+ 处置提示
+
+**输入**（模板腔中文段落）：
+
+```
+综上所述，本研究验证了假设。值得注意的是，该方法不仅提升了精度，而且降低了成本。众所周知，数据见第3.2节，p=0.03。
+```
+
+**transform --deep（句式级确定性转换，--track 可审计）**：
+
+```console
+$ python scripts/transform.py in.txt -o out.txt --deep --track track
+深改档: 句首八股删除 ×3
+深改档: 排除式连接合并 ×1
+
+$ cat out.txt
+本研究验证了假设。该方法提升了精度，且降低了成本。数据见第3.2节，p=0.03。
+```
+
+**守卫确认零损失**：
+
+```console
+$ python scripts/verify.py in.txt out.txt
+  数字/DOI/PMID/缩写/术语 全部保全。
+判定: 通过
+```
+
+track.md 里每笔深改操作独立可查（`深改档:句首八股删除 ×3`）。
+--deep 只做零信息损失操作（删纯套话标记/拆排除式连接）；黑话替换、
+节奏重排、立场重写仍由 agent 按指南执行——两层互补，不互相替代。
+
+**处置提示（v2.4.0，报告尾部 + JSON hints 字段）**——非论文文体自动建议切 profile：
+
+```console
+$ python scripts/detect.py blog_post.txt
+…
+处置提示:
+  → 深改排序：python scripts/plan.py <文件> -o plan.md 生成句级优先级计划
+  → 未识别到论文章节且特征以标点/翻译腔为主——非论文文体（博客/公文/通知）
+    可加 --profile general 降权八股信号
+```

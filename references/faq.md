@@ -5,7 +5,7 @@
 ## 基础
 
 **Q0：第一次用，最容易踩的坑？**
-读 `references/pitfalls.md`——20 条集中式常见错误清单（参数误用/编码事故/守卫
+读 `references/pitfalls.md`——23 条集中式常见错误清单（参数误用/编码事故/守卫
 误读/流程合规），每条带正确做法。TL;DR：跑 pipeline → 读报告 → 按指南深改 →
 verify → compare。
 

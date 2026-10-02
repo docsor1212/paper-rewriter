@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 2.3.0
+version: 2.4.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: AI flavor scan and style-pattern
   self-check reports (scan reports are detection only), deterministic text cleanup
@@ -29,7 +29,7 @@ Bilingual (CN/EN) style naturalization for academic & medical writing: find stif
 templated or machine-flavored patterns, clean mechanical debris, revise for clarity
 and natural register — with integrity guardrails on every step.
 
-## Feature status (v2.3.0)
+## Feature status (v2.4.0)
 
 | Feature | Status | Since |
 |---|---|---|
@@ -39,6 +39,7 @@ and natural register — with integrity guardrails on every step.
 | Sentence-level rewrite plan (`plan.py`) | Stable | v2.2 |
 | User-learned term guards (`learn_guards.py`) | Stable | v2.2 |
 | `--exit-verdict` machine exit codes (detect/compare/pipeline) | Stable | v2.3 |
+| Deterministic deep polish (`--deep`), handling hints, scan time budget | Stable | v2.4 |
 | HTML reports, `--batch`, `--track` audit trail | Stable | v1.5–1.6 |
 | PDF text extraction (English text-type only) | **Experimental** | v1.6 |
 
@@ -128,7 +129,7 @@ python scripts/compare.py draft.txt step2.txt
 
 Worked end-to-end examples: `references/examples.md`. Unified exit codes,
 violation categories and remedies: `references/errors.md`. **Centralized
-common-mistakes list (22 items): `references/pitfalls.md`** — read it before
+common-mistakes list (23 items): `references/pitfalls.md`** — read it before
 your first real run. Python API reference: `references/api.md`. FAQ:
 `references/faq.md`.
 
@@ -193,7 +194,7 @@ Scripts are automation-first: every verdict is machine-readable, two ways.
   CI check: `pipeline.py draft.txt --rewrite rewritten.txt --terms terms.txt
   --exit-verdict`.
 - **JSON**: `detect -j` (full scan result), `pipeline --json` (before/after,
-  verify verdict, `exit_verdict` field, agent brief), `compare --json`
+  verify verdict, `exit_verdict` field, handling `hints`, agent brief), `compare --json`
   (delta + verify), `plan.py --json` (sentence queue + projections).
   Example gate in one line:
   `python scripts/pipeline.py orig.txt --rewrite new.txt --json --exit-verdict || echo "blocked: $?"`
@@ -210,7 +211,10 @@ Scripts are automation-first: every verdict is machine-readable, two ways.
    `attached_file`), leftover chatbot pleasantries, markdown residue, and a safe
    list of filler phrases; CN halfwidth punctuation is normalized to fullwidth
    (decimals protected). `-a` adds em-dash reduction and empty-opener removal.
-   Clean human-written text passes through byte-identical.
+   `--deep` (v2.4.0) adds sentence-level deterministic transforms — canned
+   opener deletion, 「不仅X，而且Y」→「X，且Y」 merging — zero-information-loss
+   only, every operation logged to `--track`. Clean human-written text passes
+   through byte-identical.
 3. **Quality revision** (the real work): optionally rank the work first —
    `python scripts/plan.py draft.txt -o plan.md` gives a sentence-level P0
    queue (worst offenders with section, category and advice) so deep effort

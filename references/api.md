@@ -77,6 +77,9 @@ max_cjk_shift=0.12) -> {"ok": bool, "violations": [...], "warnings": [...], "sta
 | `hxt_core.scan_chunked(text, ..., max_chars, overlap)` | 分块扫描（重叠缝合口径）；小分块参数便于测试 |
 | `hxt_core.clear_pattern_cache()` | 清词表缓存（learn_guards 写守卫后同进程生效用） |
 | `hxt_core.verdict_exit_code(score, critical_hit, verify_ok=None)` | --exit-verdict 机器退出码（0/1/3/4），detect/compare/pipeline 共用 |
+| `hxt_core.build_hints(text, r, profile)` | 处置建议引擎（v2.4.0）：critical/plan/learn_guards/--profile general 四类提示 |
+| `transform.deep_polish(text)` | 确定性深改（v2.4.0）：句首八股删除+排除式连接合并，返回 (text, ops) |
+| `hxt_core.scan(..., time_budget=120.0)` | 墙钟预算（v2.4.0）：超时抛 ValueError 带拆分建议；`SCAN_TIME_BUDGET` 为缺省常量 |
 | `hxt_core._load_user_guards()` | 读 `scripts/user_guards.json`（损坏降级为空并 stderr 提示） |
 | `plan.py <file> --json / -o plan.md --top N` | 句级改写优先级计划：P0 队列+章节归属+线性预算投影 |
 | `learn_guards.py add/from-text/list/remove/test` | 误报→守卫固化；语义同内置 term_guards（±30 字符窗口豁免） |

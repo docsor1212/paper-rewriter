@@ -77,8 +77,12 @@ def main():
 
     ext_orig = os.path.splitext(args.orig or "")[1].lower()
     ext_new = os.path.splitext(args.new or "")[1].lower() if args.new else ext_orig
-    ro = hxt_core.scan(orig, profile=args.profile, source_ext=ext_orig)
-    rn = hxt_core.scan(new, profile=args.profile, source_ext=ext_new)
+    try:
+        ro = hxt_core.scan(orig, profile=args.profile, source_ext=ext_orig)
+        rn = hxt_core.scan(new, profile=args.profile, source_ext=ext_new)
+    except ValueError as e:
+        print("错误: %s" % e, file=sys.stderr)
+        sys.exit(2)
     vr = vf.verify(orig, new,
                    vf.load_terms(args.terms) if args.terms else None)
 
