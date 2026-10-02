@@ -36,6 +36,10 @@ def main():
     ap.add_argument("--review", help="生成结构化审稿报告（markdown）到此路径")
     ap.add_argument("--structure", action="store_true",
                     help="章节感知：识别论文结构（摘要/引言/方法/结果/讨论），分章节评分（方法/结果自动降权）")
+    ap.add_argument("--exit-verdict", action="store_true",
+                    help="自动化集成（CI/agent 管线）：按判定设退出码——0=低/无残留，"
+                         "3=风格特征中及以上（需深改），4=命中模型残留（critical）。"
+                         "缺省恒 0（判定写在报告里，人读口径不变）")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
 
@@ -83,9 +87,18 @@ def main():
                                            "academic" if args.profile == "academic" else "general"))
             body += ("<div class='card'><table><tr><th>文件</th><th>结果</th></tr>%s</table></div>"
                      % trs) + reporter._FOOT.format(ts=reporter._now())
-            with open(args.html, "w", encoding="utf-8") as hf:
-                hf.write(reporter._page("批量扫描汇总", body))
+            try:
+                with open(args.html, "w", encoding="utf-8") as hf:
+                    hf.write(reporter._page("批量扫描汇总", body))
+            except OSError as e:
+                print("错误: 无法写入 %s（%s）" % (args.html, e), file=sys.stderr)
+                sys.exit(2)
             print("HTML 汇总已写入 %s" % args.html, file=sys.stderr)
+        if args.exit_verdict:
+            valid = [x for x in rows_out if x[1] >= 0]
+            worst_score = max((x[1] for x in valid), default=0)
+            worst_crit = any(x[3] for x in valid)
+            sys.exit(hxt_core.verdict_exit_code(worst_score, worst_crit))
         sys.exit(0)
 
     if args.file:
@@ -109,21 +122,30 @@ def main():
         _stext = text
         if _ext == ".md":
             # markdown 输入：剥掉 # / ## / ** 语法标记后再做章节识别
+            # （v2.3.0 与 _sections_block._normalize_heading 同口径：# 后无空格
+            #   紧邻汉字也收，如 #摘要）
             import re as _re
-            _stext = _re.sub(r"^#{1,6}\s+", "", text, flags=_re.M)
+            _stext = _re.sub(r"^#{1,6}(?:\s+|(?=[\u4e00-\u9fff]))", "", text, flags=_re.M)
             _stext = _re.sub(r"\*\*([^*\n]+)\*\*", r"\1", _stext)
         rs = hxt_core.scan_sections(_stext, lang=None if args.lang == "auto" else args.lang,
                                     profile=args.profile, source_ext=_ext)
         if args.html:
             import reporter
-            with open(args.html, "w", encoding="utf-8") as hf:
-                hf.write(reporter.render_sections(rs, source=args.file or "(stdin)"))
+            try:
+                with open(args.html, "w", encoding="utf-8") as hf:
+                    hf.write(reporter.render_sections(rs, source=args.file or "(stdin)"))
+            except OSError as e:
+                print("错误: 无法写入 %s（%s）" % (args.html, e), file=sys.stderr)
+                sys.exit(2)
             print("章节报告已写入 %s" % args.html, file=sys.stderr)
         if args.suggestions:
             print("[提示] --structure 模式暂不生成 --suggestions 工作单（工作单面向整文诊断）",
                   file=sys.stderr)
         if args.json:
             print(json.dumps(rs, ensure_ascii=False, indent=2))
+            if args.exit_verdict:
+                sys.exit(hxt_core.verdict_exit_code(
+                    rs["overall_score"], rs.get("critical_hit", False)))
             sys.exit(0)
         print("=" * 62)
         print("章节感知扫描（论文结构模式）")
@@ -131,10 +153,14 @@ def main():
         print("综合: %d [%s]" % (rs["overall_score"], rs["overall_level"]))
         for x in rs["sections"]:
             sc = ("%d [%s]" % (x["score"], x["level"])) if x["score"] is not None else "不扫描（引用列表）"
-            print("  %-10s %s（%d 字符）" % (x["label"], sc, x["chars"]))
+            crit = " ⚠残留" if x.get("critical") else ""
+            print("  %-10s %s%s（%d 字符）" % (x["label"], sc, crit, x["chars"]))
         if rs["missing_sections"]:
             print("  ⚠ 未识别到章节: %s（非 IMRaD 结构可忽略）" % "/".join(rs["missing_sections"]))
         print("口径: 方法/结果段已自动降权（文体常态）；本地启发式，非官方分数")
+        if args.exit_verdict:
+            sys.exit(hxt_core.verdict_exit_code(
+                rs["overall_score"], rs.get("critical_hit", False)))
         sys.exit(0)
 
     if len(text) > 1_000_000:
@@ -159,8 +185,12 @@ def main():
 
     if args.html:
         import reporter
-        with open(args.html, "w", encoding="utf-8") as hf:
-            hf.write(reporter.render_detect(text, r, source=args.file or "(stdin)"))
+        try:
+            with open(args.html, "w", encoding="utf-8") as hf:
+                hf.write(reporter.render_detect(text, r, source=args.file or "(stdin)"))
+        except OSError as e:
+            print("错误: 无法写入 %s（%s）" % (args.html, e), file=sys.stderr)
+            sys.exit(2)
         print("HTML 报告已写入 %s" % args.html, file=sys.stderr)
 
     if getattr(args, "review", None):
@@ -176,10 +206,14 @@ def main():
 
     if args.score:
         print("%d/%s" % (r["score"], r["level"]))
+        if args.exit_verdict:
+            sys.exit(hxt_core.verdict_exit_code(r["score"], r["critical_hit"]))
         sys.exit(0)
 
     if args.json:
         print(json.dumps(r, ensure_ascii=False, indent=2))
+        if args.exit_verdict:
+            sys.exit(hxt_core.verdict_exit_code(r["score"], r["critical_hit"]))
         sys.exit(0)
 
     # ---- 人类可读报告 ----
@@ -232,6 +266,8 @@ def main():
     print("下一步: python scripts/transform.py <文件> -o out.txt   # 机械清洗")
     print("       深度改写按 SKILL.md 工作流（agent 依指南执行）")
     print("       python scripts/compare.py 原稿.txt 改稿.txt      # 前后对比+完整性")
+    if args.exit_verdict:
+        sys.exit(hxt_core.verdict_exit_code(r["score"], r["critical_hit"]))
     sys.exit(0)
 
 

@@ -12,7 +12,10 @@ def _normalize_heading(stripped):
     返回 (归一文本, 是否剥过标记)。只处理「整行即标题」的形态：
     行中混有正文（如 `**摘要** 本文研究了…`）不剥，避免把内容句当标题。"""
     s = stripped
-    m = re.match(r"^#{1,6}\s+", s)
+    # v2.3.0：# 后无空格但紧邻 CJK 的形态（#摘要）也收——CommonMark 不认它，
+    # 但中文写作场景高频出现，且失败方向（漏检）只会让章节感知失效；
+    # 英文 `#1 cause` 类不受影响（lookahead 限汉字）
+    m = re.match(r"^#{1,6}(?:\s+|(?=[\u4e00-\u9fff]))", s)
     if m:
         s = s[m.end():]
     if len(s) >= 4 and s.startswith("**") and s.endswith("**"):

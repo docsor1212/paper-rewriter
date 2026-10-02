@@ -11,7 +11,7 @@
 | 2 | 用 `--profile general` 处理论文 | 八股信号被降权，论文漏诊 | 论文用默认 academic；general 只用于博客/公文 |
 | 3 | 对「将直接提交」的文本开 `-a` 激进档不复核 | 破折号/开场被改，语气走样 | -a 仅用于非正式文本；提交前必须人工复核 |
 | 4 | `--batch` 传了文件路径而非目录 | exit 2 | 传目录；单文件直接作位置参数 |
-| 5 | 按 pipeline 的退出码写自动化分支 | pipeline 恒 exit 0，FAIL 被当成功 | 自动化分支一律调 verify.py（0/1/2 契约方） |
+| 5 | 按 pipeline 的退出码写自动化分支 | 缺省口径 pipeline 恒 exit 0，FAIL 被当成功 | 加 `--exit-verdict`（v2.3.0：0/1/3/4 判定码）或仍调 verify.py（0/1/2 契约方）；见 errors.md 自动化口径表 |
 | 6 | pipeline 同时给 `-o` 和 `--rewrite` | `--rewrite` 优先，`-o` 不生效 | 二选一：清理用 -o，复核用 --rewrite |
 
 ## 二、输入与编码事故

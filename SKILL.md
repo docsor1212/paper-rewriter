@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 2.2.0
+version: 2.3.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: AI flavor scan and style-pattern
   self-check reports (scan reports are detection only), deterministic text cleanup
@@ -29,7 +29,7 @@ Bilingual (CN/EN) style naturalization for academic & medical writing: find stif
 templated or machine-flavored patterns, clean mechanical debris, revise for clarity
 and natural register — with integrity guardrails on every step.
 
-## Feature status (v2.2.0)
+## Feature status (v2.3.0)
 
 | Feature | Status | Since |
 |---|---|---|
@@ -38,6 +38,7 @@ and natural register — with integrity guardrails on every step.
 | `.docx` direct input; 50MB file guard; read retry | Stable | v1.3–1.8 |
 | Sentence-level rewrite plan (`plan.py`) | Stable | v2.2 |
 | User-learned term guards (`learn_guards.py`) | Stable | v2.2 |
+| `--exit-verdict` machine exit codes (detect/compare/pipeline) | Stable | v2.3 |
 | HTML reports, `--batch`, `--track` audit trail | Stable | v1.5–1.6 |
 | PDF text extraction (English text-type only) | **Experimental** | v1.6 |
 
@@ -127,7 +128,7 @@ python scripts/compare.py draft.txt step2.txt
 
 Worked end-to-end examples: `references/examples.md`. Unified exit codes,
 violation categories and remedies: `references/errors.md`. **Centralized
-common-mistakes list (20 items): `references/pitfalls.md`** — read it before
+common-mistakes list (22 items): `references/pitfalls.md`** — read it before
 your first real run. Python API reference: `references/api.md`. FAQ:
 `references/faq.md`.
 
@@ -172,8 +173,31 @@ When invoked, decide the path first, then run it:
 - Exit codes: `verify.py` is the strict contract holder — `0` integrity PASS,
   `1` integrity FAIL (fix the rewrite, never the guard), `2` usage/file error.
   `detect/transform/compare/pipeline` report the verdict in their output and
-  always exit `0` on completed runs, `2` on usage/file errors. Every script
-  supports `--version`.
+  always exit `0` on completed runs, `2` on usage/file errors. For agent/CI
+  branching, add `--exit-verdict` (v2.3.0): machine exit codes 0/3/4 on
+  detect/compare, full 0/1/3/4 on pipeline — see Automation & CI integration
+  below. Every script supports `--version`.
+
+## Automation & CI integration (v2.3.0)
+
+Scripts are automation-first: every verdict is machine-readable, two ways.
+
+- **Default contract (human flows)**: `verify.py` alone holds exit 0/1/2
+  (1 = integrity FAIL); detect/transform/compare/pipeline finish with 0 and
+  put the verdict in their report. Never branch on their default exit code.
+- **Machine contract** — add `--exit-verdict` to detect / compare / pipeline:
+  `0` clean (low, no residue) · `3` style patterns at medium or above (needs
+  deep revision) · `4` model-residue hit (run transform first) · `1`
+  integrity FAIL (pipeline only — same meaning as verify's 1) · `2` usage
+  error (unchanged). **pipeline is the only full 1/3/4 gate** — recommended
+  CI check: `pipeline.py draft.txt --rewrite rewritten.txt --terms terms.txt
+  --exit-verdict`.
+- **JSON**: `detect -j` (full scan result), `pipeline --json` (before/after,
+  verify verdict, `exit_verdict` field, agent brief), `compare --json`
+  (delta + verify), `plan.py --json` (sentence queue + projections).
+  Example gate in one line:
+  `python scripts/pipeline.py orig.txt --rewrite new.txt --json --exit-verdict || echo "blocked: $?"`
+- Exit-code tables for both contracts: `references/errors.md` §1.
 
 ## The workflow
 
@@ -239,9 +263,9 @@ For reviewers, security scanners and cautious users:
 
   (runs clean as of this release — the claim is reproducible, not rhetorical).
 - Writes **only** to output paths you pass explicitly: `-o`/`--output` on
-  transform/compare/pipeline/plan, `--suggestions`, `--html`, `--review`
-  (detect.py's markdown report), `--report` (check_terms.py), and `--track`
-  (`base.md` + `base.json`). One tool-owned data file on top of that:
+  transform/compare/pipeline/plan/extract_terms, `--suggestions`, `--html`,
+  `--review` (detect.py's markdown report), `--report` (check_terms.py), and
+  `--track` (`base.md` + `base.json`). One tool-owned data file on top of that:
   `learn_guards.py add`/`from-text`/`remove` writes
   `scripts/user_guards.json` (your learned term guards, via a transient
   `.tmp` + atomic rename). No other writes.

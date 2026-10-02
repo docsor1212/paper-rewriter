@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "2.2.0"
+__version__ = "2.3.0"
 
 import json
 import os
@@ -485,6 +485,7 @@ def scan_sections(text, lang=None, profile="academic", source_ext=""):
     secs = detect_sections(text)
     out_sections = []
     wsum, ssum = 0.0, 0.0
+    any_critical = False
     for key, start, end in secs:
         if key == "references":
             out_sections.append({"key": key, "label": SECTION_LABEL.get(key, key),
@@ -494,18 +495,24 @@ def scan_sections(text, lang=None, profile="academic", source_ext=""):
         if not seg.strip():
             continue
         w = SECTION_W.get(key, 1.0)
-        r = scan(seg, lang=lang, profile=profile)
+        r = scan(seg, lang=lang, profile=profile, source_ext=source_ext)
+        any_critical = any_critical or bool(r["critical_hit"])
         out_sections.append({"key": key, "label": SECTION_LABEL.get(key, key),
                              "score": r["score"], "level": r["level"],
+                             "critical": bool(r["critical_hit"]),
                              "chars": end - start})
         wsum += w
         ssum += r["score"] * w
     overall_score = int(round(ssum / wsum)) if wsum else 0
-    if overall_score >= 75:
+    # critical 硬特征不参与加权平均（方法段降权/短段折减都不许稀释它）：
+    # 任一章节命中模型残留 → 综合档位直接拉到极高（与整文 _score 口径一致）
+    if any_critical:
+        overall_score = max(overall_score, 88)
+    if overall_score >= LEVEL_MAX_THRESHOLD:
         level = "极高"
-    elif overall_score >= 50:
+    elif overall_score >= LEVEL_HIGH_THRESHOLD:
         level = "高"
-    elif overall_score >= 28:
+    elif overall_score >= LEVEL_MID_THRESHOLD:
         level = "中"
     else:
         level = "低"
@@ -513,6 +520,7 @@ def scan_sections(text, lang=None, profile="academic", source_ext=""):
     missing = [k for k in ("abstract", "introduction", "methods", "results", "discussion")
                if k not in present]
     return {"overall_score": overall_score, "overall_level": level,
+            "critical_hit": any_critical,
             "sections": out_sections, "missing_sections": missing}
 
 
@@ -570,6 +578,7 @@ _ADVICE = {
     "en_para": ("负向平行句", "拆成两个平铺陈述（EN 指南第 3 步）"),
     "en_chal": ("挑战/展望公式段", "删公式，写具体判断（EN 指南第 7 步）"),
     "en_filler": ("填充短语", "transform.py 可自动处理大部分"),
+    "en_opening": ("套路开场", "删仪式感开场句，直接进入论点；万能框架换成具体陈述（EN 指南第 1/2 步）"),
     "markdown": ("Markdown 残留", "transform.py 可自动处理"),
 }
 
@@ -933,6 +942,35 @@ def _structural_stats(text, sentences, lang):
 # 校准基准：四条语料机器腔 ≥55（高），自然文 ≤10（低）。见 tests/test_offline.py
 _LANG_K = {"zh": 7.0, "en": 3.2, "mix": 5.0}
 
+# 档位阈值（v2.3.0 起单一真相源）：_score / scan_sections / pipeline 深改简报 /
+# --exit-verdict 全部引用这里，禁止各处再硬编码
+LEVEL_MID_THRESHOLD = 28   # 中 档下限
+LEVEL_HIGH_THRESHOLD = 50  # 高 档下限
+LEVEL_MAX_THRESHOLD = 75   # 极高 档下限
+
+# --exit-verdict 机器退出码档位（v2.3.0）：与 _score 的 level 阈值同源
+VERDICT_WORK_THRESHOLD = LEVEL_MID_THRESHOLD
+
+
+def verdict_exit_code(score, critical_hit=False, verify_ok=None):
+    """自动化集成退出码（--exit-verdict 时的契约，v2.3.0）。
+
+    1 = 完整性守卫 FAIL（仅当调用方传入 verify_ok=False；数字/引用/术语被改）
+    4 = 命中模型残留（critical，优先于分数档）
+    3 = 风格特征中及以上（≥28，需要深改）
+    0 = 干净（低档且无 critical）
+
+    不带 --exit-verdict 时各脚本维持既有契约：verify.py 独占 0/1/2，
+    其余脚本完成即 0（判定写在报告里）。用法错误在任何模式下都是 2。
+    """
+    if verify_ok is False:
+        return 1
+    if critical_hit:
+        return 4
+    if score >= VERDICT_WORK_THRESHOLD:
+        return 3
+    return 0
+
 
 def _score(pts, stats, units, cats, lang):
     """加权命中 → 0-100 分。critical 直接拉到「极高」档并给出依据。"""
@@ -965,11 +1003,11 @@ def _score(pts, stats, units, cats, lang):
     if critical:
         score = max(score, 88.0)
     score = int(round(score))
-    if score >= 75 or critical:
+    if score >= LEVEL_MAX_THRESHOLD or critical:
         level = "极高"
-    elif score >= 50:
+    elif score >= LEVEL_HIGH_THRESHOLD:
         level = "高"
-    elif score >= 28:
+    elif score >= LEVEL_MID_THRESHOLD:
         level = "中"
     else:
         level = "低"

@@ -6,6 +6,7 @@
     python scripts/compare.py 原稿.txt -o 改稿.txt         # 先机械清洗再对比并落盘
     python scripts/compare.py 原稿.txt 改稿.txt --terms t.txt
 退出码: 0 完成（含完整性 FAIL 也算完成，看报告）| 2 用法/文件错误
+        --exit-verdict: 0 干净 | 3 风格特征中及以上（完整性仍只写报告）
 """
 
 import argparse
@@ -44,8 +45,12 @@ def main():
     ap.add_argument("--profile", choices=["academic", "general"], default="academic",
                     help="academic=论文口径（默认）；general=非学术文本")
     ap.add_argument("--html", help="生成单文件 HTML 对照报告（含逐句 diff）到此路径")
-    ap.add_argument("--batch", help="批量模式：扫描目录内全部 .txt/.md/.docx 逐对对比（orig 改稿由 --suffix 推导）")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--exit-verdict", action="store_true",
+                    help="自动化集成（CI/agent 管线）：按改稿判定设退出码——0=低档，"
+                         "3=风格特征中及以上。完整性守卫仍只写报告（exit 1 契约专属 "
+                         "verify.py；要 1/3/4 全档判定用 pipeline --exit-verdict）。"
+                         "缺省恒 0")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
 
@@ -79,8 +84,12 @@ def main():
 
     if args.html:
         import reporter
-        with open(args.html, "w", encoding="utf-8") as hf:
-            hf.write(reporter.render_compare(orig, new, ro, rn, vr))
+        try:
+            with open(args.html, "w", encoding="utf-8") as hf:
+                hf.write(reporter.render_compare(orig, new, ro, rn, vr))
+        except OSError as e:
+            print("错误: 无法写入 %s（%s）" % (args.html, e), file=sys.stderr)
+            sys.exit(2)
         print("HTML 对照报告已写入 %s" % args.html, file=sys.stderr)
 
     if args.json:
@@ -91,6 +100,8 @@ def main():
             "categories_removed": _delta(ro["categories"], rn["categories"]),
             "verify": vr,
         }, ensure_ascii=False, indent=2))
+        if args.exit_verdict:
+            sys.exit(hxt_core.verdict_exit_code(rn["score"], rn["critical_hit"]))
         sys.exit(0)
 
     print("=" * 62)
@@ -122,6 +133,8 @@ def main():
         print("      （黑话替换/八股拆解/句式节奏），改完重跑本命令复核。")
     else:
         print("结论: 痕迹已明显下降；深改请仍按指南复核语义自然度（机器分≠官方检测器分）。")
+    if args.exit_verdict:
+        sys.exit(hxt_core.verdict_exit_code(rn["score"], rn["critical_hit"]))
     sys.exit(0)
 
 

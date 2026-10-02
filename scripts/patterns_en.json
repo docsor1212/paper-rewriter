@@ -640,6 +640,13 @@
       "weight": 0.8,
       "pattern": "^#{1,6} \\S|\\*\\*[^*\\n]{2,60}\\*\\*|^[-*] \\[ \\] |==[^=\\n]{2,40}==",
       "show_hits": true
+    },
+    {
+      "cat": "en_opening",
+      "label": "万能框架（canned openers: ever-evolving, navigating the complexities…）",
+      "weight": 0.8,
+      "show_hits": true,
+      "pattern": "in the ever-(evolving|changing|expanding) (world|landscape|realm|field) of|embark(s|ed|ing)? on (a|the|an) (journey|exploration)|(dive|diving|delves?|delving) into the (world|realm) of"
     }
   ],
   "auto_fixes": [

@@ -186,3 +186,28 @@ $ echo "以创新为抓手，全面赋能业务增长。" | python scripts/detec
 守卫存进 `scripts/user_guards.json`（升级词表不丢）；`list` 查看、
 `remove 抓手` 撤销、`from-text 术语 样本.txt` 从真实语料自动提取上下文
 （中英双语口径）。强制要求 `--before/--after` 上下文——纯词白名单会被拒绝。
+
+## 样例 7：CI/agent 门禁——机器退出码（v2.3.0 --exit-verdict）
+
+把改稿质量卡进自动化流程：改稿不达标就拦截，不需要人读报告。
+
+```console
+$ # 坏改稿：改稿=原稿（一句没改），门禁应拦截
+$ python scripts/pipeline.py draft.txt --rewrite draft.txt --exit-verdict
+$ echo $?
+3                                    ← 风格特征中及以上（52/高），进深改队列
+
+$ # 好改稿：事实保留、模板腔清除，门禁放行
+$ python scripts/pipeline.py draft.txt --rewrite rewritten.txt --exit-verdict
+完整性守卫: PASS ✓
+$ echo $?
+0
+
+$ # JSON 里的同源字段（agent 管线直接读）
+$ python scripts/pipeline.py draft.txt --rewrite draft.txt --json | jq .exit_verdict
+3
+```
+
+退出码全表（0/1/3/4/2 两套口径）：`references/errors.md` 第一节。
+`detect --exit-verdict` / `compare --exit-verdict` 只出 0/3/4——完整性 FAIL
+的 exit 1 契约专属 verify.py 与 pipeline。

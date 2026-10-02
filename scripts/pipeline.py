@@ -12,10 +12,14 @@
 --rewrite rewritten.txt: 已有人工/agent 改稿时，直接对改稿跑守卫+对比（跳过清理）。
 
 退出码: 0 完成（完整性 FAIL 也算完成，看报告）| 2 用法/文件错误
+--exit-verdict（v2.3.0 自动化集成档）: 0=干净 | 1=完整性 FAIL（与 verify 契约同义）
+    | 3=风格特征中及以上（需深改）| 4=命中模型残留 | 2=用法/文件错误不变。
+    pipeline 是唯一提供 1/3/4 全档判定的命令——CI/agent 门禁推荐用它。
 """
 
 import argparse
 import json
+import re
 import sys
 import os
 
@@ -54,6 +58,9 @@ def main():
     ap.add_argument("--track", help="输出修订记录（.md+.json）到此路径基名")
     ap.add_argument("--batch", help="批量模式：目录内全部 .txt/.md/.docx 逐个「清理+守卫」，汇总 CSV 输出到 stdout/此路径")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--exit-verdict", action="store_true",
+                    help="自动化集成（CI/agent 门禁）：按判定设退出码——0=干净，"
+                         "1=完整性 FAIL，3=风格特征中及以上，4=模型残留。缺省恒 0")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
 
@@ -107,6 +114,18 @@ def main():
             except OSError as e:
                 print("错误: 无法写入 %s（%s）" % (args.output, e), file=sys.stderr)
                 sys.exit(2)
+        if getattr(args, "exit_verdict", False):
+            # 聚合最坏行：integrity FAIL 优先（1），其次残留（4）/分数档（3）
+            worst = 0
+            for row in rows_out:
+                integrity, after = row[3], row[2]
+                if str(integrity).startswith("FAIL"):
+                    worst = max(worst, 1)
+                    continue
+                m = re.match(r"^(\d+)", str(after))
+                score = int(m.group(1)) if m else 0
+                worst = max(worst, hxt_core.verdict_exit_code(score))
+            sys.exit(worst)
         sys.exit(0)
 
     if not args.file:
@@ -171,6 +190,8 @@ def main():
         "after": {"score": rn["score"], "level": rn["level"], "critical": rn["critical_hit"]},
         "verify": vr,
         "agent_brief": brief,
+        "exit_verdict": hxt_core.verdict_exit_code(rn["score"], rn["critical_hit"],
+                                                   verify_ok=vr["ok"]),
         "honest_note": "本地启发式风格特征评分，非任何官方检测分数",
     }
 
@@ -188,6 +209,9 @@ def main():
 
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
+        if args.exit_verdict:
+            sys.exit(report["exit_verdict"])
+        sys.exit(0)
     else:
         print("=" * 62)
         print("一键管线报告（%s）" % mode)
@@ -209,11 +233,17 @@ def main():
             print("修订建议工作单: " + args.suggestions)
         if getattr(args, "html", None):
             import reporter
-            with open(args.html, "w", encoding="utf-8") as hf:
-                hf.write(reporter.render_pipeline(orig, new, ro, rn, vr, brief,
-                                                  chunked=getattr(rn, "get", lambda k: None)("chunked")))
+            try:
+                with open(args.html, "w", encoding="utf-8") as hf:
+                    hf.write(reporter.render_pipeline(orig, new, ro, rn, vr, brief,
+                                                      chunked=getattr(rn, "get", lambda k: None)("chunked")))
+            except OSError as e:
+                print("错误: 无法写入 %s（%s）" % (args.html, e), file=sys.stderr)
+                sys.exit(2)
             print("HTML 报告: " + args.html)
         print("口径: " + report["honest_note"])
+    if args.exit_verdict:
+        sys.exit(report["exit_verdict"])
     sys.exit(0)
 
 

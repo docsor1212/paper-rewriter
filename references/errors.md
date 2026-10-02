@@ -5,6 +5,8 @@
 
 ## 一、退出码（CLI 契约）
 
+**缺省口径**（不带 `--exit-verdict`，人读/人工流程）：
+
 | 退出码 | 脚本 | 含义 | 处置 |
 |---|---|---|---|
 | 0 | 全部 | 完成（verify: 完整性 PASS） | 正常继续；其余脚本的判定读输出报告 |
@@ -12,6 +14,19 @@
 | 2 | 全部 | 用法或文件错误 | 看 stderr 提示：路径错/文件空/二进制/编码/超限，每条提示自带处置建议 |
 
 > pipeline.py / compare.py 的守卫判定在输出报告的「完整性守卫: PASS/FAIL」行；按退出码分支的脚本请调 verify.py。
+
+**自动化口径**（v2.3.0：detect/compare/pipeline 加 `--exit-verdict` 后）：
+
+| 退出码 | 含义 | 典型 CI 动作 |
+|---|---|---|
+| 0 | 干净（低档、无残留；pipeline 另含完整性 PASS） | 合并/继续 |
+| 1 | 完整性守卫 FAIL（仅 pipeline 会产出；与 verify 契约同义） | 拒绝该改稿，回给 agent 重改 |
+| 3 | 风格特征中及以上（≥28，需要深改） | 进深改队列（plan.py 排优先级） |
+| 4 | 命中模型残留（critical） | 先跑 transform.py 清理 |
+| 2 | 用法/文件错误（不受 --exit-verdict 影响） | 修调用 |
+
+> detect/compare 的 `--exit-verdict` 只出 0/3/4（完整性仍只写报告——exit 1 契约专属 verify/pipeline）；
+> **pipeline 是唯一 1/3/4 全档判定命令**，CI 门禁推荐 `pipeline.py 原稿 --rewrite 改稿 --exit-verdict`。
 
 ## 二、verify.py 违规类别（exit 1 = violations；WARN = 告警继续）
 
