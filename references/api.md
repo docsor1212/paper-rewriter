@@ -80,6 +80,9 @@ max_cjk_shift=0.12) -> {"ok": bool, "violations": [...], "warnings": [...], "sta
 | `hxt_core.build_hints(text, r, profile)` | 处置建议引擎（v2.4.0）：critical/plan/learn_guards/--profile general 四类提示 |
 | `transform.deep_polish(text)` | 确定性深改（v2.4.0）：句首八股删除+排除式连接合并，返回 (text, ops) |
 | `hxt_core.scan(..., time_budget=120.0)` | 墙钟预算（v2.4.0）：超时抛 ValueError 带拆分建议；`SCAN_TIME_BUDGET` 为缺省常量 |
+| `hxt_core.CliError(msg, hint)` / `fail()` / `cli_entry(main)` | 集中异常层（v2.5.0）：两行中文错误+处置建议，exit 2；SystemExit 穿透 |
+| `pipeline.py --step-timeout SEC` / report `timings` | 单步墙钟预算与各步耗时（cleanup/scan/verify，v2.5.0） |
+| `detect --batch --json` / `pipeline --batch` 的 `retried` | 批量二遍重试标记（v2.5.0）：失败文件以双倍预算重扫一次 |
 | `hxt_core._load_user_guards()` | 读 `scripts/user_guards.json`（损坏降级为空并 stderr 提示） |
 | `plan.py <file> --json / -o plan.md --top N` | 句级改写优先级计划：P0 队列+章节归属+线性预算投影 |
 | `learn_guards.py add/from-text/list/remove/test` | 误报→守卫固化；语义同内置 term_guards（±30 字符窗口豁免） |

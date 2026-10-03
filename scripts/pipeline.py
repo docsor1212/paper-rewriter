@@ -22,6 +22,7 @@ import json
 import re
 import sys
 import os
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import hxt_core
@@ -65,10 +66,17 @@ def main():
                     help="深改档（v2.4.0）：清理阶段追加句式级确定性转换"
                          "（句首八股删除/排除式连接合并），操作进 --track 可审计。"
                          "--rewrite/--batch 下不生效")
+    ap.add_argument("--step-timeout", type=float, default=hxt_core.SCAN_TIME_BUDGET,
+                    help="单步墙钟预算秒（v2.5.0，缺省 120，须 >0）：清理与扫描各阶段"
+                         "超时即干净报错（exit 2）并给拆分建议；分块扫描时为每块独立"
+                         "预算（最坏 k 块 k 倍）；JSON 报告含各步耗时")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
 
     # ── 批量模式：逐文件 清理+守卫 汇总 ──
+    if getattr(args, "step_timeout", 0) is not None and args.step_timeout <= 0:
+        hxt_core.fail("--step-timeout 必须为正数（收到 %s）" % args.step_timeout,
+                      hint="秒数请 >0；缺省 120 秒")
     if args.batch:
         import csv as _csv
         root = args.batch
@@ -76,6 +84,7 @@ def main():
             print("错误: --batch 需要目录（%s）" % root, file=sys.stderr)
             sys.exit(2)
         rows_out = []
+        pending = []  # (fp, 行索引)——二遍重试队列（v2.5.0 stability 处方）
         for fn in sorted(os.listdir(root)):
             if not fn.lower().endswith((".txt", ".md", ".docx")):
                 continue
@@ -90,14 +99,40 @@ def main():
                 n, _rm = tf.drop_flagged_sentences(n)
                 n, _nq = tf.normalize_quotes(n)
                 v = vf.verify(o, n)
-                before = hxt_core.scan(o)
-                after = hxt_core.scan(n)
+                before = hxt_core.scan(o, time_budget=args.step_timeout)
+                after = hxt_core.scan(n, time_budget=args.step_timeout)
                 rows_out.append((fn, "%d[%s]" % (before["score"], before["level"]),
                                  "%d[%s]" % (after["score"], after["level"]),
                                  "PASS" if v["ok"] else "FAIL(%d)" % len(v["violations"]),
                                  "%+d%%" % v["stats"]["length_delta_pct"]))
+            except (OSError, ValueError):
+                # 首遍失败不放弃：进二遍重试队列（超时/IO 抖动多为瞬时态）
+                pending.append((fp, len(rows_out)))
+                rows_out.append((fn, "-", "-", "错误（待重试）", "-"))
+        retried = {}
+        for fp, idx in pending:
+            fn = rows_out[idx][0]
+            try:
+                o = hxt_core.read_text(fp)
+                fx = tf.load_fixes(None, False)
+                n, _ap = tf.apply_auto_fixes(o, fx)
+                n, _rm = tf.drop_flagged_sentences(n)
+                n, _nq = tf.normalize_quotes(n)
+                v = vf.verify(o, n)
+                before = hxt_core.scan(o, time_budget=hxt_core.SCAN_TIME_BUDGET * 2)
+                after = hxt_core.scan(n, time_budget=hxt_core.SCAN_TIME_BUDGET * 2)
+                rows_out[idx] = (fn, "%d[%s]" % (before["score"], before["level"]),
+                                 "%d[%s]" % (after["score"], after["level"]),
+                                 "PASS" if v["ok"] else "FAIL(%d)" % len(v["violations"]),
+                                 "%+d%%" % v["stats"]["length_delta_pct"])
+                retried[fn] = True
             except (OSError, ValueError) as e:
-                rows_out.append((fn, "-", "-", "错误", str(e)[:40]))
+                rows_out[idx] = (fn, "-", "-", "错误: %s（已重试 1 次）" % str(e)[:60], "-")
+                retried[fn] = False
+        if retried:
+            n_ok = sum(1 for v in retried.values() if v)
+            print("[重试] 二遍处理：%d 个失败文件重试，%d 个恢复" % (len(retried), n_ok),
+                  file=sys.stderr)
         if getattr(args, "html", None):
             print("[提示] pipeline --batch 暂不生成 --html（可用 detect --batch --html）", file=sys.stderr)
         if getattr(args, "track", None):
@@ -128,6 +163,10 @@ def main():
                 if str(integrity).startswith("FAIL"):
                     worst = max(worst, 1)
                     continue
+                if str(integrity).startswith("错误"):
+                    # fail-closed：扫描不出的文件门禁不放行
+                    worst = max(worst, 2)
+                    continue
                 m = re.match(r"^(\d+)", str(after))
                 score = int(m.group(1)) if m else 0
                 worst = max(worst, hxt_core.verdict_exit_code(score))
@@ -148,9 +187,15 @@ def main():
         new = _read(args.rewrite)
         mode = "对已有改稿守卫"
         applied, removed = {}, []
+        cleanup_s = None
     else:
+        t_clean = time.monotonic()
+        _deadline = t_clean + args.step_timeout
         fixes = tf.load_fixes(None, False)
         new, applied = tf.apply_auto_fixes(orig, fixes)
+        if time.monotonic() > _deadline:
+            hxt_core.fail("清理阶段超时（预算 %g 秒）" % args.step_timeout,
+                          hint="文件较大时请按章节拆分后分别处理，或调大 --step-timeout")
         new, removed = tf.drop_flagged_sentences(new)
         new, _ = tf.normalize_quotes(new)
         deep_ops = []
@@ -158,6 +203,10 @@ def main():
             new, deep_ops = tf.deep_polish(new)
             for op in deep_ops:
                 applied["深改档:%s" % op["op"]] = op["count"]
+        if time.monotonic() > _deadline:
+            hxt_core.fail("清理阶段超时（预算 %g 秒）" % args.step_timeout,
+                          hint="文件较大时请按章节拆分后分别处理，或调大 --step-timeout")
+        cleanup_s = time.monotonic() - t_clean
         mode = "机械清理" + ("+深改档" if deep_ops else "")
         if args.output:
             try:
@@ -168,13 +217,17 @@ def main():
                 sys.exit(2)
 
     scan_fn = hxt_core.scan_chunked if max(len(orig), len(new)) > 1_000_000 else hxt_core.scan
+    t_scan = time.monotonic()
     try:
-        ro = scan_fn(orig, profile=profile)
-        rn = scan_fn(new, profile=profile)
+        ro = scan_fn(orig, profile=profile, time_budget=args.step_timeout)
+        rn = scan_fn(new, profile=profile, time_budget=args.step_timeout)
     except ValueError as e:
         print("错误: %s" % e, file=sys.stderr)
         sys.exit(2)
+    scan_s = time.monotonic() - t_scan
+    t_ver = time.monotonic()
     vr = vf.verify(orig, new, terms, args.max_length_change)
+    verify_s = time.monotonic() - t_ver
 
     lang = rn["lang"]
     top = sorted(rn["categories"].items(),
@@ -210,6 +263,13 @@ def main():
         "exit_verdict": hxt_core.verdict_exit_code(rn["score"], rn["critical_hit"],
                                                    verify_ok=vr["ok"]),
         "hints": hxt_core.build_hints(new, rn, profile=profile),
+        "timings": ({"cleanup_s": round(cleanup_s, 2), "scan_s": round(scan_s, 2),
+                     "verify_s": round(verify_s, 2),
+                     "total_s": round(cleanup_s + scan_s + verify_s, 2)}
+                    if cleanup_s is not None else
+                    {"cleanup_s": None, "scan_s": round(scan_s, 2),
+                     "verify_s": round(verify_s, 2),
+                     "total_s": round(scan_s + verify_s, 2)}),
         "honest_note": "本地启发式风格特征评分，非任何官方检测分数",
     }
 
@@ -259,6 +319,11 @@ def main():
                 print("错误: 无法写入 %s（%s）" % (args.html, e), file=sys.stderr)
                 sys.exit(2)
             print("HTML 报告: " + args.html)
+        tm = report["timings"]
+        clean_disp = "—" if tm["cleanup_s"] is None else "%.1fs" % tm["cleanup_s"]
+        print("耗时: 清理 %s | 扫描 %.1fs | 守卫 %.1fs（合计 %.1fs，单步预算 %g 秒）"
+              % (clean_disp, tm["scan_s"], tm["verify_s"], tm["total_s"],
+                 args.step_timeout))
         if report["hints"]:
             print("处置提示:")
             for h in report["hints"]:
@@ -270,8 +335,4 @@ def main():
 
 
 if __name__ == "__main__":
-    try:
-        sys.stdout.reconfigure(encoding="utf-8")
-    except Exception:
-        pass
-    main()
+    hxt_core.cli_entry(main)

@@ -271,9 +271,9 @@ def main():
         else:
             print(out_text)
     except (OSError, ValueError) as e:
-        print("错误：%s" % e, file=sys.stderr)
+        print("错误: %s" % e, file=sys.stderr)
         sys.exit(2)
 
 
 if __name__ == "__main__":
-    main()
+    hxt_core.cli_entry(main)

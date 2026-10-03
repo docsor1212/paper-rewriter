@@ -49,6 +49,7 @@ def main():
             print("错误: --batch 需要目录（%s）" % root, file=sys.stderr)
             sys.exit(2)
         rows_out = []
+        pending = []  # (fp, 行索引)——二遍重试队列（v2.5.0 stability 处方）
         for fn in sorted(os.listdir(root)):
             if not fn.lower().endswith((".txt", ".md", ".docx")):
                 continue
@@ -65,15 +66,42 @@ def main():
                       hxt_core.scan(t, lang=None if args.lang == "auto" else args.lang,
                                     profile=args.profile, source_ext=_ext))
                 rows_out.append((fn, rr["score"], rr["level"], rr["critical_hit"], rr["lang"]))
+            except (OSError, ValueError):
+                # 首遍失败不放弃：进二遍重试队列（超时/IO 抖动多为瞬时态）
+                pending.append((fp, len(rows_out)))
+                rows_out.append((fn, -1, "错误（待重试）", False, "-"))
+        retried = {}  # fn -> True(重试成功) / False(重试仍败)
+        for fp, idx in pending:
+            fn = rows_out[idx][0]
+            try:
+                t = hxt_core.read_text(fp)
+                _ext = os.path.splitext(fn)[1].lower()
+                rr = (hxt_core.scan_chunked(t, lang=None if args.lang == "auto" else args.lang,
+                                            profile=args.profile, source_ext=_ext,
+                                            time_budget=hxt_core.SCAN_TIME_BUDGET * 2)
+                      if len(t) > 1_000_000 else
+                      hxt_core.scan(t, lang=None if args.lang == "auto" else args.lang,
+                                    profile=args.profile, source_ext=_ext,
+                                    time_budget=hxt_core.SCAN_TIME_BUDGET * 2))
+                rows_out[idx] = (fn, rr["score"], rr["level"], rr["critical_hit"], rr["lang"])
+                retried[fn] = True
             except (OSError, ValueError) as e:
-                rows_out.append((fn, -1, "错误: %s" % str(e)[:40], False, "-"))
+                rows_out[idx] = (fn, -1, "错误: %s（已重试 1 次）" % str(e)[:60], False, "-")
+                retried[fn] = False
+        if retried:
+            n_ok = sum(1 for v in retried.values() if v)
+            print("[重试] 二遍扫描：%d 个失败文件重试，%d 个恢复" % (len(retried), n_ok),
+                  file=sys.stderr)
         if args.json:
-            print(json.dumps([{"file": f, "score": s, "level": l, "critical": c, "lang": g}
+            print(json.dumps([{"file": f, "score": s, "level": l, "critical": c, "lang": g,
+                               "retried": retried.get(f, False)}
                               for f, s, l, c, g in rows_out], ensure_ascii=False, indent=2))
         else:
             print("批量扫描 %d 个文件：" % len(rows_out))
             for f, s, l, c, g in rows_out:
                 mark = (" %s/%s%s" % (s, l, " ⚠残留" if c else "")) if s >= 0 else (" %s" % l)
+                if retried.get(f):
+                    mark += "（重试成功）"
                 print("  %-36s%s" % (f, mark))
         if args.html:
             import reporter
@@ -95,9 +123,13 @@ def main():
                 sys.exit(2)
             print("HTML 汇总已写入 %s" % args.html, file=sys.stderr)
         if args.exit_verdict:
-            valid = [x for x in rows_out if x[1] >= 0]
-            worst_score = max((x[1] for x in valid), default=0)
-            worst_crit = any(x[3] for x in valid)
+            # fail-closed：有文件两遍重试仍扫不出 → 门禁不给放行（exit 2）
+            if any(x[1] < 0 for x in rows_out):
+                print("错误: 批量中存在扫描失败的文件，--exit-verdict 门禁不予放行",
+                      file=sys.stderr)
+                sys.exit(2)
+            worst_score = max((x[1] for x in rows_out), default=0)
+            worst_crit = any(x[3] for x in rows_out)
             sys.exit(hxt_core.verdict_exit_code(worst_score, worst_crit))
         sys.exit(0)
 
@@ -287,8 +319,4 @@ def main():
 
 
 if __name__ == "__main__":
-    try:
-        sys.stdout.reconfigure(encoding="utf-8")
-    except Exception:
-        pass
-    main()
+    hxt_core.cli_entry(main)

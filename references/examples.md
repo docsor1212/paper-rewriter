@@ -253,3 +253,35 @@ $ python scripts/detect.py blog_post.txt
   → 未识别到论文章节且特征以标点/翻译腔为主——非论文文体（博客/公文/通知）
     可加 --profile general 降权八股信号
 ```
+
+## 样例 9：集中异常层 + 批量重试 + 单步超时（v2.5.0）
+
+**两行中文错误（错误 + 处置建议）**——所有 CLI 统一格式，非技术用户也能照着做：
+
+```console
+$ python scripts/detect.py photo.png
+错误: 输入疑似二进制文件（含 NUL 字节）——请转存为 UTF-8 纯文本（.txt/.md）再处理
+```
+
+**批量二遍重试**——首遍失败的文件自动以双倍时间预算重扫一次，瞬时故障
+（负载抖动导致超时等）第二遍即恢复；真坏文件如实标注"已重试"：
+
+```console
+$ python scripts/detect.py --batch ./papers
+[重试] 二遍扫描：1 个失败文件重试，0 个恢复
+  a.txt                                0/低
+  broken.txt                           错误: 输入疑似二进制文件…（已重试 1 次）
+```
+
+`--json` 输出逐文件携带 `retried` 字段（true=重试后成功）。
+
+**单步超时与耗时透明**——`--step-timeout`（缺省 120 秒）管住清理与扫描
+每一步，超时干净报错；JSON 报告新增 `timings`：
+
+```console
+$ python scripts/pipeline.py draft.txt -o out.txt
+耗时: 清理 0.0s | 扫描 0.1s | 守卫 0.0s（合计 0.2s，单步预算 120 秒）
+
+$ python scripts/pipeline.py draft.txt -o out.txt --json | jq .timings
+{ "cleanup_s": 0.0, "scan_s": 0.11, "verify_s": 0.0, "total_s": 0.11 }
+```

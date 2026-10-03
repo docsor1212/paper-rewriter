@@ -193,9 +193,9 @@ def main():
                 if c["count"]:
                     print("  [%s] ×%d %s" % (cid, c["count"], c["label"]))
     except (OSError, ValueError) as e:
-        print("错误：%s" % e, file=sys.stderr)
+        print("错误: %s" % e, file=sys.stderr)
         sys.exit(2)
 
 
 if __name__ == "__main__":
-    main()
+    hxt_core.cli_entry(main)

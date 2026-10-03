@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "2.4.0"
+__version__ = "2.5.0"
 
 import json
 import os
@@ -783,7 +783,7 @@ def scan(text, lang=None, profile="academic", source_ext="",
     time_budget: 墙钟预算秒（v2.4.0）；超时抛 ValueError 带处置建议。
     """
     if lang not in ("zh", "en", "mix", None):
-        raise ValueError("lang must be zh/en/mix/None")
+        raise ValueError("lang 参数只接受 zh/en/mix/None（省略则按文本自动判断）")
     if profile not in ("academic", "general"):
         raise ValueError("profile 必须是 academic（默认，论文口径）或 general（非学术文本）")
     t0 = time.monotonic()
@@ -1021,6 +1021,57 @@ def build_hints(text, r, profile="academic"):
         if kinds == {"body"} and soft > hard:
             hints.append("未识别到论文章节且特征以标点/翻译腔为主——非论文文体（博客/公文/通知）可加 --profile general 降权八股/翻译腔信号（半角标点/排版残留请先 transform.py 清理）")
     return hints
+
+
+class CliError(Exception):
+    """CLI 用户错误（v2.5.0 集中异常层）：msg 主信息 + hint 处置建议。
+
+    各 CLI 把「错误 + 怎么办」分两行用中文说清（面向非技术用户），
+    由 cli_entry 统一输出并 exit 2。程序内部逻辑 bug 不用此类
+    （让它带 traceback 冒出来，宁可吵不可吞）。"""
+
+    def __init__(self, msg, hint=""):
+        super().__init__(msg)
+        self.hint = hint
+
+
+def fail(msg, hint=""):
+    """抛 CliError 的快捷方式：fail("输入为空", hint="请传入 .txt/.md/.docx 文件")"""
+    raise CliError(msg, hint)
+
+
+def cli_entry(main_fn):
+    """集中式 CLI 入口（v2.5.0）：UTF-8 输出 + 统一异常 → 两行中文 + exit 2。
+
+    SystemExit 原样穿透——各脚本语义化退出码（verify 0/1/2、--exit-verdict）
+    不受影响。所有 scripts/*.py 的 __main__ 块统一为 hxt_core.cli_entry(main)。
+    """
+    import sys as _s
+    try:
+        try:
+            _s.stdout.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+        main_fn()
+    except SystemExit:
+        raise
+    except CliError as e:
+        print("错误: %s" % e, file=_s.stderr)
+        if e.hint:
+            print("处置建议: %s" % e.hint, file=_s.stderr)
+        _s.exit(2)
+    except ValueError as e:
+        # 引擎层参数/编码类错误（消息本身已中文并多自带处置建议）
+        print("错误: %s" % e, file=_s.stderr)
+        _s.exit(2)
+    except OSError as e:
+        print("错误: 文件/系统操作失败——%s" % e, file=_s.stderr)
+        print("处置建议: 检查文件路径与权限；路径含空格请加引号；"
+              "Windows 路径分隔符用 \\ 或 /", file=_s.stderr)
+        _s.exit(2)
+    except KeyboardInterrupt:
+        print("已中断（Ctrl+C）", file=_s.stderr)
+        _s.exit(130)
 
 
 def _score(pts, stats, units, cats, lang):

@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 2.4.0
+version: 2.5.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: AI flavor scan and style-pattern
   self-check reports (scan reports are detection only), deterministic text cleanup
@@ -29,7 +29,7 @@ Bilingual (CN/EN) style naturalization for academic & medical writing: find stif
 templated or machine-flavored patterns, clean mechanical debris, revise for clarity
 and natural register — with integrity guardrails on every step.
 
-## Feature status (v2.4.0)
+## Feature status (v2.5.0)
 
 | Feature | Status | Since |
 |---|---|---|
@@ -40,6 +40,8 @@ and natural register — with integrity guardrails on every step.
 | User-learned term guards (`learn_guards.py`) | Stable | v2.2 |
 | `--exit-verdict` machine exit codes (detect/compare/pipeline) | Stable | v2.3 |
 | Deterministic deep polish (`--deep`), handling hints, scan time budget | Stable | v2.4 |
+| Centralized error layer (`CliError` + 处置建议), batch retry, per-step timeout | Stable | v2.5 |
+| Scale envelope: 800K-char chunks (2K overlap) · 50MB file cap · 120s step budget | — | — |
 | HTML reports, `--batch`, `--track` audit trail | Stable | v1.5–1.6 |
 | PDF text extraction (English text-type only) | **Experimental** | v1.6 |
 
@@ -77,6 +79,8 @@ regression-tested offline on every release.
 | Before/after | `scripts/compare.py` | Pattern-score delta + integrity verdict |
 
 ## Quick start
+
+No agent is required — every capability below runs directly in a terminal.
 
 One command (self-check → cleanup → revision brief → integrity guard):
 
@@ -157,10 +161,13 @@ When invoked, decide the path first, then run it:
   naturalize academic writing, de-templating → run the pipeline above.
 - **Disambiguation (this tool vs a polisher)**: 「论文改写润色」 here means
   style naturalization / de-templating (removing the machine flavor from
-  academic prose). If the user only wants
-  language polish — grammar, wording, fluency, journal-style phrasing — that is
-  a polishing tool's job (e.g. paper-polisher-pro), not this toolkit; route
-  accordingly instead of running a style pipeline on a polish request.
+  academic prose). Decision rule with examples —
+  route to a polisher (e.g. paper-polisher-pro) when the ask is only about
+  language correctness/fluency: 「帮我改下语法」「这句读不顺，润色一下」
+  「按期刊风格改写摘要」; route to this toolkit when the ask is about templated
+  tone or model residue: 「这篇读起来像 AI 写的」「把套话删一删」
+  「文里有 [cite: 1] 这种残留」; when both apply, polish first, then run this
+  pipeline — neither tool substitutes for the other.
 - **User wants to know what to fix first** → `plan.py draft.txt -o plan.md`
   (P0 sentence queue + budget projection) before deep revision.
 - **A scan flags a legitimate term** (false positive) → don't edit the pattern

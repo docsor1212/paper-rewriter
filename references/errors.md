@@ -28,6 +28,14 @@
 > detect/compare 的 `--exit-verdict` 只出 0/3/4（完整性仍只写报告——exit 1 契约专属 verify/pipeline）；
 > **pipeline 是唯一 1/3/4 全档判定命令**，CI 门禁推荐 `pipeline.py 原稿 --rewrite 改稿 --exit-verdict`。
 
+## 一B、集中异常层（v2.5.0）
+
+全部 CLI 的 `__main__` 统一经 `hxt_core.cli_entry(main)` 进入：任何用户侧
+异常输出**两行中文**——「错误: <发生了什么>」+「处置建议: <怎么办>」——并以
+exit 2 结束。`CliError(msg, hint)` 是脚本内主动报错的规范方式；SystemExit
+原样穿透，各脚本语义化退出码不受影响。程序内部 bug 仍带完整 traceback
+冒出（宁可吵，不可吞）。
+
 ## 二、verify.py 违规类别（exit 1 = violations；WARN = 告警继续）
 
 | 类别 | 级别 | 含义 | 常见原因与处置 |
