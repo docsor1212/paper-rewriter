@@ -285,3 +285,34 @@ $ python scripts/pipeline.py draft.txt -o out.txt
 $ python scripts/pipeline.py draft.txt -o out.txt --json | jq .timings
 { "cleanup_s": 0.0, "scan_s": 0.11, "verify_s": 0.0, "total_s": 0.11 }
 ```
+
+## 样例 10：风格画像——深改的量化验收（v2.6.0 stylecheck）
+
+**单文件画像**（AI 语料演示，黑话命中定位到段）：
+
+```console
+$ python scripts/stylecheck.py draft.txt
+| 指标 | 值 | 档位 |
+|---|---|---|
+| 黑话密度（每千字） | 36.81 | 偏机器 |
+| 句长变异系数 | 0.388 | 自然 |
+| 最高频句首占比 | 0.077 | 自然 |
+| 最长连续同开场 | 1 | 自然 |
+
+## 重点段落（黑话命中降序）
+- 第 1 段（104 字/3 句，命中 4）：赋能 → 支持 / 帮助 / 为…提供能力
+- 第 2 段（112 字/4 句，命中 5）：保驾护航 → 保障 / 支持
+- 第 4 段（126 字/2 句，命中 5）：抓手 → 工具 / 途径 / 切入点
+```
+
+**--compare 验收差值**（AI 语料 → 人写语料的演示对比，深改实际效果介于其间）：
+
+```console
+$ python scripts/stylecheck.py 原稿.txt 改稿.txt --compare
+| 黑话密度（每千字） | 36.81 | 0.0 | 偏机器 → 自然 |
+黑话命中合计：18 → 0（-18）
+```
+
+档位阈值用本地语料校准（AI 语料黑话密度 17-37/千字 vs 人写 0），只做验收
+提示、不改评分；改稿完整性仍以 verify.py 为准。深改验收闭环：
+plan.py 排队列 → agent 按指南改 → --compare 看画像差值 → verify 过守卫。

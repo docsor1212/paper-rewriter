@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 2.5.0
+version: 2.6.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: AI flavor scan and style-pattern
   self-check reports (scan reports are detection only), deterministic text cleanup
@@ -29,7 +29,7 @@ Bilingual (CN/EN) style naturalization for academic & medical writing: find stif
 templated or machine-flavored patterns, clean mechanical debris, revise for clarity
 and natural register — with integrity guardrails on every step.
 
-## Feature status (v2.5.0)
+## Feature status (v2.6.0)
 
 | Feature | Status | Since |
 |---|---|---|
@@ -42,6 +42,7 @@ and natural register — with integrity guardrails on every step.
 | Deterministic deep polish (`--deep`), handling hints, scan time budget | Stable | v2.4 |
 | Centralized error layer (`CliError` + 处置建议), batch retry, per-step timeout | Stable | v2.5 |
 | Scale envelope: 800K-char chunks (2K overlap) · 50MB file cap · 120s step budget | — | — |
+| Style profile (`stylecheck.py`: per-paragraph quantified guide audit) | Stable | v2.6 |
 | HTML reports, `--batch`, `--track` audit trail | Stable | v1.5–1.6 |
 | PDF text extraction (English text-type only) | **Experimental** | v1.6 |
 
@@ -81,6 +82,17 @@ regression-tested offline on every release.
 ## Quick start
 
 No agent is required — every capability below runs directly in a terminal.
+Every script has built-in `--help` (full flag reference) and `--version`;
+quick flag semantics:
+
+| Flag | Meaning |
+|---|---|
+| `--profile general` | non-academic text: down-weight formulaic/boilerplate signals |
+| `--deep` | deterministic sentence-level transforms (canned openers, not-only merge) |
+| `--exit-verdict` | machine exit codes for CI/agent gating (see below) |
+| `--structure` | section-aware scoring (IMRaD) |
+| `--step-timeout SEC` | per-step wall-clock budget (default 120) |
+| `--terms FILE` | term list for the integrity guard (build via extract_terms.py) |
 
 One command (self-check → cleanup → revision brief → integrity guard):
 
@@ -170,6 +182,9 @@ When invoked, decide the path first, then run it:
   pipeline — neither tool substitutes for the other.
 - **User wants to know what to fix first** → `plan.py draft.txt -o plan.md`
   (P0 sentence queue + budget projection) before deep revision.
+- **User wants quantified acceptance of a rewrite** → `stylecheck.py 原稿 改稿
+  --compare` (v2.6.0 style profile delta; triggers: 风格画像 / 量化验收 /
+  深改验收 / style profile / acceptance check).
 - **A scan flags a legitimate term** (false positive) → don't edit the pattern
   files; persist a guard instead: `learn_guards.py from-text 术语 样本.txt`
   (or `add`) — the guard survives upgrades and applies to every later scan.
@@ -232,6 +247,11 @@ Scripts are automation-first: every verdict is machine-readable, two ways.
      frames → plain clauses instead of parallelism → rhythm → real attribution →
      commit to a position
    - Revise section by section. Preserve all facts, numbers, citations, terminology.
+3b. **Quantified acceptance** (`stylecheck.py`, v2.6.0): per-paragraph style
+    profile — jargon hits located to the paragraph, sentence-rhythm CV, opener
+    diversity, each banded 自然/观察/偏机器 with style_guide anchors;
+    `--compare 原稿 改稿` shows the delta so deep-revision acceptance is
+    metric-based. Bands are calibration hints only — they never alter scores.
 4. **Guard**: `verify.py draft.txt step2.txt --terms terms.txt` — exit 1 means a
    number/citation/term was altered: fix the revision, not the guard. Build
    terms.txt for medical text (drug names, gene symbols — include mouse-style

@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "2.5.0"
+__version__ = "2.6.0"
 
 import json
 import os
@@ -1038,6 +1038,139 @@ class CliError(Exception):
 def fail(msg, hint=""):
     """抛 CliError 的快捷方式：fail("输入为空", hint="请传入 .txt/.md/.docx 文件")"""
     raise CliError(msg, hint)
+
+
+# ---------------------------------------------------------------------------
+# 风格画像（v2.6.0 stylecheck.py 的引擎）：style_guide 七步法的量化自查。
+# 阈值用 dev 仓库四语料校准（AI 语料 vs 人写语料的实测分离度见 tests/v260）：
+#   黑话密度（每千字）：人写 0.0 / AI 17-37 → <=0.5 自然，>3 偏机器
+#   句长 CV：与 _score 的 burstiness 同源（<0.30 偏机器，>0.45 自然）
+#   开场词占比/连续同开场：句数>=8 才判（短文本统计无意义）
+# 阈值只做「观察提示」不改评分——分数仍归 scan，画像归指南执行验收。
+# ---------------------------------------------------------------------------
+STYLE_BANDS = {
+    "jargon_1k": [(0.5, "自然"), (3.0, "观察")],      # >3.0 偏机器
+    # sent_cv 是「越小越机器」的反向指标：<=0.30 偏机器，(0.30,0.45] 观察，>0.45 自然
+    "sent_cv": [(0.30, "偏机器"), (0.45, "观察"), (float("inf"), "自然")],
+    "opener_top": [(0.15, "自然"), (0.25, "观察")],   # >0.25 偏机器
+    "opener_streak": [(2, "自然"), (3, "观察")],      # >=3 偏机器
+}
+
+
+def _band(name, value):
+    for threshold, label in STYLE_BANDS[name]:
+        if value <= threshold:
+            return label
+    return "偏机器"
+
+
+def style_profile(text):
+    """风格画像（v2.6.0）：段落级量化指标 + 逐项档位 + 指南锚点。
+
+    返回 dict：
+    {
+      "n_paras", "n_sents",
+      "global": {metric: {"value":…, "band":…}},
+      "paras": [{"idx", "chars", "sents", "jargon_hits", "worst_sample"}…],
+      "worst_paras": [段号…]  按黑话命中降序前 3，
+      "advice": [指南锚点…]
+    }
+    口径：画像只做「验收放大镜」（哪个段落、哪类特征还剩多少），不改评分；
+    阈值带出自 dev 仓库四语料校准，短文本（<8 句）的多样性指标不判档。
+    """
+    r = scan(text)
+    jargon_ids = ("zh_jargon", "zh_eightleg", "zh_jargon_struct",
+                  "en_vocab", "en_opening")
+    jargon_total = sum(r["categories"].get(k, {}).get("count", 0) for k in jargon_ids)
+    sents = [s for s in split_sentences(text) if len(s.strip()) >= 2]
+    lens = [len(s) for s in sents]
+    mean = sum(lens) / max(1, len(lens))
+    var = sum((x - mean) ** 2 for x in lens) / max(1, len(lens))
+    sent_cv = (var ** 0.5) / mean if mean else 0.0
+    openers = [s.strip()[:2] for s in sents]
+    from collections import Counter as _C
+    c = _C(openers)
+    top_ratio = (c.most_common(1)[0][1] / len(openers)) if openers else 0.0
+    streak = best = 1 if openers else 0
+    for i in range(1, len(openers)):
+        streak = streak + 1 if openers[i] == openers[i - 1] else 1
+        best = max(best, streak)
+    enough = len(sents) >= 8
+
+    # 段落级黑话定位（复用一次逐段 scan 的类别样本）
+    paras_out = []
+    paras = [p for p in re.split(r"\n\s*\n", text) if p.strip()]
+    for i, para in enumerate(paras, 1):
+        pr = scan(para)
+        hits = sum(pr["categories"].get(k, {}).get("count", 0) for k in jargon_ids)
+        worst = ""
+        for k in jargon_ids:
+            smp = pr["categories"].get(k, {}).get("samples") or []
+            if smp:
+                worst = smp[0]
+                break
+        paras_out.append({"idx": i, "chars": len(para.strip()),
+                          "sents": len([s for s in split_sentences(para) if s.strip()]),
+                          "jargon_hits": hits, "worst_sample": worst[:40]})
+
+    def g(name, value, judge=True):
+        return {"value": value, "band": _band(name, value) if judge else "—（样本不足）"}
+
+    gp = {
+        "jargon_1k": g("jargon_1k", round(jargon_total / max(1, len(text)) * 1000, 2)),
+        # sent_cv 与 _structural_stats 同口径：n>=8 才判
+        "sent_cv": g("sent_cv", round(sent_cv, 3), judge=enough),
+        "opener_top": g("opener_top", round(top_ratio, 3), judge=enough),
+        "opener_streak": g("opener_streak", best, judge=enough),
+    }
+    worst_paras = [p["idx"] for p in sorted(paras_out, key=lambda x: -x["jargon_hits"])
+                   if p["jargon_hits"] > 0][:3]
+    advice = []
+    if gp["jargon_1k"]["band"] != "自然":
+        advice.append("黑话/八股残留：指南第 1-2 步（黑话替换 + 骨架模板删除）；"
+                      "重点段落 %s" % (worst_paras or "—"))
+    if gp["sent_cv"]["band"] == "偏机器":
+        advice.append("句长过于均匀：指南第 4 步（节奏）——长句后刻意插短句")
+    if enough and gp["opener_top"]["band"] == "偏机器":
+        advice.append("句首开场词高度重复：指南第 1 步（拆仪式感开场/换开场方式）")
+    advice.append("深改后验收闭环：stylecheck.py 改前 改后 --compare 看画像差值；"
+                  "改稿过 verify.py 守卫后重跑本命令确认档位回落")
+    return {"n_paras": len(paras_out), "n_sents": len(sents),
+            "global": gp, "paras": paras_out,
+            "worst_paras": worst_paras, "advice": advice}
+
+
+# 未受限贪婪量词构型（v2.6.0 audit_patterns 检测器；正负对照见 tests/v260）：
+# 通配上的贪婪量词且未惰性化。[^^n^^r] 分支用双反斜杠匹配模式文本里的
+# 字面 backslash-n/backslash-r 两字符序列（单反斜杠会编译成真实控制字符）。
+_RISKY_QUANT = re.compile(r"(?:\.[*+]|\[\\s\\S\][*+]|\[\^\\n\\r\][*+])(?![?])")
+
+def audit_patterns(verbose=False):
+    r"""词表模式审计（v2.6.0，errorHandling 处方「灾难性回溯显式兜底」）。
+
+    逐条检查 patterns_*.json 全部正则中的未受限量化符——`.*`/`.+`/`[\s\S]*`
+    这类作用于通配的贪婪量词（无 `?` 惰性化）是灾难性回溯的典型构型；
+    本词表的设计规范是有界量词（如 `.{0,200}?`），审计是防未来新增模式
+    踩线的机制网。返回 (总数, 告警列表)；有告警即 stderr 提示，
+    verbose=True 时逐条列出。供测试与发布链调用。"""
+    total, warns = 0, []
+    risky = _RISKY_QUANT
+    for lang in ("zh", "en"):
+        pats = load_patterns(lang)
+        for key in ("model_artifacts", "chatbot_artifacts", "knowledge_cutoff",
+                    "regex_signals"):
+            for item in (pats.get(key) or []):
+                total += 1
+                pat = item.get("pattern", "")
+                if risky.search(pat):
+                    warns.append("%s/%s: %s" % (lang, key, pat[:60]))
+        for entry in (pats.get("vocabulary") or []):
+            total += 1  # 词表项是字面量+\b，无回溯面
+    if warns:
+        sys.stderr.write("警告: %d 条模式含未受限贪婪量词，存在回溯风险：\n" % len(warns))
+        for w in (warns if verbose else warns[:3]):
+            sys.stderr.write("  %s\n" % w)
+    return total, warns
 
 
 def cli_entry(main_fn):
