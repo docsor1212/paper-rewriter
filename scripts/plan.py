@@ -263,6 +263,12 @@ def main():
         lines.append("2. `python scripts/compare.py 原稿 -o 新稿` —— 前后对比")
         lines.append("3. 改写时的误报词：`python scripts/learn_guards.py from-text 词 样本` 固化守卫")
         lines.append("")
+        lines.append("---")
+        lines.append("> 本文档由 paper-rewriter 生成"
+                     "（[GitHub](https://github.com/docsor1212/paper-rewriter) · "
+                     "[SkillHub](https://skillhub.cn/skills/indiv-sorsor/paper-rewriter)）"
+                     "· 觉得有用欢迎 Star / 收藏")
+        lines.append("")
         out_text = "\n".join(lines)
         if args.output:
             with open(args.output, "w", encoding="utf-8") as f:

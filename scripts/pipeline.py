@@ -49,7 +49,9 @@ def main():
     ap.add_argument("file", nargs="?", help="原稿（--batch 模式下传目录）")
     ap.add_argument("-o", "--output", help="清理结果落盘文件（建议必填）")
     ap.add_argument("--rewrite", help="已有改稿（提供则跳过机械清理，直接守卫+对比）")
-    ap.add_argument("--terms", help="术语表文件（每行一个）")
+    ap.add_argument("--terms", help="术语表文件（每行一个）；传 auto 则先自动生成"
+                    "术语草稿（extract_terms 口径）再用——草稿未经人工确认，"
+                    "守卫口径偏松，正式稿件建议人工过一遍后重跑")
     ap.add_argument("--lang", choices=["zh", "en", "mix", "auto"], default="auto")
     ap.add_argument("--profile", choices=["academic", "general"], default="academic",
                     help="academic=论文口径（默认）；general=非学术文本")
@@ -179,7 +181,22 @@ def main():
     orig = _read(args.file)
     track_base = getattr(args, "track", None)
     profile = args.profile
-    terms = vf.load_terms(args.terms) if args.terms else None
+    terms = None
+    terms_note = ""
+    if args.terms == "auto":
+        import extract_terms as _et
+        draft_path = (os.path.splitext(args.output or args.file)[0]
+                      + ".terms.auto.txt")
+        cands = _et.extract(orig, min_count=1)  # auto 档放宽到 1 次（去噪仍在），草稿供人工筛
+        with open(draft_path, "w", encoding="utf-8") as _tf:
+            for term, _n, _kind in cands:
+                _tf.write(term + "\n")
+        terms = vf.load_terms(draft_path)
+        terms_note = ("术语表=自动草稿 %s（%d 条，未经人工确认）——正式稿件建议"
+                      "人工过一遍后重跑" % (draft_path, len(cands)))
+        print("[术语] " + terms_note, file=sys.stderr)
+    elif args.terms:
+        terms = vf.load_terms(args.terms)
 
     if args.rewrite:
         if getattr(args, "deep", False):
@@ -263,6 +280,7 @@ def main():
         "exit_verdict": hxt_core.verdict_exit_code(rn["score"], rn["critical_hit"],
                                                    verify_ok=vr["ok"]),
         "hints": hxt_core.build_hints(new, rn, profile=profile),
+        "terms_note": terms_note,
         "timings": ({"cleanup_s": round(cleanup_s, 2), "scan_s": round(scan_s, 2),
                      "verify_s": round(verify_s, 2),
                      "total_s": round(cleanup_s + scan_s + verify_s, 2)}

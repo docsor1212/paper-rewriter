@@ -316,3 +316,20 @@ $ python scripts/stylecheck.py 原稿.txt 改稿.txt --compare
 档位阈值用本地语料校准（AI 语料黑话密度 17-37/千字 vs 人写 0），只做验收
 提示、不改评分；改稿完整性仍以 verify.py 为准。深改验收闭环：
 plan.py 排队列 → agent 按指南改 → --compare 看画像差值 → verify 过守卫。
+
+
+## 样例 11：--terms auto 与画像 HTML（v2.7.0）
+
+```console
+$ python scripts/pipeline.py manuscript.txt -o clean.txt --terms auto
+[术语] 术语表=自动草稿 clean.terms.auto.txt（12 条，未经人工确认）——正式稿件建议人工过一遍后重跑
+
+$ python scripts/pipeline.py manuscript.txt -o clean.txt --terms auto --json | jq .terms_note
+"术语表=自动草稿 clean.terms.auto.txt（12 条，未经人工确认）——…"
+
+$ python scripts/stylecheck.py clean.txt --html profile.html
+HTML 画像报告已写入 profile.html
+```
+
+CJK 相邻缩写抽取修复（v2.7.0）：`IRAK4抑制剂` 里的 IRAK4 此前因 \b 在汉字旁
+失效而抽不到——与 verify.py v2.1.0 同族问题，本版统一为 CJK 安全 lookaround。

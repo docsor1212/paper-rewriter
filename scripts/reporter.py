@@ -43,7 +43,14 @@ margin:2px 4px 2px 0;background:#eaeef2}
 """
 
 _FOOT = ("<div class='foot'>本地启发式风格诊断 · 非任何官方检测分数 · "
-         "报告不代写原文 · 生成于 {ts}</div>")
+         "报告不代写原文</div>"
+         "<footer style=\"margin-top:24px;padding-top:12px;border-top:1px solid #eee;"
+         "color:#9aa0a6;font-size:12px;text-align:center;\">"
+         "本文档由 paper-rewriter 生成 · "
+         "<a href=\"https://github.com/docsor1212/paper-rewriter\" "
+         "style=\"color:#9aa0a6;\">GitHub</a> · "
+         "<a href=\"https://skillhub.cn/skills/indiv-sorsor/paper-rewriter\" "
+         "style=\"color:#9aa0a6;\">SkillHub</a> · 觉得有用欢迎 Star / 收藏</footer>\n")
 
 
 def _score_card(title, score, level, extra=""):
@@ -175,6 +182,64 @@ def render_pipeline(orig, new, ro, rn, verify_result, brief, chunked=None):
     return _page("一键管线报告", body)
 
 
+def render_style_profile(profile, source=""):
+    """风格画像 HTML（v2.7.0）：总览档位表+重点段落+指南锚点。"""
+    names = {"jargon_1k": "黑话密度（每千字）", "sent_cv": "句长变异系数",
+             "opener_top": "最高频句首占比", "opener_streak": "最长连续同开场"}
+    band_color = {"自然": "#1a7f37", "观察": "#9a6700", "偏机器": "#cf222e"}
+    body = ("<div class='card'><h1>风格画像</h1><p class='meta'>%s · %d 段 / %d 句"
+            "</p></div>" % (esc(source), profile["n_paras"], profile["n_sents"]))
+    rows = ""
+    for k in ("jargon_1k", "sent_cv", "opener_top", "opener_streak"):
+        g = profile["global"][k]
+        c = band_color.get(g["band"], "#57606a")
+        rows += ("<tr><td>%s</td><td>%s</td><td><span class='badge' "
+                 "style='background:%s'>%s</span></td></tr>"
+                 % (esc(names[k]), g["value"], c, esc(g["band"])))
+    body += ("<div class='card'><h2>指标档位</h2><table><tr><th>指标</th>"
+             "<th>值</th><th>档位</th></tr>%s</table>"
+             "<p class='meta'>档位出自本地语料校准，只做验收提示，不改变评分。</p></div>" % rows)
+    if profile["worst_paras"]:
+        items = "".join("<li>第 %d 段（%d 字/%d 句，命中 %d）：%s</li>" % (
+            p["idx"], p["chars"], p["sents"], p["jargon_hits"],
+            esc(p["worst_sample"]))
+            for p in profile["paras"] if p["idx"] in profile["worst_paras"])
+        body += ("<div class='card'><h2>重点段落（黑话命中降序）</h2><ul>%s</ul></div>" % items)
+    tips = "".join("<li>%s</li>" % esc(a) for a in profile["advice"])
+    body += "<div class='card'><h2>指南锚点</h2><ul>%s</ul></div>" % tips
+    body += _FOOT.format(ts=_now())
+    return _page("风格画像", body)
+
+
+def render_style_compare(pa, pb, sa, sb):
+    """风格画像对比 HTML（v2.7.0）：改前改后档位变化+黑话合计。"""
+    names = {"jargon_1k": "黑话密度（每千字）", "sent_cv": "句长变异系数",
+             "opener_top": "最高频句首占比", "opener_streak": "最长连续同开场"}
+    order = {"自然": 0, "观察": 1, "偏机器": 2}
+    rows = ""
+    for k in ("jargon_1k", "sent_cv", "opener_top", "opener_streak"):
+        a, b = pa["global"][k], pb["global"][k]
+        if a["band"] != b["band"]:
+            delta = "%s → %s" % (a["band"], b["band"])
+        elif order.get(a["band"], 0) == 0:
+            delta = "维持自然"
+        else:
+            delta = "持平"
+        rows += "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" % (
+            esc(names[k]), a["value"], b["value"], esc(delta))
+    hit_a = sum(p["jargon_hits"] for p in pa["paras"])
+    hit_b = sum(p["jargon_hits"] for p in pb["paras"])
+    body = ("<div class='card'><h1>风格画像对比</h1><p class='meta'>%s → %s</p></div>"
+            % (esc(sa), esc(sb)))
+    body += ("<div class='card'><table><tr><th>指标</th><th>改前</th><th>改后</th>"
+             "<th>档位</th></tr>%s</table></div>" % rows)
+    body += ("<div class='card'><p>黑话命中合计：%d → %d（%s%d）</p>"
+             "<p class='meta'>档位只做验收提示；改稿完整性以 verify.py 为准。</p></div>"
+             % (hit_a, hit_b, "+" if hit_b >= hit_a else "", hit_b - hit_a))
+    body += _FOOT.format(ts=_now())
+    return _page("风格画像对比", body)
+
+
 def sentence_diff(orig, new):
     """句级对齐：返回 [(tag, orig_sent, new_sent)]，tag∈equal/replace/delete/insert。"""
     def split(text):
@@ -300,4 +365,9 @@ def build_review_md(text, scan_result, verify_result=None, source=""):
     lines.append("")
     lines.append("---")
     lines.append("*审稿报告由 paper-rewriter 自动生成 · 仅供写作质量参考 · 不构成任何检测结论*")
+    lines.append("")
+    lines.append("> 本文档由 paper-rewriter 生成"
+                 "（[GitHub](https://github.com/docsor1212/paper-rewriter) · "
+                 "[SkillHub](https://skillhub.cn/skills/indiv-sorsor/paper-rewriter)）"
+                 "· 觉得有用欢迎 Star / 收藏")
     return "\n".join(lines)

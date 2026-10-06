@@ -85,6 +85,8 @@ max_cjk_shift=0.12) -> {"ok": bool, "violations": [...], "warnings": [...], "sta
 | `detect --batch --json` / `pipeline --batch` 的 `retried` | 批量二遍重试标记（v2.5.0）：失败文件以双倍预算重扫一次 |
 | `hxt_core.style_profile(text)` / `stylecheck.py` | 风格画像（v2.6.0）：段落级黑话定位+节奏/开场档位+指南锚点；--compare 验收差值（阈值=dev 四语料校准） |
 | `hxt_core.audit_patterns()` / `STYLE_BANDS` | 模式审计兜底（v2.6.0）：未受限贪婪量词检测；档位阈值常量 |
+| `reporter.render_style_profile/compare` / `stylecheck.py --html` | 风格画像 HTML（v2.7.0）：档位表+重点段落+对比差值 |
+| `pipeline.py --terms auto` | 自动术语草稿（v2.7.0）：extract_terms 口径 min_count=1+警告；JSON terms_note 字段 |
 | `hxt_core._load_user_guards()` | 读 `scripts/user_guards.json`（损坏降级为空并 stderr 提示） |
 | `plan.py <file> --json / -o plan.md --top N` | 句级改写优先级计划：P0 队列+章节归属+线性预算投影 |
 | `learn_guards.py add/from-text/list/remove/test` | 误报→守卫固化；语义同内置 term_guards（±30 字符窗口豁免） |

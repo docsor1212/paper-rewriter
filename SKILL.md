@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 2.6.0
+version: 2.7.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: AI flavor scan and style-pattern
   self-check reports (scan reports are detection only), deterministic text cleanup
@@ -29,7 +29,7 @@ Bilingual (CN/EN) style naturalization for academic & medical writing: find stif
 templated or machine-flavored patterns, clean mechanical debris, revise for clarity
 and natural register — with integrity guardrails on every step.
 
-## Feature status (v2.6.0)
+## Feature status (v2.7.0)
 
 | Feature | Status | Since |
 |---|---|---|
@@ -43,6 +43,7 @@ and natural register — with integrity guardrails on every step.
 | Centralized error layer (`CliError` + 处置建议), batch retry, per-step timeout | Stable | v2.5 |
 | Scale envelope: 800K-char chunks (2K overlap) · 50MB file cap · 120s step budget | — | — |
 | Style profile (`stylecheck.py`: per-paragraph quantified guide audit) | Stable | v2.6 |
+| Best-practices handbook (7 real scenarios), stylecheck `--html`, `--terms auto` | Stable | v2.7 |
 | HTML reports, `--batch`, `--track` audit trail | Stable | v1.5–1.6 |
 | PDF text extraction (English text-type only) | **Experimental** | v1.6 |
 
@@ -143,6 +144,9 @@ python scripts/verify.py draft.txt step2.txt --terms terms.txt
 python scripts/compare.py draft.txt step2.txt
 ```
 
+Scenario-organized best practices (journal submission, thesis, revision
+letters, batch, CI gates, false-positive handling, CN punctuation):
+`references/best_practices.md`.
 Worked end-to-end examples: `references/examples.md`. Unified exit codes,
 violation categories and remedies: `references/errors.md`. **Centralized
 common-mistakes list (23 items): `references/pitfalls.md`** — read it before
@@ -296,7 +300,10 @@ For reviewers, security scanners and cautious users:
 - Writes **only** to output paths you pass explicitly: `-o`/`--output` on
   transform/compare/pipeline/plan/extract_terms, `--suggestions`, `--html`,
   `--review` (detect.py's markdown report), `--report` (check_terms.py), and
-  `--track` (`base.md` + `base.json`). One tool-owned data file on top of that:
+  `--track` (`base.md` + `base.json`). One derived exception: with
+  `pipeline --terms auto`, the tool also writes the auto-generated term draft
+  `<output-basename>.terms.auto.txt` (tool-written, unreviewed — see the
+  workflow note). One tool-owned data file on top of that:
   `learn_guards.py add`/`from-text`/`remove` writes
   `scripts/user_guards.json` (your learned term guards, via a transient
   `.tmp` + atomic rename). No other writes.

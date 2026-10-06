@@ -37,7 +37,9 @@ def extract(orig, min_count=2, cap=40):
     cands = Counter()
     kinds = {}
     # 缩写+数字/连字符组合术语（IL-6/CD4/BRCA1/H1N1 等完整医学缩写）
-    for m in re.finditer(r"(?<![A-Za-z])\b([A-Z]{1,6}[-]?[0-9]{1,4}[A-Za-z]{0,3})\b(?![0-9])", orig):
+    # v2.7.0 修：\b 在 CJK 相邻处失效（IRAK4抑制剂 抽不到 IRAK4——与 verify.py
+    # v2.1.0 同族问题）——改 verify 同款 CJK 安全 lookaround
+    for m in re.finditer(r"(?<![A-Za-z0-9])([A-Z]{1,6}[-]?[0-9]{1,4}[A-Za-z]{0,3})(?![A-Za-z0-9])", orig):
         w = m.group(1)
         if w in _EN_STOP or len(w) < 2:
             continue

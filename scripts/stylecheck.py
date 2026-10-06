@@ -104,6 +104,7 @@ def main():
     ap.add_argument("--compare", action="store_true",
                     help="对比模式：file=改前，file2=改后，输出画像差值")
     ap.add_argument("--json", action="store_true", help="JSON 输出（单文件画像）")
+    ap.add_argument("--html", help="生成单文件 HTML 画像报告到此路径（单文件与 --compare 均可用）")
     ap.add_argument("--version", action="version",
                     version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
@@ -120,6 +121,14 @@ def main():
             hxt_core.fail("输入为空（原稿或改稿）",
                           hint="--compare 的两份文件都必须是非空文本")
         pa, pb = hxt_core.style_profile(ta), hxt_core.style_profile(tb)
+        if args.html:
+            import reporter
+            try:
+                with open(args.html, "w", encoding="utf-8") as hf:
+                    hf.write(reporter.render_style_compare(pa, pb, args.file, args.file2))
+            except OSError as e:
+                hxt_core.fail("无法写入 %s" % args.html, hint="检查路径与权限：%s" % e)
+            print("HTML 对比报告已写入 %s" % args.html, file=sys.stderr)
         print(render_compare(pa, pb, args.file, args.file2))
         return
     if not args.file:
@@ -131,6 +140,14 @@ def main():
     if not t.strip():
         hxt_core.fail("输入为空", hint="请传入 .txt/.md/.docx 文件或通过管道给文本")
     profile = hxt_core.style_profile(t)
+    if args.html:
+        import reporter
+        try:
+            with open(args.html, "w", encoding="utf-8") as hf:
+                hf.write(reporter.render_style_profile(profile, src))
+        except OSError as e:
+            hxt_core.fail("无法写入 %s" % args.html, hint="检查路径与权限：%s" % e)
+        print("HTML 画像报告已写入 %s" % args.html, file=sys.stderr)
     if args.json:
         print(json.dumps(profile, ensure_ascii=False, indent=2))
     else:
