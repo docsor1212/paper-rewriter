@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 2.7.0
+version: 2.8.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: AI flavor scan and style-pattern
   self-check reports (scan reports are detection only), deterministic text cleanup
@@ -29,7 +29,7 @@ Bilingual (CN/EN) style naturalization for academic & medical writing: find stif
 templated or machine-flavored patterns, clean mechanical debris, revise for clarity
 and natural register — with integrity guardrails on every step.
 
-## Feature status (v2.7.0)
+## Feature status (v2.8.0)
 
 | Feature | Status | Since |
 |---|---|---|
@@ -44,6 +44,7 @@ and natural register — with integrity guardrails on every step.
 | Scale envelope: 800K-char chunks (2K overlap) · 50MB file cap · 120s step budget | — | — |
 | Style profile (`stylecheck.py`: per-paragraph quantified guide audit) | Stable | v2.6 |
 | Best-practices handbook (7 real scenarios), stylecheck `--html`, `--terms auto` | Stable | v2.7 |
+| PDF extraction confidence self-report (`read_text_ex`, detect/pipeline annotation) | Experimental | v2.8 |
 | HTML reports, `--batch`, `--track` audit trail | Stable | v1.5–1.6 |
 | PDF text extraction (English text-type only) | **Experimental** | v1.6 |
 
@@ -149,7 +150,7 @@ letters, batch, CI gates, false-positive handling, CN punctuation):
 `references/best_practices.md`.
 Worked end-to-end examples: `references/examples.md`. Unified exit codes,
 violation categories and remedies: `references/errors.md`. **Centralized
-common-mistakes list (23 items): `references/pitfalls.md`** — read it before
+common-mistakes list (24 items): `references/pitfalls.md`** — read it before
 your first real run. Python API reference: `references/api.md`. FAQ:
 `references/faq.md`.
 
@@ -158,8 +159,13 @@ mechanical layer makes is recorded to `base.md` + `base.json` — an auditable
 list of what the tool touched (rule, count, deleted sentences,
 flagged-for-review).
 
-**PDF input (experimental, v1.6.0)**: English text PDFs (FlateDecode/WinAnsi,
-unencrypted) are extracted with the standard library only. PDFs with embedded
+**PDF input (experimental, v1.6.0; confidence self-report since v2.8.0)**:
+English text PDFs (FlateDecode/WinAnsi, unencrypted) are extracted with the
+standard library only. Since v2.8.0 every PDF scan reports an extraction
+confidence (高/中/低) computed from four heuristics — common-word hit rate,
+control-character rate, average word length, extractable word count — so
+"review the output" becomes "the tool tells you how trustworthy this
+extraction is". 低 means garbled-form typical: export to UTF-8 text instead. PDFs with embedded
 font encodings (ToUnicode CMaps, typical for CJK) are rejected when detected —
 detection is best-effort: if one slips through, the output may be garbled, so
 **review extracted PDF text before relying on it**. When in doubt, export to
@@ -173,8 +179,14 @@ auto-chunk at any size within the cap; the integrity guard is whole-document).
 
 When invoked, decide the path first, then run it:
 
-- **Trigger words**: 写作风格自查 / 论文改写润色 / 去模板腔 / 翻译腔清理 / style self-check,
-  naturalize academic writing, de-templating → run the pipeline above.
+- **Trigger words**: 写作风格自查 / 论文改写润色 / 去模板腔 / 翻译腔清理 /
+  学术改写 / 段落改写 / 表达优化 / style self-check /
+  style naturalization / naturalize academic writing / de-templating /
+  academic rewriting / passage rewrite / expression polish → run the pipeline
+  above.（中文变体触发词见 SKILL_ZH.md——CH 分寸词不入英文文件）
+  （Parameter cheat sheet lives in Quick start; exit-code tables in
+  references/errors.md — both are linked from here to avoid hunting across
+  sections.）
 - **Disambiguation (this tool vs a polisher)**: 「论文改写润色」 here means
   style naturalization / de-templating (removing the machine flavor from
   academic prose). Decision rule with examples —
@@ -278,6 +290,20 @@ Scripts are automation-first: every verdict is machine-readable, two ways.
 - This tool does not interact with any external review system, does not remove
   official content labels or watermarks, and does not assist concealment of
   required disclosures. See `references/compliance.md`.
+- **Detection-capability boundary (measured, 2026-10)**: on fluent LLM-generated
+  text this toolkit's style channel barely fires — 128 real ChatGPT texts scored
+  below 28 in 98% of cases, and 60 samples of 2026-era models scored 0 (nothing
+  flagged). Style tools that do flag everything in that benchmark misfire on
+  ~50% of human forum prose. **A low score here does not mean "no AI was
+  involved"** — use this toolkit as a style self-check + integrity guard, not
+  as a judge of authorship.
+- **Statistical-channel experiment (2026-10, 373 files measured)**: sentence-
+  length band concentration is the strongest single statistical signal (AI
+  corpora 0.68/0.72 vs human 0.48/0.47). Integrated conservatively as a
+  "uniform rhythm flag" (≥8 sentences; band≥0.65 or cv≤0.30): 41% of 2023-era
+  AI corpus flagged @ 3% human flag rate (below the FP baseline). The flag is
+  informational only — regular genres (e.g. literature abstracts) trigger it
+  too; it is never a detection verdict.
 - Scale envelope: regression-tested up to ~1MB text files; the scanner is linear
   (no catastrophic backtracking, bounded quantifiers only). Memory use is roughly
   3x file size; for very long manuscripts, split by section for readable reports.

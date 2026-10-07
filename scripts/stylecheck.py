@@ -27,6 +27,7 @@ import hxt_core
 
 _BAND_ORDER = {"自然": 0, "观察": 1, "偏机器": 2}
 _METRIC_NAMES = {"jargon_1k": "黑话密度（每千字）", "sent_cv": "句长变异系数",
+                 "band_conc": "句长带集中度（规整文体也会偏高）",
                  "opener_top": "最高频句首占比", "opener_streak": "最长连续同开场"}
 
 
@@ -51,7 +52,7 @@ def render(profile, source=""):
     lines.append("")
     lines.append("| 指标 | 值 | 档位 |")
     lines.append("|---|---|---|")
-    for k in ("jargon_1k", "sent_cv", "opener_top", "opener_streak"):
+    for k in ("jargon_1k", "sent_cv", "band_conc", "opener_top", "opener_streak"):
         g = profile["global"][k]
         lines.append("| %s | %s | %s |" % (m[k], g["value"], g["band"]))
     lines.append("")
@@ -77,7 +78,7 @@ def render_compare(pa, pb, sa, sb):
     lines = ["# 风格画像对比：%s → %s" % (sa, sb), ""]
     lines.append("| 指标 | 改前 | 改后 | 档位变化 |")
     lines.append("|---|---|---|---|")
-    for k in ("jargon_1k", "sent_cv", "opener_top", "opener_streak"):
+    for k in ("jargon_1k", "sent_cv", "band_conc", "opener_top", "opener_streak"):
         a, b = pa["global"][k], pb["global"][k]
         delta = ""
         if a["band"] != b["band"]:

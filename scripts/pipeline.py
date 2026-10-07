@@ -178,7 +178,15 @@ def main():
     if not args.file:
         print("错误: 需要 原稿 参数（或使用 --batch 目录模式）", file=sys.stderr)
         sys.exit(2)
-    orig = _read(args.file)
+    pdf_meta = None
+    if args.file.lower().endswith(".pdf"):
+        try:
+            orig, pdf_meta = hxt_core.read_text_ex(args.file)
+        except (OSError, ValueError) as e:
+            print("错误: %s" % e, file=sys.stderr)
+            sys.exit(2)
+    else:
+        orig = _read(args.file)
     track_base = getattr(args, "track", None)
     profile = args.profile
     terms = None
@@ -281,6 +289,7 @@ def main():
                                                    verify_ok=vr["ok"]),
         "hints": hxt_core.build_hints(new, rn, profile=profile),
         "terms_note": terms_note,
+        "pdf_meta": pdf_meta,
         "timings": ({"cleanup_s": round(cleanup_s, 2), "scan_s": round(scan_s, 2),
                      "verify_s": round(verify_s, 2),
                      "total_s": round(cleanup_s + scan_s + verify_s, 2)}
@@ -346,6 +355,12 @@ def main():
             print("处置提示:")
             for h in report["hints"]:
                 print("  → " + h)
+        if rn["stats"].get("uniform_flag"):
+            print("节奏规整旗: 句长高度集中（统计倾向信号，规整文体也可能触发，非检测结论）")
+        if pdf_meta:
+            print("PDF 抽取置信度: %s" % pdf_meta["confidence"])
+            for note in pdf_meta["notes"]:
+                print("  ⚠ " + note)
         print("口径: " + report["honest_note"])
     if args.exit_verdict:
         sys.exit(report["exit_verdict"])

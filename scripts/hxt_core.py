@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "2.7.0"
+__version__ = "2.8.0"
 
 import json
 import os
@@ -67,6 +67,65 @@ def _read_text_impl(path, max_mb):
             "输入文件解码后乱码占比过高（疑似 GBK/UTF-16 等非 UTF-8 编码）——"
             "请转存为 UTF-8 纯文本后重试")
     return text
+
+
+def read_text_ex(path, max_mb=50.0, retries=2):
+    """read_text 的带元数据版（v2.8.0）：返回 (text, meta)。
+
+    meta 仅对 .pdf 输入非空：{"confidence": 高/中/低, "notes": [建议…]}——
+    置信度由 _pdf_confidence 的四项启发指标合成，把「PDF 直读需人工复核」
+    升级为「工具告诉你这次抽取有多可信」。其余格式 meta={}。"""
+    text = read_text(path, max_mb=max_mb, retries=retries)
+    meta = {}
+    if path.lower().endswith(".pdf"):
+        meta = _pdf_confidence(text)
+    return text, meta
+
+
+# 英文常用词抽样表（~120 高频学术/功能词；命中率是抽取健全性的强信号）
+_PDF_PROBE_WORDS = frozenset((
+    "the of and to in a is that for it as was with be this are or by from not "
+    "which we results method methods study analysis data table figure "
+    "between using based group value time than these however their such can "
+    "may has have been were more when two different case used shown show "
+    "level change significant treatment patients model effect observed "
+    "conclusion introduction discussion abstract keywords references et al"
+).split())
+
+
+def _pdf_confidence(text):
+    """PDF 抽取置信度自评（v2.8.0，accuracy 处方）：四项启发指标合成。
+
+    高：常用词命中率 >=25% 且控制字符率 <0.3% 且词均长 3-9；
+    低：命中率 <8% 或控制字符率 >=2% 或词均长 >14（乱码典型形态）；
+    其余中。置信度只标注不拦截——内容判断仍是启发式口径。"""
+    words = re.findall(r"[A-Za-z]+", text)
+    n = len(words)
+    if n < 30:
+        return {"confidence": "低",
+                "notes": ["可抽取词过少（%d 个）——常见于扫描件/图片型或表格页，"
+                          "请用 OCR 或导出 UTF-8 文本" % n]}
+    hit = sum(1 for w in words if w.lower() in _PDF_PROBE_WORDS)
+    hit_rate = hit / n
+    ctrl = sum(1 for c in text if ord(c) < 32 and c not in "\n\t\r") / max(1, len(text))
+    avg_len = sum(len(w) for w in words) / n
+    notes = []
+    if hit_rate >= 0.25 and ctrl < 0.003 and 3.0 <= avg_len <= 9.0:
+        conf = "高"
+    elif hit_rate < 0.08 or ctrl >= 0.02 or avg_len > 14.0:
+        conf = "低"
+        if avg_len > 14.0:
+            notes.append("词均长 %.1f（正常 3-9）——断词/粘连形态，疑字符映射异常"
+                         "——强烈建议导出 UTF-8 文本后重试" % avg_len)
+        else:
+            notes.append("常用词命中率仅 %.0f%%（控制字符 %.1f%%）——疑非英文文本"
+                         "或字符映射异常——请人工抽查或导出 UTF-8 文本后重试"
+                         % (hit_rate * 100, ctrl * 100))
+    else:
+        conf = "中"
+        notes.append("抽取可用但建议抽查（命中率 %.0f%%/词均长 %.1f）——"
+                     "可能存在断词或字符丢失" % (hit_rate * 100, avg_len))
+    return {"confidence": conf, "notes": notes}
 
 
 def _chunk_spans(text, max_chars=800_000, overlap=2000):
@@ -174,7 +233,8 @@ def scan_chunked(text, lang=None, profile="academic", source_ext="",
     pts = sum(weighted.values())
     critical = any(k.startswith(("model_artifact", "chatbot", "cutoff")) and c["count"]
                    for k, c in merged.items())
-    stats = _structural_stats(text, split_sentences(text), lang or "zh")
+    all_sents = split_sentences(text)
+    stats = _structural_stats(text, all_sents, lang or "zh")
     stats["notes"].append(
         "超大文本已自动分块（%d 块，块间 2000 字符重叠缝合）——跨块边界信号已缝合，"
         "恰骑重叠窗两端的极端信号仍可能少量偏差" % len(spans))
@@ -187,7 +247,7 @@ def scan_chunked(text, lang=None, profile="academic", source_ext="",
         "level": level,
         "critical_hit": critical,
         "units": round(total_units, 1),
-        "sentences": None,
+        "sentences": len(all_sents),  # v2.8.0 修复：整文分句计数（原为 None → detect %d 崩溃）
         "categories": merged,
         "guards_applied": all_guards,
         "stats": stats,
@@ -812,11 +872,23 @@ def scan(text, lang=None, profile="academic", source_ext="",
             c["weight"] = weight
         c["samples"] = (c["samples"] + samples)[:6]
 
+    user_guards = _load_user_guards()
+
     def scan_simple_list(key, cat_id, label, weight, pats):
-        # chatbot/knowledge cutoff/model artifacts 不做术语保护（不存在正当用法）
+        # chatbot/knowledge cutoff/model artifacts：内置设计=不做术语保护（无正当用法）；
+        # v2.8.0：但接受【用户自 learn 的守卫】豁免——2026-10 二轮真实测试实锤
+        # "Hope this helps" 是人类论坛高频用语（critical 误报 88 分），
+        # learn_guards 固化后应能豁免。内置 term_guards 仍不参与 critical 类。
         for item in pats:
             for m in item["_re"].finditer(text):
-                add_cat(cat_id, label, weight, 1, [m.group(0).strip()])
+                hit = m.group(0).strip()
+                if user_guards:
+                    g = guard_hit(hit, text[max(0, m.start() - 30):m.start()],
+                                  text[m.end():m.end() + 30], user_guards)
+                    if g:
+                        guards_applied.append({"hit": hit, "guard": g, "position": m.start()})
+                        continue
+                add_cat(cat_id, label, weight, 1, [hit])
 
     zh_pats = load_patterns("zh") if lang in ("zh", "mix") else None
     en_pats = load_patterns("en") if lang in ("en", "mix") else None
@@ -941,6 +1013,17 @@ def _structural_stats(text, sentences, lang):
         cv = (var ** 0.5) / mean if mean else 0
         stats["burstiness_cv"] = round(cv, 3)
         stats["sentence_mean_len"] = round(mean, 1)
+        # v2.8.0 统计通道实验定案（373 文件实测：AI23 语料 0.676/0.723 vs 人写
+        # 0.478/0.465；保守阈值 41% 检出 @ 3% 人写标注率——低于现行误报基线）：
+        # 句长带集中度 + 规整旗。只做信息标注，绝不改评分/档位/退出码。
+        med = sorted(lens)[len(lens) // 2]
+        band = (sum(1 for x in lens if abs(x - med) <= 0.3 * med) / len(lens)) if med else 0
+        stats["band_conc"] = round(band, 3)
+        if band >= 0.65 or cv <= 0.30:
+            stats["uniform_flag"] = True
+            stats["notes"].append(
+                "节奏规整旗：句长高度集中于中位带（band %.2f，cv %.2f）——统计倾向信号，"
+                "规整文体（如文献摘要）也可能触发，非检测结论" % (band, cv))
     paras = [p for p in re.split(r"\n\s*\n|\n", text) if p.strip()]
     plens = [len(p.strip()) for p in paras]
     if len(plens) >= 4:
@@ -1049,6 +1132,9 @@ def fail(msg, hint=""):
 # 阈值只做「观察提示」不改评分——分数仍归 scan，画像归指南执行验收。
 # ---------------------------------------------------------------------------
 STYLE_BANDS = {
+    # 句长带集中度（v2.8.0 统计通道实验定案：373 文件实测分离度最强；
+    # 规整文体——文献摘要等——也会偏高，文案必须带此限定）
+    "band_conc": [(0.55, "自然"), (0.65, "观察")],   # >0.65 偏机器
     "jargon_1k": [(0.5, "自然"), (3.0, "观察")],      # >3.0 偏机器
     # sent_cv 是「越小越机器」的反向指标：<=0.30 偏机器，(0.30,0.45] 观察，>0.45 自然
     "sent_cv": [(0.30, "偏机器"), (0.45, "观察"), (float("inf"), "自然")],
@@ -1113,6 +1199,10 @@ def style_profile(text):
                           "sents": len([s for s in split_sentences(para) if s.strip()]),
                           "jargon_hits": hits, "worst_sample": worst[:40]})
 
+    band_med = sorted(lens)[len(lens) // 2] if lens else 0
+    band_conc = ((sum(1 for x in lens if abs(x - band_med) <= 0.3 * band_med) / len(lens))
+                 if (lens and band_med) else 0.0)
+
     def g(name, value, judge=True):
         return {"value": value, "band": _band(name, value) if judge else "—（样本不足）"}
 
@@ -1120,6 +1210,7 @@ def style_profile(text):
         "jargon_1k": g("jargon_1k", round(jargon_total / max(1, len(text)) * 1000, 2)),
         # sent_cv 与 _structural_stats 同口径：n>=8 才判
         "sent_cv": g("sent_cv", round(sent_cv, 3), judge=enough),
+        "band_conc": g("band_conc", round(band_conc, 3), judge=enough),
         "opener_top": g("opener_top", round(top_ratio, 3), judge=enough),
         "opener_streak": g("opener_streak", best, judge=enough),
     }

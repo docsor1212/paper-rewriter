@@ -92,11 +92,33 @@ def _missing(orig_c, new_c):
     return miss
 
 
+_FW_DIGITS = "０１２３４５６７８９"
+_FW_LETTERS = "ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ"
+_FW_RUN = re.compile("[" + _FW_DIGITS + _FW_LETTERS + "]{2,}")
+
+
+def _fullwidth_new_in(new_raw, orig_raw):
+    """v2.8.0（邻居 agent 二轮实测实锤）：新稿含全角数字/字母串，且其 NFKC
+    半角形态存在于原稿——中文输入法把 2025 打成 ２０２５、IL-6 打成 ＩＬ-6 这类
+    形式篡改。NFKC 值比较会把它们判为等值静默 PASS，但学术稿件必须半角，
+    按「数字/字符被改写」红线处理。返回描述列表（≤6 个）。"""
+    import unicodedata as _ud
+    hits = []
+    for m in _FW_RUN.finditer(new_raw):
+        half = _ud.normalize("NFKC", m.group(0))
+        if half in orig_raw and m.group(0) not in orig_raw:
+            hits.append("%s（应作 %s）" % (m.group(0)[:20], half[:20]))
+        if len(hits) >= 6:
+            break
+    return hits
+
+
 def verify(orig, new, terms=None, max_len_change=25.0, max_cjk_shift=0.12):
-    """返回 {ok, violations:[{check, detail}], warnings:[...], stats:{...}}。"""
+    """返回 {ok, violations:[{check, code, detail}], warnings:[...], stats:{...}}。"""
     violations = []
     warnings = []
 
+    orig_raw, new_raw = orig, new  # 原始文本（E_NUM_WIDTH/W_SENT_ADDED 检查用，先于 NFKC）
     orig, new = _norm_text(orig), _norm_text(new)
 
     def multiset(rex, text, normalize=lambda x: x):
@@ -120,6 +142,14 @@ def verify(orig, new, terms=None, max_len_change=25.0, max_cjk_shift=0.12):
         warnings.append({"check": "numbers_added", "code": "W_NUM_ADDED",
                          "detail": "出现原稿没有的数字: %s——若非原文数据立即删除（防编造）"
                                    % ", ".join(fmt(k) for k in added[:8])})
+    # 1b2) 全角形式篡改（NFKC 等值但字符已变——v2.8.0 邻居二轮实测盲区修复）
+    fw = _fullwidth_new_in(new_raw, orig_raw)
+    if fw:
+        violations.append({"check": "fullwidth", "code": "E_NUM_WIDTH",
+                           "detail": "数字/字母被改写为全角（值等价但字符已变——"
+                                     "常见于中文输入法；学术稿件必须半角）: "
+                                     + "、".join(fw)})
+
     # 1c) 数字上下文指纹：多集一致但上下文变化 → 两臂互换/方位错位类静默改写
     ctx_o = multiset(NUM_CTX_RE, orig_s, lambda s: re.sub(r"\s+", "", s))
     ctx_n = multiset(NUM_CTX_RE, new_s, lambda s: re.sub(r"\s+", "", s))
@@ -179,6 +209,17 @@ def verify(orig, new, terms=None, max_len_change=25.0, max_cjk_shift=0.12):
                            "detail": "长度变化 %.1f%% 超过警戒线 ±%.0f%%" % (delta, eff_max)})
     elif abs(delta) > eff_max * 0.7:
         warnings.append({"check": "length", "code": "E_LEN_DRIFT", "detail": "长度变化 %.1f%%，接近警戒线" % delta})
+
+    # 7) 整句新增告警（v2.8.0 邻居二轮实测：无数字的整句插入此前零告警）——
+    #    改稿中出现原稿没有的完整句（≥8 字符）即提示，W 级不改判定
+    _o_sents = set(s for s in hxt_core.split_sentences(_strip_residue(orig_raw)) if len(s) >= 8)
+    _n_sents = [s for s in hxt_core.split_sentences(_strip_residue(new_raw))
+                if len(s) >= 8 and s not in _o_sents]
+    if _n_sents:
+        warnings.append({"check": "sentences_added", "code": "W_SENT_ADDED",
+                         "detail": "新增原稿没有的句子 %d 句（无数字也须核对是否擅自加内容）: %s"
+                                   % (len(_n_sents),
+                                      " | ".join(s[:24] for s in _n_sents[:3]))})
 
     return {"ok": not violations,
             "violations": violations,

@@ -133,9 +133,13 @@ def main():
             sys.exit(hxt_core.verdict_exit_code(worst_score, worst_crit))
         sys.exit(0)
 
+    pdf_meta = None
     if args.file:
         try:
-            text = hxt_core.read_text(args.file)
+            if args.file.lower().endswith(".pdf"):
+                text, pdf_meta = hxt_core.read_text_ex(args.file)
+            else:
+                text = hxt_core.read_text(args.file)
         except OSError as e:
             print("错误: 无法读取文件 %s（%s）" % (args.file, e), file=sys.stderr)
             sys.exit(2)
@@ -165,6 +169,8 @@ def main():
         except ValueError as e:
             print("错误: %s" % e, file=sys.stderr)
             sys.exit(2)
+        if pdf_meta:
+            rs["pdf_meta"] = pdf_meta
         if args.html:
             import reporter
             try:
@@ -186,6 +192,10 @@ def main():
         print("=" * 62)
         print("章节感知扫描（论文结构模式）")
         print("=" * 62)
+        if rs.get("pdf_meta"):
+            print("PDF 抽取置信度: %s" % rs["pdf_meta"]["confidence"])
+            for note in rs["pdf_meta"]["notes"]:
+                print("  ⚠ %s" % note)
         print("综合: %d [%s]" % (rs["overall_score"], rs["overall_level"]))
         for x in rs["sections"]:
             sc = ("%d [%s]" % (x["score"], x["level"])) if x["score"] is not None else "不扫描（引用列表）"
@@ -211,6 +221,8 @@ def main():
         print("错误: %s" % e, file=sys.stderr)
         sys.exit(2)
 
+    if pdf_meta:
+        r["pdf_meta"] = pdf_meta
     r["hints"] = hxt_core.build_hints(text, r, profile=args.profile)
 
     if args.suggestions:
@@ -269,6 +281,10 @@ def main():
         lang_disp, r["units"], r["sentences"],
         "学术论文(academic)" if r.get("profile") == "academic" else "非学术(general)"))
     print()
+    if pdf_meta:
+        print("PDF 抽取置信度: %s" % pdf_meta["confidence"])
+        for note in pdf_meta["notes"]:
+            print("  ⚠ %s" % note)
     print("综合评分: %d/100  [%s]" % (r["score"], r["level"]))
     if r["critical_hit"]:
         print("级别依据: 含模型残留/聊天客套/知识截止声明等硬特征 → 直接判「极高」")

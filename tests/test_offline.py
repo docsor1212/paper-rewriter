@@ -1306,16 +1306,29 @@ class TestDocs(unittest.TestCase):
                                      "%s 含 CH 分寸词「%s」（SH/CH 分寸机制层）" % (path, w))
 
     def test_language_iron_law(self):
-        """CH 包（SKILL.md）frontmatter+正文均无中文（打包断言①同样要求）；
-        SH 包（SKILL_ZH.md）frontmatter 必须有 CJK。"""
+        """CH 包（SKILL.md）规则（v2.8.0 重写）：①frontmatter 零中文；②正文零
+        CH 分寸词（降ai率/去ai味/ai味/降ai 族）——安全 CJK 触发词（学术改写等）
+        是 v2.8.0 明示决策，绝对零 CJK 政策已废。
+        修复史：旧实现 read().split("---") 被正文表格分隔行 |---| 切碎，
+        实际只扫了前 335 字符（守卫空转假 PASS，v2.8.0 评审实锤）——
+        现改用正则只剥 frontmatter、扫描全文正文。"""
+        import re as _re
         with open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8") as f:
-            parts = f.read().split("---")
-        fm_en, body_en = parts[1], parts[2]
-        for label, seg in (("frontmatter", fm_en), ("正文", body_en)):
-            cjk = [c for c in seg if "\u4e00" <= c <= "\u9fff"]
-            self.assertEqual(cjk, [], "SKILL.md 英文包 %s 混入中文: %s" % (label, "".join(cjk[:20])))
+            raw_en = f.read()
+        m = _re.match(r"^---\n.*?\n---\n", raw_en, _re.S)
+        self.assertIsNotNone(m, "SKILL.md frontmatter 结构异常（无 --- 定界）")
+        fm_en = raw_en[:m.end()]
+        body_en = raw_en[m.end():]
+        cjk_fm = [c for c in fm_en if "\u4e00" <= c <= "\u9fff"]
+        self.assertEqual(cjk_fm, [], "SKILL.md 英文包 frontmatter 混入中文: %s" % "".join(cjk_fm[:20]))
+        for w in ("降ai率", "去ai味", "ai痕迹", "ai味", "降ai"):
+            self.assertNotIn(w, body_en.lower(),
+                             "SKILL.md 英文包正文含 CH 分寸词「%s」" % w)
         with open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8") as f:
-            fm_zh = f.read().split("---")[1]
+            raw_zh = f.read()
+        m2 = _re.match(r"^---\n.*?\n---\n", raw_zh, _re.S)
+        self.assertIsNotNone(m2, "SKILL_ZH.md frontmatter 结构异常")
+        fm_zh = raw_zh[:m2.end()]
         self.assertTrue(any("\u4e00" <= c <= "\u9fff" for c in fm_zh), "SKILL_ZH.md frontmatter 无中文")
 
     def test_patterns_json_valid(self):

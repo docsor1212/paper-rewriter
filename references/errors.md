@@ -47,8 +47,10 @@ exit 2 结束。`CliError(msg, hint)` 是脚本内主动报错的规范方式；
 | terms | E_TERMS_LOST | ✗ 红线 | 术语表条目缺失/减少 | 术语被替换——恢复，或把该词从术语表移除（若确认非术语） |
 | cjk_ratio | E_CJK_SHIFT | ✗ 红线 | 中英占比漂移超阈 | 整段被删或被译——检查是否误删段落 |
 | length | E_LEN_DRIFT | ✗ 红线 | 长度变化超阈（长文 ±25%，短文放宽） | 内容被整段删除——核对删减是否有意 |
+| fullwidth | E_NUM_WIDTH | ✗ 红线 | 数字/字母被改写为全角（２０２５≡2025 值等价但字符已变；v2.8.0） | 中文输入法所致——全部改回半角后重跑（学术稿件必须半角） |
 | numbers_added | W_NUM_ADDED | ⚠ 告警 | 出现原稿没有的数字 | **编造防线**：深改时凭空补的数字必须删除 |
 | number_context | W_CTX_SWAP | ⚠ 告警 | 数字上下文/顺序变化 | 两臂互换/方位错位——人工核对方向 |
+| sentences_added | W_SENT_ADDED | ⚠ 告警 | 改稿新增原稿没有的完整句（≥8 字符，无数字也提示；v2.8.0） | 逐句核对是否擅自加内容（编造防线的一部分） |
 | years | W_YEARS | ⚠ 告警 | 年份数量变化 | 年份引用被删——核对 |
 
 阈值均可 CLI 覆盖：`--max-length-change`、`--max-cjk-shift`。
