@@ -41,6 +41,7 @@ def transform_text(text, aggressive=False):
     out, applied = tf.apply_auto_fixes(text, fixes)
     out, removed = tf.drop_flagged_sentences(out)
     out, nq = tf.normalize_quotes(out)
+    out, nfw = tf.normalize_fullwidth_alnum(out)  # v2.9.0：与真实主链（5 步）保持同步
     return out, applied, removed, nq
 
 

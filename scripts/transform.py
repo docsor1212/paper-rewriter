@@ -169,6 +169,25 @@ def deep_polish(text):
     return text, ops
 
 
+# 全角字母/数字 → 半角（v2.9.0）。学术稿件规范用半角；中文输入法滑键常把
+# 2025 打成 ２０２５（v2.8.0 verify E_NUM_WIDTH 红线的对症修复）。只动字母与
+# 数字——全角标点是中文正当用法，不在此列。
+_FW_ALNUM_MAP = str.maketrans(
+    "ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ"
+    "ａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ"
+    "０１２３４５６７８９",
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyz"
+    "0123456789")
+
+
+def normalize_fullwidth_alnum(text):
+    """全角字母/数字归一为半角（v2.9.0），返回 (text, 改写数)。"""
+    out = text.translate(_FW_ALNUM_MAP)
+    n = sum(1 for a, b in zip(text, out) if a != b)
+    return out, n
+
+
 def main():
     ap = argparse.ArgumentParser(description="确定性机械清洗（不改数据/引用/术语）")
     ap.add_argument("file", nargs="?", help="输入文件；缺省读 stdin")
@@ -211,6 +230,11 @@ def main():
     out, applied = apply_auto_fixes(text, fixes)
     out, removed = drop_flagged_sentences(out)
     out, n_quotes = normalize_quotes(out)
+    out, n_fw = normalize_fullwidth_alnum(out)
+    if n_fw:
+        applied["全角字母数字归一"] = n_fw
+        if not args.quiet:
+            print("全角字母/数字→半角: %d 字符" % n_fw, file=sys.stderr)
     deep_ops = []
     if args.deep:
         out, deep_ops = deep_polish(out)

@@ -32,7 +32,7 @@ def main():
                     help="academic=论文口径（默认）；general=非学术文本，八股/公文信号降权")
     ap.add_argument("--suggestions", help="输出修订建议工作单（markdown 侧车）到此路径")
     ap.add_argument("--html", help="生成单文件 HTML 报告到此路径")
-    ap.add_argument("--batch", help="批量模式：扫描目录内全部 .txt/.md/.docx，输出逐文件评分汇总（stdout；--json/--html 可同用）")
+    ap.add_argument("--batch", help="批量模式：扫描目录内全部 .txt/.md/.docx/.pdf，输出逐文件评分汇总（stdout；--json/--html 可同用）")
     ap.add_argument("--review", help="生成结构化审稿报告（markdown）到此路径")
     ap.add_argument("--structure", action="store_true",
                     help="章节感知：识别论文结构（摘要/引言/方法/结果/讨论），分章节评分（方法/结果自动降权）")
@@ -51,11 +51,16 @@ def main():
         rows_out = []
         pending = []  # (fp, 行索引)——二遍重试队列（v2.5.0 stability 处方）
         for fn in sorted(os.listdir(root)):
-            if not fn.lower().endswith((".txt", ".md", ".docx")):
+            if not fn.lower().endswith((".txt", ".md", ".docx", ".pdf")):
                 continue
             fp = os.path.join(root, fn)
             try:
-                t = hxt_core.read_text(fp)
+                if fp.lower().endswith(".pdf"):
+                    t, _pm = hxt_core.read_text_ex(fp)
+                    pdf_conf = _pm.get("confidence", "")
+                else:
+                    t = hxt_core.read_text(fp)
+                    pdf_conf = ""
                 if not t.strip():
                     rows_out.append((fn, -1, "空文件", False, "-"))
                     continue
@@ -65,7 +70,12 @@ def main():
                       if len(t) > 1_000_000 else
                       hxt_core.scan(t, lang=None if args.lang == "auto" else args.lang,
                                     profile=args.profile, source_ext=_ext))
-                rows_out.append((fn, rr["score"], rr["level"], rr["critical_hit"], rr["lang"]))
+                if pdf_conf:
+                    mark_pdf = " [置信度:%s]" % pdf_conf
+                    rows_out.append((fn, rr["score"], rr["level"] + mark_pdf,
+                                     rr["critical_hit"], rr["lang"]))
+                else:
+                    rows_out.append((fn, rr["score"], rr["level"], rr["critical_hit"], rr["lang"]))
             except (OSError, ValueError):
                 # 首遍失败不放弃：进二遍重试队列（超时/IO 抖动多为瞬时态）
                 pending.append((fp, len(rows_out)))
@@ -74,7 +84,12 @@ def main():
         for fp, idx in pending:
             fn = rows_out[idx][0]
             try:
-                t = hxt_core.read_text(fp)
+                pdf_conf = ""
+                if fp.lower().endswith(".pdf"):
+                    t, _pm = hxt_core.read_text_ex(fp)
+                    pdf_conf = _pm.get("confidence", "")
+                else:
+                    t = hxt_core.read_text(fp)
                 _ext = os.path.splitext(fn)[1].lower()
                 rr = (hxt_core.scan_chunked(t, lang=None if args.lang == "auto" else args.lang,
                                             profile=args.profile, source_ext=_ext,
@@ -83,7 +98,8 @@ def main():
                       hxt_core.scan(t, lang=None if args.lang == "auto" else args.lang,
                                     profile=args.profile, source_ext=_ext,
                                     time_budget=hxt_core.SCAN_TIME_BUDGET * 2))
-                rows_out[idx] = (fn, rr["score"], rr["level"], rr["critical_hit"], rr["lang"])
+                lvl = rr["level"] + (" [置信度:%s]" % pdf_conf if pdf_conf else "")
+                rows_out[idx] = (fn, rr["score"], lvl, rr["critical_hit"], rr["lang"])
                 retried[fn] = True
             except (OSError, ValueError) as e:
                 rows_out[idx] = (fn, -1, "错误: %s（已重试 1 次）" % str(e)[:60], False, "-")

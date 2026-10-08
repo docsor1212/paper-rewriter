@@ -59,7 +59,7 @@ def main():
     ap.add_argument("--suggestions", help="输出修订建议工作单（markdown 侧车）到此路径")
     ap.add_argument("--html", help="生成单文件 HTML 报告到此路径")
     ap.add_argument("--track", help="输出修订记录（.md+.json）到此路径基名")
-    ap.add_argument("--batch", help="批量模式：目录内全部 .txt/.md/.docx 逐个「清理+守卫」，汇总 CSV 输出到 stdout/此路径")
+    ap.add_argument("--batch", help="批量模式：目录内全部 .txt/.md/.docx/.pdf 逐个「清理+守卫」，汇总 CSV 输出到 stdout/此路径")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--exit-verdict", action="store_true",
                     help="自动化集成（CI/agent 门禁）：按判定设退出码——0=干净，"
@@ -88,11 +88,16 @@ def main():
         rows_out = []
         pending = []  # (fp, 行索引)——二遍重试队列（v2.5.0 stability 处方）
         for fn in sorted(os.listdir(root)):
-            if not fn.lower().endswith((".txt", ".md", ".docx")):
+            if not fn.lower().endswith((".txt", ".md", ".docx", ".pdf")):
                 continue
             fp = os.path.join(root, fn)
             try:
-                o = hxt_core.read_text(fp)
+                if fp.lower().endswith(".pdf"):
+                    o, _pm = hxt_core.read_text_ex(fp)
+                    pdf_conf = _pm.get("confidence", "")
+                else:
+                    o = hxt_core.read_text(fp)
+                    pdf_conf = ""
                 if not o.strip():
                     rows_out.append((fn, "-", "-", "空文件", "-"))
                     continue
@@ -103,8 +108,9 @@ def main():
                 v = vf.verify(o, n)
                 before = hxt_core.scan(o, time_budget=args.step_timeout)
                 after = hxt_core.scan(n, time_budget=args.step_timeout)
+                conf_suffix = (" [置信度:%s]" % pdf_conf) if pdf_conf else ""
                 rows_out.append((fn, "%d[%s]" % (before["score"], before["level"]),
-                                 "%d[%s]" % (after["score"], after["level"]),
+                                 "%d[%s]%s" % (after["score"], after["level"], conf_suffix),
                                  "PASS" if v["ok"] else "FAIL(%d)" % len(v["violations"]),
                                  "%+d%%" % v["stats"]["length_delta_pct"]))
             except (OSError, ValueError):
@@ -115,7 +121,12 @@ def main():
         for fp, idx in pending:
             fn = rows_out[idx][0]
             try:
-                o = hxt_core.read_text(fp)
+                if fp.lower().endswith(".pdf"):
+                    o, _pm = hxt_core.read_text_ex(fp)
+                    pdf_conf = _pm.get("confidence", "")
+                else:
+                    o = hxt_core.read_text(fp)
+                    pdf_conf = ""
                 fx = tf.load_fixes(None, False)
                 n, _ap = tf.apply_auto_fixes(o, fx)
                 n, _rm = tf.drop_flagged_sentences(n)
@@ -123,8 +134,9 @@ def main():
                 v = vf.verify(o, n)
                 before = hxt_core.scan(o, time_budget=hxt_core.SCAN_TIME_BUDGET * 2)
                 after = hxt_core.scan(n, time_budget=hxt_core.SCAN_TIME_BUDGET * 2)
+                conf_suffix = (" [置信度:%s]" % pdf_conf) if pdf_conf else ""
                 rows_out[idx] = (fn, "%d[%s]" % (before["score"], before["level"]),
-                                 "%d[%s]" % (after["score"], after["level"]),
+                                 "%d[%s]%s" % (after["score"], after["level"], conf_suffix),
                                  "PASS" if v["ok"] else "FAIL(%d)" % len(v["violations"]),
                                  "%+d%%" % v["stats"]["length_delta_pct"])
                 retried[fn] = True
@@ -223,6 +235,9 @@ def main():
                           hint="文件较大时请按章节拆分后分别处理，或调大 --step-timeout")
         new, removed = tf.drop_flagged_sentences(new)
         new, _ = tf.normalize_quotes(new)
+        new, _nfw = tf.normalize_fullwidth_alnum(new)
+        if _nfw:
+            applied["全角字母数字归一"] = _nfw
         deep_ops = []
         if getattr(args, "deep", False):
             new, deep_ops = tf.deep_polish(new)

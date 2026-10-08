@@ -82,6 +82,7 @@ max_cjk_shift=0.12) -> {"ok": bool, "violations": [...], "warnings": [...], "sta
 | `hxt_core.scan(..., time_budget=120.0)` | 墙钟预算（v2.4.0）：超时抛 ValueError 带拆分建议；`SCAN_TIME_BUDGET` 为缺省常量 |
 | `hxt_core.CliError(msg, hint)` / `fail()` / `cli_entry(main)` | 集中异常层（v2.5.0）：两行中文错误+处置建议，exit 2；SystemExit 穿透 |
 | `pipeline.py --step-timeout SEC` / report `timings` | 单步墙钟预算与各步耗时（cleanup/scan/verify，v2.5.0） |
+| `transform.normalize_fullwidth_alnum(text)` | 全角字母/数字→半角（v2.9.0）：E_NUM_WIDTH 的对症修复，返回 (text, 改写数) |
 | `hxt_core.read_text_ex(path)` / `_pdf_confidence` | 带元数据读取（v2.8.0）：.pdf 返回 (text, {confidence 高/中/低, notes})；四启发指标校准见 tests/v280 |
 | `detect --batch --json` / `pipeline --batch` 的 `retried` | 批量二遍重试标记（v2.5.0）：失败文件以双倍预算重扫一次 |
 | `hxt_core.style_profile(text)` / `stylecheck.py` | 风格画像（v2.6.0）：段落级黑话定位+节奏/开场档位+指南锚点；--compare 验收差值（阈值=dev 四语料校准） |

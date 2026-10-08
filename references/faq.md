@@ -73,7 +73,7 @@ v1.4.0 起不再需要手动切分：detect/pipeline 对超 1MB 文本**自动�
 **Q14b：报告能导出成网页吗？能一次扫整个目录吗？**
 都能。`--html report.html` 生成单文件 HTML（无外链可直接存档/转发）；compare 的
 HTML 含逐句增删对照，复核改稿最直观。批量：`--batch 目录名` 一次扫全部
-.txt/.md/.docx（detect 出逐文件评分，pipeline 逐文件清理+守卫汇总 CSV）。
+.txt/.md/.docx/.pdf（detect 出逐文件评分，pipeline 逐文件清理+守卫汇总 CSV）。
 
 **Q14a：transform 的激进模式（-a）什么时候用？**
 适合：非正式文本的破折号堆叠、空泛开场白清理。不适合：学术方法段的插入语破折号、

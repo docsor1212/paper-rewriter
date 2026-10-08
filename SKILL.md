@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 2.8.0
+version: 2.9.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: AI flavor scan and style-pattern
   self-check reports (scan reports are detection only), deterministic text cleanup
@@ -29,7 +29,7 @@ Bilingual (CN/EN) style naturalization for academic & medical writing: find stif
 templated or machine-flavored patterns, clean mechanical debris, revise for clarity
 and natural register — with integrity guardrails on every step.
 
-## Feature status (v2.8.0)
+## Feature status (v2.9.0)
 
 | Feature | Status | Since |
 |---|---|---|
@@ -45,6 +45,7 @@ and natural register — with integrity guardrails on every step.
 | Style profile (`stylecheck.py`: per-paragraph quantified guide audit) | Stable | v2.6 |
 | Best-practices handbook (7 real scenarios), stylecheck `--html`, `--terms auto` | Stable | v2.7 |
 | PDF extraction confidence self-report (`read_text_ex`, detect/pipeline annotation) | Experimental | v2.8 |
+| Batch accepts `.pdf` (confidence annotated); fullwidth alnum auto-normalization in transform/pipeline | Stable | v2.9 |
 | HTML reports, `--batch`, `--track` audit trail | Stable | v1.5–1.6 |
 | PDF text extraction (English text-type only) | **Experimental** | v1.6 |
 
@@ -82,6 +83,12 @@ regression-tested offline on every release.
 | Before/after | `scripts/compare.py` | Pattern-score delta + integrity verdict |
 
 ## Quick start
+
+**Reading map** (this file is the hub; details live one click away):
+first time → Quick start + The workflow below · troubleshooting →
+`references/pitfalls.md` + `references/errors.md` · CI/agent integration →
+Automation section · capability limits → Honest boundaries · scenario how-tos →
+`references/best_practices.md` · programmatic use → `references/api.md`.
 
 No agent is required — every capability below runs directly in a terminal.
 Every script has built-in `--help` (full flag reference) and `--version`;
@@ -252,7 +259,8 @@ Scripts are automation-first: every verdict is machine-readable, two ways.
    `--deep` (v2.4.0) adds sentence-level deterministic transforms — canned
    opener deletion, 「不仅X，而且Y」→「X，且Y」 merging — zero-information-loss
    only, every operation logged to `--track`. Clean human-written text passes
-   through byte-identical.
+   through byte-identical
+   (except fullwidth alnum normalization, see feature status v2.9).
 3. **Quality revision** (the real work): optionally rank the work first —
    `python scripts/plan.py draft.txt -o plan.md` gives a sentence-level P0
    queue (worst offenders with section, category and advice) so deep effort
@@ -313,7 +321,7 @@ Scripts are automation-first: every verdict is machine-readable, two ways.
 For reviewers, security scanners and cautious users:
 
 - Reads **only** the file paths you pass as arguments (plus stdin, including the
-  `.txt`/`.md`/`.docx` files inside a `--batch` directory) and its own
+  `.txt`/`.md`/`.docx`/`.pdf` files inside a `--batch` directory) and its own
   bundled wordlist files (`scripts/patterns_*.json`, plus
   `scripts/user_guards.json` if you have created one with `learn_guards.py`).
   Verify it yourself:
