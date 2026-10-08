@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 2.9.0
+version: 3.0.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: AI flavor scan and style-pattern
   self-check reports (scan reports are detection only), deterministic text cleanup
@@ -29,7 +29,7 @@ Bilingual (CN/EN) style naturalization for academic & medical writing: find stif
 templated or machine-flavored patterns, clean mechanical debris, revise for clarity
 and natural register — with integrity guardrails on every step.
 
-## Feature status (v2.9.0)
+## Feature status (v3.0.0)
 
 | Feature | Status | Since |
 |---|---|---|
@@ -40,14 +40,16 @@ and natural register — with integrity guardrails on every step.
 | User-learned term guards (`learn_guards.py`) | Stable | v2.2 |
 | `--exit-verdict` machine exit codes (detect/compare/pipeline) | Stable | v2.3 |
 | Deterministic deep polish (`--deep`), handling hints, scan time budget | Stable | v2.4 |
-| Centralized error layer (`CliError` + 处置建议), batch retry, per-step timeout | Stable | v2.5 |
+| Centralized error layer (`CliError` + handling hints), batch retry, per-step timeout | Stable | v2.5 |
 | Scale envelope: 800K-char chunks (2K overlap) · 50MB file cap · 120s step budget | — | — |
 | Style profile (`stylecheck.py`: per-paragraph quantified guide audit) | Stable | v2.6 |
 | Best-practices handbook (7 real scenarios), stylecheck `--html`, `--terms auto` | Stable | v2.7 |
-| PDF extraction confidence self-report (`read_text_ex`, detect/pipeline annotation) | Experimental | v2.8 |
+| PDF extraction confidence self-report (`read_text_ex`, detect/pipeline annotation) — calibrated on 200 real-world PDFs, see `references/pdf_confidence.md` | Experimental | v2.8 |
+| Term guard packs (`check_terms --pack cardiovascular` — 8 domains, nesting-safe, `--list-packs`) | Stable | v3.0 |
+| Deep-rewrite handoff block (`plan.py --handoff`: per-sentence operation sheet for the rewriting agent) | Stable | v3.0 |
 | Batch accepts `.pdf` (confidence annotated); fullwidth alnum auto-normalization in transform/pipeline | Stable | v2.9 |
 | HTML reports, `--batch`, `--track` audit trail | Stable | v1.5–1.6 |
-| PDF text extraction (English text-type only) | **Experimental** | v1.6 |
+| PDF text extraction (text PDFs; v3.0.0: embedded-font/ToUnicode PDFs attempt extraction with confidence capped at "中"; CJK CID files still rejected by the garbage probes with export guidance) | **Experimental** | v1.6 |
 
 Anything marked **Experimental** can reject valid files or need manual review of
 its output — export to UTF-8 text when in doubt. Everything else is
@@ -88,7 +90,9 @@ regression-tested offline on every release.
 first time → Quick start + The workflow below · troubleshooting →
 `references/pitfalls.md` + `references/errors.md` · CI/agent integration →
 Automation section · capability limits → Honest boundaries · scenario how-tos →
-`references/best_practices.md` · programmatic use → `references/api.md`.
+`references/best_practices.md` · deep-rewrite process →
+`references/deep_rewrite_guide.md` · PDF confidence tiers →
+`references/pdf_confidence.md` · programmatic use → `references/api.md`.
 
 No agent is required — every capability below runs directly in a terminal.
 Every script has built-in `--help` (full flag reference) and `--version`;
@@ -133,7 +137,9 @@ promise, and not any external detector's score.
 Preparing the term list: `python scripts/extract_terms.py draft.txt -o terms.txt`
 auto-extracts candidates (abbreviations, quoted terms) into a draft you confirm
 by hand. Input formats: `.txt`/`.md` directly, **`.docx` (Word) directly** since
-v1.3.0; PDF has no dependency-free extraction — export to text first. Ask for a
+v1.3.0; PDF direct-read is **experimental** (text PDFs; confidence self-report —
+a "低" tier means garbled extraction, export to UTF-8 text instead; see
+`references/pdf_confidence.md`). Ask for a
 revision worksheet alongside any run with `--suggestions path.md` (detect.py and
 pipeline.py both support it): category, sample, suggested handling and the guide
 section to read — the tool proposes, you and the guide decide.
@@ -203,6 +209,9 @@ When invoked, decide the path first, then run it:
   tone or model residue: 「这篇读起来像 AI 写的」「把套话删一删」
   「文里有 [cite: 1] 这种残留」; when both apply, polish first, then run this
   pipeline — neither tool substitutes for the other.
+- **Term inconsistency** (abbreviation vs full form, mixed synonyms) →
+  `check_terms.py file --pack <domain>`; `--list-packs` shows all eight
+  domain packs (v3.0.0).
 - **User wants to know what to fix first** → `plan.py draft.txt -o plan.md`
   (P0 sentence queue + budget projection) before deep revision.
 - **User wants quantified acceptance of a rewrite** → `stylecheck.py 原稿 改稿
@@ -264,7 +273,10 @@ Scripts are automation-first: every verdict is machine-readable, two ways.
 3. **Quality revision** (the real work): optionally rank the work first —
    `python scripts/plan.py draft.txt -o plan.md` gives a sentence-level P0
    queue (worst offenders with section, category and advice) so deep effort
-   lands where the score lives. Then read the guide for the text's language —
+   lands where the score lives; add `--handoff` to emit a per-sentence
+   operation sheet (original sentence + directive + guard rules + acceptance
+   commands) that a rewriting agent can follow verbatim (v3.0.0).
+   Then read the guide for the text's language —
    - CN: `references/style_guide_zh.md` — structural de-templating → jargon
      cleanup → rhythm → concreteness → stance → integrity red lines
    - EN: `references/style_guide_en.md` — smaller words → fewer significance
@@ -282,6 +294,9 @@ Scripts are automation-first: every verdict is machine-readable, two ways.
    capitalized forms like Myc — and scale names), one term per line. The guard
    also warns on numbers absent from the original (fabrication defense) and
    number-context swaps (arm/direction ordering).
+   For mixed synonym usage (abbreviation vs full form, e.g. HF vs
+   心力衰竭), also run `check_terms.py file --pack cardiovascular`
+   (v3.0.0 domain packs; `--list-packs` shows all eight).
 5. **Re-check**: `compare.py draft.txt step2.txt` — pattern reduction + integrity
    verdict. Keep the before/after pair for your records; if your institution or
    journal requires an AI-use disclosure, state it plainly — this report is a

@@ -91,6 +91,8 @@ max_cjk_shift=0.12) -> {"ok": bool, "violations": [...], "warnings": [...], "sta
 | `pipeline.py --terms auto` | 自动术语草稿（v2.7.0）：extract_terms 口径 min_count=1+警告；JSON terms_note 字段 |
 | `hxt_core._load_user_guards()` | 读 `scripts/user_guards.json`（损坏降级为空并 stderr 提示） |
 | `plan.py <file> --json / -o plan.md --top N` | 句级改写优先级计划：P0 队列+章节归属+线性预算投影 |
+| `plan.py <file> --handoff`（v3.0.0） | 深改交接块：逐句「原句+操作指令」指令单（含守卫铁律+验收命令）；markdown 追加输出，`--json` 下为 `handoff` 键 |
+| `check_terms.py <file> --pack <域> / --list-packs`（v3.0.0） | 术语守卫域包：八学科域 28 对按域选跑；结果带 `pack` 域标签；`hxt_core` 侧 `check_terms.validate_packs()` 嵌套安全校验（变体互斥断言） |
 | `learn_guards.py add/from-text/list/remove/test` | 误报→守卫固化；语义同内置 term_guards（±30 字符窗口豁免） |
 
 plan 的逐句贡献与投影均为近似口径（同类同权线性近似）；learn_guards 只写

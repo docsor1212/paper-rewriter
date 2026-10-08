@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "2.9.0"
+__version__ = "3.0.0"
 
 import json
 import os
@@ -72,13 +72,15 @@ def _read_text_impl(path, max_mb):
 def read_text_ex(path, max_mb=50.0, retries=2):
     """read_text 的带元数据版（v2.8.0）：返回 (text, meta)。
 
-    meta 仅对 .pdf 输入非空：{"confidence": 高/中/低, "notes": [建议…]}——
+    meta 仅对 .pdf 输入非空：{"confidence": 高/中/低, "indicators": {…},
+    "notes": [建议…]}——
     置信度由 _pdf_confidence 的四项启发指标合成，把「PDF 直读需人工复核」
     升级为「工具告诉你这次抽取有多可信」。其余格式 meta={}。"""
     text = read_text(path, max_mb=max_mb, retries=retries)
     meta = {}
     if path.lower().endswith(".pdf"):
-        meta = _pdf_confidence(text)
+        meta = _pdf_confidence(
+            text, had_tounicode=getattr(_extract_pdf, "last_tounicode", False))
     return text, meta
 
 
@@ -93,25 +95,34 @@ _PDF_PROBE_WORDS = frozenset((
 ).split())
 
 
-def _pdf_confidence(text):
-    """PDF 抽取置信度自评（v2.8.0，accuracy 处方）：四项启发指标合成。
+def _pdf_confidence(text, had_tounicode=False):
+    """PDF 抽取置信度自评（v2.8.0 四指标合成；v3.0.0 校准）。
 
     高：常用词命中率 >=25% 且控制字符率 <0.3% 且词均长 3-9；
     低：命中率 <8% 或控制字符率 >=2% 或词均长 >14（乱码典型形态）；
-    其余中。置信度只标注不拦截——内容判断仍是启发式口径。"""
+    其余中。置信度只标注不拦截——内容判断仍是启发式口径。
+    had_tounicode（v3.0.0）：源 PDF 含 ToUnicode CMap 时「高」封顶为「中」——
+    嵌入字体子集存在字面替换风险，乱码探针无法发现语义级错映射。"""
     words = re.findall(r"[A-Za-z]+", text)
     n = len(words)
     if n < 30:
         return {"confidence": "低",
+                "indicators": {"words": n},
                 "notes": ["可抽取词过少（%d 个）——常见于扫描件/图片型或表格页，"
                           "请用 OCR 或导出 UTF-8 文本" % n]}
     hit = sum(1 for w in words if w.lower() in _PDF_PROBE_WORDS)
     hit_rate = hit / n
     ctrl = sum(1 for c in text if ord(c) < 32 and c not in "\n\t\r") / max(1, len(text))
     avg_len = sum(len(w) for w in words) / n
+    indicators = {"words": n, "probe_hit_rate": round(hit_rate, 3),
+                  "ctrl_rate": round(ctrl, 4), "avg_word_len": round(avg_len, 1)}
     notes = []
     if hit_rate >= 0.25 and ctrl < 0.003 and 3.0 <= avg_len <= 9.0:
         conf = "高"
+        if had_tounicode:
+            conf = "中"
+            notes.append("源 PDF 含 ToUnicode CMap（嵌入字体）——字面抽取已过乱码"
+                         "探针，但字体子集存在字面替换风险，建议抽查关键数字与术语")
     elif hit_rate < 0.08 or ctrl >= 0.02 or avg_len > 14.0:
         conf = "低"
         if avg_len > 14.0:
@@ -125,7 +136,7 @@ def _pdf_confidence(text):
         conf = "中"
         notes.append("抽取可用但建议抽查（命中率 %.0f%%/词均长 %.1f）——"
                      "可能存在断词或字符丢失" % (hit_rate * 100, avg_len))
-    return {"confidence": conf, "notes": notes}
+    return {"confidence": conf, "indicators": indicators, "notes": notes}
 
 
 def _chunk_spans(text, max_chars=800_000, overlap=2000):
@@ -392,21 +403,23 @@ def _pdf_walk_text(data):
 def _extract_pdf(path):
     """PDF 文本直读（v1.6.0 实验性，纯标准库，字符级状态机）。
 
-    能力：未加密、FlateDecode/未压缩、英文文本型 PDF。
-    明确拒绝：加密 PDF；含 ToUnicode CMap（CJK/嵌入字体强标记）的 PDF；
-    抽取结果乱码/控制字符超阈的 PDF（最坏失败态=乱码静默放行，三重探针设防）。
+    能力：未加密、FlateDecode/未压缩、文本型 PDF（v3.0.0 起含嵌字体/ToUnicode
+    的英文 PDF——见下）。明确拒绝：加密 PDF；抽取结果乱码/控制字符超阈的 PDF
+    （最坏失败态=乱码静默放行，后置三探针设防：控制字符率/GBK 回程/FFFD 占比）。
+    ToUnicode CMap 不再硬拒（v3.0.0）：30 篇真实中文医学 PDF 对照实验——29 篇
+    仍被控制字符探针拦下、1 篇解压预算拒绝（CID 编码文件对硬拒是冗余），而英文
+    嵌字体 PDF 被硬拒纯属误伤——降级为置信度封顶信号（_extract_pdf.last_tounicode，
+    read_text_ex 读取后把「高」封顶为「中」并注明建议抽查；校准正本
+    references/pdf_confidence.md）。
     尽力探测可漏网：抽取结果请人工检查。"""
     import zlib
     with open(path, "rb") as f:
         raw = f.read()
+    _extract_pdf.last_tounicode = b"/ToUnicode" in raw
     if not raw.startswith(b"%PDF"):
         raise ValueError("输入 .pdf 缺少 PDF 头——文件可能损坏或只是改了扩展名")
     if b"/Encrypt" in raw:
         raise ValueError("输入 PDF 受密码保护——请解除密码或导出为 UTF-8 文本")
-    if b"/ToUnicode" in raw:
-        raise ValueError(
-            "该 PDF 含 ToUnicode CMap（CJK/嵌入字体文档的强标记）——本工具的"
-            "实验性 PDF 直读无法可靠解码，请导出为 UTF-8 文本后重试")
     parts = []
     total_unc = 0  # v2.2.0 累计解压预算：单流 20MB + 全文 50MB，防多流炸弹
     for m in re.finditer(rb"stream\r?\n(.*?)endstream", raw, re.S):
@@ -431,7 +444,8 @@ def _extract_pdf(path):
             "PDF 中未找到可抽取的文本流（可能是扫描件/纯图片 PDF）——"
             "请用 OCR 或导出为 UTF-8 文本")
     text = "".join(p.decode("latin-1") for p in parts)
-    # 三重乱码探针（最坏失败态=乱码静默放行）
+    # 乱码探针（最坏失败态=乱码静默放行）：控制字符率 + GBK 回程两道实闸；
+    # FFFD 守卫对当前 latin-1 解码路径恒空，留作未来非 latin-1 解码扩展的兜底
     ctrl = sum(1 for c in text if ord(c) < 32 and c not in "\n\t\r")
     if ctrl / max(1, len(text)) > 0.005:
         raise ValueError(

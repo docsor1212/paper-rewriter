@@ -94,6 +94,30 @@ def advice_str(cid):
     return str(v)
 
 
+def build_handoff(rows, sections, source=""):
+    """v3.0.0 深改交接块：把 P0 队列变成执行改写 agent 可直接照做的逐句指令单。
+
+    官方评测（completeness/summary）指出深改环节依赖外部 agent 而工具未把
+    交接做透——本函数把「哪句、改什么、守什么、改完怎么验」一次给全。"""
+    lines = ["## 深改交接块（复制给执行改写的 agent）", "",
+             "```text",
+             "守卫铁律：数字/量纲/DOI/PMID/术语/专有名词/引文内容一律原样保留；",
+             "每完成 3-5 句运行一次 verify，出现任何 GUARD/ERROR 立即回滚该句。",
+             "处理原则详见 references/style_guide_zh.md（英文稿用 style_guide_en.md），",
+             "流程细节见 references/deep_rewrite_guide.md。"]
+    for i, r in enumerate(rows, 1):
+        sec = SECTION_LABELS.get(section_at(sections, r["off"]), "正文")
+        ops = "；".join(dict.fromkeys(advice_str(cid) for cid in r["cats"]))
+        lines.append("")
+        lines.append("%d. [%s] %s" % (i, sec, r["sent"]))
+        lines.append("   操作：%s" % ops)
+    lines += ["", "全部改完后运行（任一 FAIL 都不得交付）：",
+              "  python scripts/verify.py <原文件> <改后文件>",
+              "  python scripts/stylecheck.py <改后文件> --compare <原文件>",
+              "```"]
+    return "\n".join(lines)
+
+
 def main():
     ap = argparse.ArgumentParser(
         description="句级改写优先级计划：逐句风险排序 + 预算投影（本地启发式口径）")
@@ -103,6 +127,8 @@ def main():
     ap.add_argument("--top", type=int, default=15, help="P0 队列长度（默认 15）")
     ap.add_argument("-o", "--output", help="把 markdown 计划写到该文件（仅显式路径）")
     ap.add_argument("--json", action="store_true", help="输出 JSON（供 agent 消费）")
+    ap.add_argument("--handoff", action="store_true",
+                    help="输出深改交接块（逐句操作指令单，供执行改写的 agent 直接照做）")
     ap.add_argument("--version", action="version",
                     version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
@@ -207,6 +233,9 @@ def main():
             "projections": projections,
         }
 
+        if args.handoff:
+            result["handoff"] = build_handoff(top, sections, source=args.file)
+
         if args.json:
             out = json.dumps(result, ensure_ascii=False, indent=2)
             if args.output:
@@ -269,6 +298,9 @@ def main():
                      "[SkillHub](https://skillhub.cn/skills/indiv-sorsor/paper-rewriter)）"
                      "· 觉得有用欢迎 Star / 收藏")
         lines.append("")
+        if args.handoff:
+            lines.append(build_handoff(top, sections, source=args.file))
+            lines.append("")
         out_text = "\n".join(lines)
         if args.output:
             with open(args.output, "w", encoding="utf-8") as f:

@@ -12,8 +12,9 @@
 | 0 | 全部 | 完成（verify: 完整性 PASS） | 正常继续；其余脚本的判定读输出报告 |
 | 1 | **仅 verify.py** | 完整性守卫 FAIL——改稿动了数字/引用/术语 | **修改改稿**，不是改守卫、不是换参数 |
 | 2 | 全部 | 用法或文件错误 | 看 stderr 提示：路径错/文件空/二进制/编码/超限，每条提示自带处置建议 |
+| 1 | check_terms.py（独立口径） | 发现术语不一致（报变体对与次数） | 按「建议统一为」人工统一；`--report` 出 markdown 明细 |
 
-> pipeline.py / compare.py 的守卫判定在输出报告的「完整性守卫: PASS/FAIL」行；按退出码分支的脚本请调 verify.py。
+> pipeline.py / compare.py 的守卫判定在输出报告的「完整性守卫: PASS/FAIL」行；按退出码分支的脚本请调 verify.py。check_terms.py 的 0/1/2 是自己的契约（0=一致），与 verify 的 1=FAIL 语义不同表，勿混用。
 
 **自动化口径**（v2.3.0：detect/compare/pipeline 加 `--exit-verdict` 后）：
 
