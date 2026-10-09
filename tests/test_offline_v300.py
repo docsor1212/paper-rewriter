@@ -51,7 +51,8 @@ def test_term_packs():
           str(ct.validate_packs()))
     check("packs.肝功嵌套对已移除",
           ("肝功", "肝功能") not in ct._BUILTIN_PAIRS)
-    check("packs.总对数 28", len(ct._BUILTIN_PAIRS) == 28,
+    # v3.1.0 起变体组制：兼容投影=每组前两变体，HF 三变体组投影后 28→27
+    check("packs.兼容对数 27（v3.1.0 组制投影）", len(ct._BUILTIN_PAIRS) == 27,
           "got %d" % len(ct._BUILTIN_PAIRS))
     check("packs.八域齐全",
           set(ct._TERM_PACKS) == {"通用", "风湿免疫", "内分泌", "心血管",
@@ -156,7 +157,9 @@ def make_pdf(path, with_tounicode, sentence=None):
 
 
 def test_pdf_confidence():
-    check("pdf.__version__ = 3.0.0", hxt_core.__version__ == "3.0.0")
+    check("pdf.__version__ >= 3.0.0",
+          tuple(int(x) for x in hxt_core.__version__.split(".")) >= (3, 0, 0),
+          hxt_core.__version__)
     with tempfile.TemporaryDirectory() as td:
         p1 = os.path.join(td, "en_plain.pdf")
         make_pdf(p1, with_tounicode=False)
@@ -216,8 +219,11 @@ def test_pdf_confidence():
 def test_docs():
     en = open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8").read()
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()
-    check("docs.EN 版本锚 v3.0.0", "## Feature status (v3.0.0)" in en)
-    check("docs.ZH 版本锚 v3.0.0", "功能状态（v3.0.0）" in zh)
+    import re as _re
+    check("docs.EN 版本锚 v3.x 在位",
+          bool(_re.search(r"## Feature status \(v3\.\d+\.\d+\)", en)))
+    check("docs.ZH 版本锚 v3.x 在位",
+          bool(_re.search(r"功能状态（v3\.\d+\.\d+）", zh)))
     check("docs.新 references 存在且非空",
           os.path.getsize(os.path.join(ROOT, "references/pdf_confidence.md")) > 1000
           and os.path.getsize(os.path.join(ROOT, "references/deep_rewrite_guide.md")) > 1000)

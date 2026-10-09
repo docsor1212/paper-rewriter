@@ -40,6 +40,8 @@ def main():
                     help="自动化集成（CI/agent 管线）：按判定设退出码——0=低/无残留，"
                          "3=风格特征中及以上（需深改），4=命中模型残留（critical）。"
                          "缺省恒 0（判定写在报告里，人读口径不变）")
+    ap.add_argument("--ci", action="store_true", dest="exit_verdict",
+                 help="CI 门禁模式：--exit-verdict 的短别名（机器退出码 0/3/4；1 仅 pipeline）")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
 

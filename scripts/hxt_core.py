@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "3.0.0"
+__version__ = "3.1.0"
 
 import json
 import os
@@ -1103,6 +1103,10 @@ def build_hints(text, r, profile="academic"):
     hints = []
     if r.get("critical_hit"):
         hints.append("命中模型残留硬特征——先跑 transform.py <文件> -o 清理稿.txt，再复核清理稿")
+    if (r.get("categories", {}).get("zh_eightleg", {}).get("count", 0) > 0
+            and len(hints) < 4):
+        hints.append("命中句首八股——加 --deep 可确定性删除句首套话/合并「不仅…而且」"
+                     "（零信息损失，操作进 --track 可审计）")
     if r.get("score", 0) >= LEVEL_MID_THRESHOLD:
         hints.append("深改排序：python scripts/plan.py <文件> -o plan.md 生成句级优先级计划（先改贡献最大的句子）")
     guards = r.get("guards_applied") or []
@@ -1240,9 +1244,42 @@ def style_profile(text):
         advice.append("句首开场词高度重复：指南第 1 步（拆仪式感开场/换开场方式）")
     advice.append("深改后验收闭环：stylecheck.py 改前 改后 --compare 看画像差值；"
                   "改稿过 verify.py 守卫后重跑本命令确认档位回落")
+    # v3.1.0 统计面板（信息性扩展，不判档、不改评分、不进 advice）：
+    # TTR/虚词比例/句长分位——把 v2.8.0 统计通道实验的口径开放给自查。
+    zh_chars = re.findall(r"[\u4e00-\u9fff]", text)
+    en_words = [w.lower() for w in re.findall(r"[A-Za-z]+", text)]
+    _ZH_FUNC = set("的了着呢吗吧啊呀哦嘛么之乎者与其并且但是然而因为所以如果虽然"
+                   "因此于是还也都就很便才又再通过进行对于作为由于")
+    _EN_FUNC = set(("the of and to a in is are was were be been that this it as "
+                    "for with on at by from not or an we their such can may").split())
+    ttr_zh = (len(set(zh_chars)) / len(zh_chars)) if zh_chars else None
+    ttr_en = (len(set(en_words)) / len(en_words)) if en_words else None
+    func_zh = (sum(1 for c in zh_chars if c in _ZH_FUNC) / len(zh_chars)) if zh_chars else None
+    func_en = (sum(1 for w in en_words if w in _EN_FUNC) / len(en_words)) if en_words else None
+    qs = {}
+    if lens:
+        sl = sorted(lens)
+        def _p(q):
+            i = min(len(sl) - 1, max(0, int(round(q * (len(sl) - 1)))))
+            return sl[i]
+        qs = {"p25": _p(0.25), "p50": _p(0.50), "p75": _p(0.75), "p90": _p(0.90)}
+    stats_panel = {
+        "ttr_zh": round(ttr_zh, 3) if ttr_zh is not None else None,
+        "ttr_en": round(ttr_en, 3) if ttr_en is not None else None,
+        "func_ratio_zh": round(func_zh, 3) if func_zh is not None else None,
+        "func_ratio_en": round(func_en, 3) if func_en is not None else None,
+        "sent_len_quantiles": qs,
+        "note": "统计面板为信息性口径（v2.8.0 统计通道实验延伸），不判档不改评分，"
+                "更不是检测结论；TTR=字符/词汇丰富度；虚词比例为字符级近似口径"
+                "（多字虚词按字计入，比例系统性偏高，只看前后趋势别看单值）；"
+                "常见学术散文参考带：ttr_zh 约 0.35-0.65、func_ratio_zh 约 0.12-0.22；"
+                "用 stylecheck --compare 看两侧差值最直观",
+    }
+
     return {"n_paras": len(paras_out), "n_sents": len(sents),
             "global": gp, "paras": paras_out,
-            "worst_paras": worst_paras, "advice": advice}
+            "worst_paras": worst_paras, "advice": advice,
+            "stats": stats_panel}
 
 
 # 未受限贪婪量词构型（v2.6.0 audit_patterns 检测器；正负对照见 tests/v260）：

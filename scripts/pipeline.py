@@ -64,6 +64,8 @@ def main():
     ap.add_argument("--exit-verdict", action="store_true",
                     help="自动化集成（CI/agent 门禁）：按判定设退出码——0=干净，"
                          "1=完整性 FAIL，3=风格特征中及以上，4=模型残留。缺省恒 0")
+    ap.add_argument("--ci", action="store_true", dest="exit_verdict",
+                 help="CI 门禁模式：--exit-verdict 的短别名（机器退出码 0/1/3/4）")
     ap.add_argument("--deep", action="store_true",
                     help="深改档（v2.4.0）：清理阶段追加句式级确定性转换"
                          "（句首八股删除/排除式连接合并），操作进 --track 可审计。"
@@ -240,7 +242,7 @@ def main():
             applied["全角字母数字归一"] = _nfw
         deep_ops = []
         if getattr(args, "deep", False):
-            new, deep_ops = tf.deep_polish(new)
+            new, deep_ops, deep_changed = tf.deep_polish_ex(new)
             for op in deep_ops:
                 applied["深改档:%s" % op["op"]] = op["count"]
         if time.monotonic() > _deadline:
@@ -266,7 +268,8 @@ def main():
         sys.exit(2)
     scan_s = time.monotonic() - t_scan
     t_ver = time.monotonic()
-    vr = vf.verify(orig, new, terms, args.max_length_change)
+    vr = vf.verify(orig, new, terms, args.max_length_change,
+                   expected_new=(deep_changed if args.deep else None))
     verify_s = time.monotonic() - t_ver
 
     lang = rn["lang"]

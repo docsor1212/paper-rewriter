@@ -236,6 +236,25 @@ def render_style_compare(pa, pb, sa, sb):
     body += ("<div class='card'><p>黑话命中合计：%d → %d（%s%d）</p>"
              "<p class='meta'>档位只做验收提示；改稿完整性以 verify.py 为准。</p></div>"
              % (hit_a, hit_b, "+" if hit_b >= hit_a else "", hit_b - hit_a))
+    sa_, sb_ = pa.get("stats") or {}, pb.get("stats") or {}
+    if sa_ and sb_:
+        srows = ""
+        for k, label in (("ttr_zh", "TTR（中）"), ("ttr_en", "TTR（英）"),
+                         ("func_ratio_zh", "虚词比例（中）"),
+                         ("func_ratio_en", "虚词比例（英）")):
+            va, vb = sa_.get(k), sb_.get(k)
+            if va is not None or vb is not None:
+                srows += "<tr><td>%s</td><td>%s</td><td>%s</td></tr>" % (
+                    esc(label), va, vb)
+        qa, qb = sa_.get("sent_len_quantiles") or {}, sb_.get("sent_len_quantiles") or {}
+        if qa and qb:
+            srows += ("<tr><td>句长分位 P25/50/75/90</td><td>%s/%s/%s/%s</td>"
+                      "<td>%s/%s/%s/%s</td></tr>"
+                      % (qa.get("p25"), qa.get("p50"), qa.get("p75"), qa.get("p90"),
+                         qb.get("p25"), qb.get("p50"), qb.get("p75"), qb.get("p90")))
+        body += ("<div class='card'><h2>统计面板（信息性）</h2>"
+                 "<table><tr><th>统计量</th><th>改前</th><th>改后</th></tr>%s"
+                 "</table></div>" % srows)
     body += _FOOT.format(ts=_now())
     return _page("风格画像对比", body)
 

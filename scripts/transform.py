@@ -169,6 +169,19 @@ def deep_polish(text):
     return text, ops
 
 
+def deep_polish_ex(text):
+    """deep_polish 的带改写句集合版（v3.1.1）：返回 (text, ops, changed_sents)。
+
+    changed_sents = 改写后新出现的完整句集合——pipeline 传给 verify 做
+    W_SENT_ADDED 精准豁免（--deep 自己改写的句不再触发「新增句子」告警；
+    agent 真正擅自加的句子照拦）。零信息损失口径由此可审计。"""
+    import hxt_core as _hc
+    before = set(s for s in _hc.split_sentences(text) if len(s) >= 8)
+    out, ops = deep_polish(text)
+    after = set(s for s in _hc.split_sentences(out) if len(s) >= 8)
+    return out, ops, after - before
+
+
 # 全角字母/数字 → 半角（v2.9.0）。学术稿件规范用半角；中文输入法滑键常把
 # 2025 打成 ２０２５（v2.8.0 verify E_NUM_WIDTH 红线的对症修复）。只动字母与
 # 数字——全角标点是中文正当用法，不在此列。

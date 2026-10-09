@@ -14,72 +14,94 @@ import datetime
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import hxt_core
 
-# v3.0.0 域包制：内置对按学科域分组（--pack 选域 / 默认全量=向后兼容）。
-# 嵌套铁律（v2.8.0 狼疮教训制度化）：任何变体不得是另一变体的子串——
-# findall(子串) 会把包含它的长变体也计进去，次数虚高。validate_packs() 在测试里断言。
-_TERM_PACKS = {
-    "通用": [
-        ("患者", "病人"),
-        ("肾功能", "肾脏功能"),
-        ("副作用", "不良反应"),
-        ("禁忌症", "禁忌证"),
-        ("适应症", "适应证"),
-        ("血象", "血液常规"),
-        # ("肝功","肝功能") v3.0.0 移除：肝功 ⊂ 肝功能 天然嵌套（狼疮同类），
-        # findall(肝功) 会把「肝功能」也计入——validate_packs() 拦截证实
-        ("identifier", "ID"),
-        ("health care", "healthcare"),
-    ],
-    "风湿免疫": [
-        ("SLE", "系统性红斑狼疮"),
-    ],
-    "内分泌": [
-        ("T2DM", "2型糖尿病"),
-        ("HbA1c", "糖化血红蛋白"),
-        ("甲减", "甲状腺功能减退"),
-        ("DKA", "糖尿病酮症酸中毒"),
-    ],
-    "心血管": [
-        ("HF", "心力衰竭"),
-        ("HF", "心衰"),
-        ("AMI", "急性心肌梗死"),
-        ("AF", "心房颤动"),
-        ("PCI", "经皮冠状动脉介入治疗"),
-        ("CHD", "冠心病"),
-    ],
-    "肿瘤": [
-        ("NSCLC", "非小细胞肺癌"),
-        ("化疗", "化学治疗"),
-        ("实体瘤", "实体肿瘤"),
-    ],
-    "呼吸": [
-        ("COPD", "慢性阻塞性肺疾病"),
-        ("ARDS", "急性呼吸窘迫综合征"),
-    ],
-    "消化": [
-        ("GERD", "胃食管反流病"),
-        ("IBS", "肠易激综合征"),
-    ],
-    "神经": [
-        ("脑卒中", "中风"),
-        ("TIA", "短暂性脑缺血发作"),
-    ],
-}
+# v3.1.0 变体组制（v3.0.0 域包制升级）：同组变体可 >2 个——HF 组直接带 心衰，
+# 告诉引擎「这 N 个写法指同一概念」即可，无需两两复制对。嵌套铁律不变：
+# 任何变体不得是另一变体的子串（狼疮/肝功教训），validate_packs() 断言。
+_TERM_GROUPS = [
+    {"pack": "通用", "variants": ["患者", "病人"]},
+    {"pack": "通用", "variants": ["肾功能", "肾脏功能"]},
+    {"pack": "通用", "variants": ["副作用", "不良反应"]},
+    {"pack": "通用", "variants": ["禁忌症", "禁忌证"]},
+    {"pack": "通用", "variants": ["适应症", "适应证"]},
+    {"pack": "通用", "variants": ["血象", "血液常规"]},
+    {"pack": "通用", "variants": ["identifier", "ID"]},
+    {"pack": "通用", "variants": ["health care", "healthcare"]},
+    {"pack": "风湿免疫", "variants": ["SLE", "系统性红斑狼疮"]},
+    {"pack": "内分泌", "variants": ["T2DM", "2型糖尿病"]},
+    {"pack": "内分泌", "variants": ["HbA1c", "糖化血红蛋白"]},
+    {"pack": "内分泌", "variants": ["甲减", "甲状腺功能减退"]},
+    {"pack": "内分泌", "variants": ["DKA", "糖尿病酮症酸中毒"]},
+    {"pack": "心血管", "variants": ["HF", "心力衰竭", "心衰"]},
+    {"pack": "心血管", "variants": ["AMI", "急性心肌梗死"]},
+    {"pack": "心血管", "variants": ["AF", "心房颤动"]},
+    {"pack": "心血管", "variants": ["PCI", "经皮冠状动脉介入治疗"]},
+    {"pack": "心血管", "variants": ["CHD", "冠心病"]},
+    {"pack": "肿瘤", "variants": ["NSCLC", "非小细胞肺癌"]},
+    {"pack": "肿瘤", "variants": ["化疗", "化学治疗"]},
+    {"pack": "肿瘤", "variants": ["实体瘤", "实体肿瘤"]},
+    {"pack": "呼吸", "variants": ["COPD", "慢性阻塞性肺疾病"]},
+    {"pack": "呼吸", "variants": ["ARDS", "急性呼吸窘迫综合征"]},
+    {"pack": "消化", "variants": ["GERD", "胃食管反流病"]},
+    {"pack": "消化", "variants": ["IBS", "肠易激综合征"]},
+    {"pack": "神经", "variants": ["脑卒中", "中风"]},
+    {"pack": "神经", "variants": ["TIA", "短暂性脑缺血发作"]},
+]
 
-_BUILTIN_PAIRS = [(a, b) for _pk, ps in sorted(_TERM_PACKS.items()) for a, b in ps]
+# 兼容视图：_TERM_PACKS[域]=组列表；_BUILTIN_PAIRS=每组前两变体的平面投影
+_TERM_PACKS = {}
+for _g in _TERM_GROUPS:
+    _TERM_PACKS.setdefault(_g["pack"], []).append(list(_g["variants"]))
+
+_BUILTIN_PAIRS = [(g["variants"][0], g["variants"][1]) for g in _TERM_GROUPS]
 
 _PAIR_PACK = {}
-for _pk, _ps in _TERM_PACKS.items():
-    for _a, _b in _ps:
-        _PAIR_PACK[(_a, _b)] = _pk
+for _g in _TERM_GROUPS:
+    for _i, _a in enumerate(_g["variants"]):
+        for _b in _g["variants"][_i + 1:]:
+            _PAIR_PACK[(_a, _b)] = _g["pack"]
+            _PAIR_PACK[(_b, _a)] = _g["pack"]
+
+
+def _pair_in_builtin(a, b):
+    """(a,b) 是否同属某内置组（任意两个成员，不限相邻）——去重与域归属共用。"""
+    for _g in _TERM_GROUPS:
+        if a in _g["variants"] and b in _g["variants"]:
+            return _g["pack"]
+    return None
+
+
+def find_group_inconsistencies(text, groups):
+    """变体组检查（v3.1.0）：同组 ≥2 个变体各自出现 → 一行报告。
+
+    行结构兼容 v3.0.x 的 a/b/a_count/b_count（取出现次数最多的前两变体），
+    并新增 canonical/variants 字段（variants=全部变体计数 dict）。"""
+    results = []
+    for g in groups:
+        counts = {v: len(re.findall(re.escape(v), text)) for v in g["variants"]}
+        present = {v: c for v, c in counts.items() if c > 0}
+        if len(present) >= 2:
+            ranked = sorted(present.items(), key=lambda x: -x[1])
+            (a, ca), (b, cb) = ranked[0], ranked[1]
+            results.append({
+                "pack": g["pack"], "canonical": g["variants"][0],
+                "variants": present, "a": a, "b": b, "a_count": ca, "b_count": cb,
+                "suggestion": a})
+    return results
+
+
+def find_inconsistencies(text, pairs):
+    """v3.0.x 二元对接口（保留兼容）：内部转为变体组复用同引擎。"""
+    groups = [{"pack": _pair_in_builtin(a, b) or "用户自定义",
+               "variants": [a, b]} for a, b in pairs]
+    return find_group_inconsistencies(text, groups)
 
 
 def validate_packs():
     """嵌套安全校验：返回违规清单 [(变体A, 变体B, 所属域)]（A 是 B 的子串）。
     空列表=全部安全。测试套件对此断言为空。"""
     bad = []
-    allvars = [(v, pk) for pk, ps in _TERM_PACKS.items() for pr in ps for v in pr]
-    for i, (v1, p1) in enumerate(allvars):
+    allvars = [(v, g["pack"]) for g in _TERM_GROUPS for v in g["variants"]]
+    for v1, p1 in allvars:
         for v2, p2 in allvars:
             if v1 != v2 and v1 in v2:
                 bad.append((v1, v2, p1))
@@ -101,17 +123,6 @@ def load_user_pairs(path):
     return out
 
 
-def find_inconsistencies(text, pairs):
-    results = []
-    for a, b in pairs:
-        ca = len(re.findall(re.escape(a), text))
-        cb = len(re.findall(re.escape(b), text))
-        if ca > 0 and cb > 0:
-            results.append({"a": a, "b": b, "a_count": ca, "b_count": cb,
-                            "suggestion": a if ca >= cb else b})
-    return results
-
-
 def build_report(results, source=""):
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     lines = ["# 术语一致性检查：%s" % (source or "未命名文稿"), "",
@@ -121,10 +132,12 @@ def build_report(results, source=""):
         return "\n".join(lines)
     lines.append("发现 %d 组术语不一致：" % len(results))
     lines.append("")
-    lines.append("| 域 | 变体 A | 变体 B | A 次数 | B 次数 | 建议统一为 |")
-    lines.append("| --- | --- | --- | --- | --- | --- |")
+    lines.append("| 域 | 变体（出现次数） | 建议统一为 |")
+    lines.append("| --- | --- | --- |")
     for r in results:
-        lines.append("| %s | %s | %s | %d | %d | %s |" % (r.get("pack", ""), r["a"], r["b"], r["a_count"], r["b_count"], r["suggestion"]))
+        vs = " / ".join("%s(%d)" % (v, c) for v, c in sorted(
+            r["variants"].items(), key=lambda x: -x[1]))
+        lines.append("| %s | %s | %s |" % (r.get("pack", ""), vs, r["suggestion"]))
     lines.append("")
     lines.append("> 术语不统一是审稿人最常见的批注之一。建议通读全文，将"
                  "使用频次较低的变体统一替换。")
@@ -147,7 +160,8 @@ def main():
 
     if args.list_packs:
         for pk in sorted(_TERM_PACKS):
-            print("%s（%d 对）" % (pk, len(_TERM_PACKS[pk])))
+            n = sum(len(v) for v in _TERM_PACKS[pk])
+            print("%s（%d 组 / %d 变体）" % (pk, len(_TERM_PACKS[pk]), n))
         sys.exit(0)
     if not args.file:
         ap.error("缺少待检文档")
@@ -161,18 +175,17 @@ def main():
         print("错误: %s" % e, file=sys.stderr)
         sys.exit(2)
 
-    pairs = ([(a, b) for a, b in _TERM_PACKS[args.pack]] if args.pack
-             else list(_BUILTIN_PAIRS))
+    groups = ([{"pack": args.pack, "variants": list(vs)}
+               for vs in _TERM_PACKS[args.pack]] if args.pack
+              else [dict(g) for g in _TERM_GROUPS])
     if args.pairs:
-        # 用户对去重合并：与内置对字面相同的不再追加（避免重复行且被误标内置域名）
-        seen = set(pairs)
-        for pr in load_user_pairs(args.pairs):
-            if pr not in seen:
-                pairs.append(pr)
-                seen.add(pr)
-    results = find_inconsistencies(text, pairs)
-    for r in results:
-        r["pack"] = _PAIR_PACK.get((r["a"], r["b"]), "用户自定义")
+        # 用户对去重合并：两变体同属某内置组（任意成员对，不限相邻）的不再追加——
+        # 否则同一概念出两行且一行错标「用户自定义」（v3.1.0 评审实锤）
+        for a, b in load_user_pairs(args.pairs):
+            if _pair_in_builtin(a, b):
+                continue
+            groups.append({"pack": "用户自定义", "variants": [a, b]})
+    results = find_group_inconsistencies(text, groups)
 
     if args.json:
         print(json.dumps({"inconsistencies": results, "total": len(results)},
@@ -194,7 +207,9 @@ def main():
 
     print("发现 %d 组术语不一致：" % len(results))
     for r in results:
-        print("  [%s] %s (%d) ↔ %s (%d) → 建议「%s」" % (r.get("pack", ""), r["a"], r["a_count"], r["b"], r["b_count"], r["suggestion"]))
+        vs = " / ".join("%s(%d)" % (v, c) for v, c in sorted(
+            r["variants"].items(), key=lambda x: -x[1]))
+        print("  [%s] %s → 建议「%s」" % (r.get("pack", ""), vs, r["suggestion"]))
     sys.exit(1)
 
 

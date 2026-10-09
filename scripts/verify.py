@@ -113,7 +113,8 @@ def _fullwidth_new_in(new_raw, orig_raw):
     return hits
 
 
-def verify(orig, new, terms=None, max_len_change=25.0, max_cjk_shift=0.12):
+def verify(orig, new, terms=None, max_len_change=25.0, max_cjk_shift=0.12,
+           expected_new=None):
     """返回 {ok, violations:[{check, code, detail}], warnings:[...], stats:{...}}。"""
     violations = []
     warnings = []
@@ -213,8 +214,9 @@ def verify(orig, new, terms=None, max_len_change=25.0, max_cjk_shift=0.12):
     # 7) 整句新增告警（v2.8.0 邻居二轮实测：无数字的整句插入此前零告警）——
     #    改稿中出现原稿没有的完整句（≥8 字符）即提示，W 级不改判定
     _o_sents = set(s for s in hxt_core.split_sentences(_strip_residue(orig_raw)) if len(s) >= 8)
+    _known_new = set(expected_new or ())
     _n_sents = [s for s in hxt_core.split_sentences(_strip_residue(new_raw))
-                if len(s) >= 8 and s not in _o_sents]
+                if len(s) >= 8 and s not in _o_sents and s not in _known_new]
     if _n_sents:
         warnings.append({"check": "sentences_added", "code": "W_SENT_ADDED",
                          "detail": "新增原稿没有的句子 %d 句（无数字也须核对是否擅自加内容）: %s"

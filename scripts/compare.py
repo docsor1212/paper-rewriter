@@ -51,6 +51,8 @@ def main():
                          "3=风格特征中及以上。完整性守卫仍只写报告（exit 1 契约专属 "
                          "verify.py；要 1/3/4 全档判定用 pipeline --exit-verdict）。"
                          "缺省恒 0")
+    ap.add_argument("--ci", action="store_true", dest="exit_verdict",
+                 help="CI 门禁模式：--exit-verdict 的短别名（机器退出码 0/3/4；1 仅 pipeline）")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
 

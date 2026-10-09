@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 3.0.0
+version: 3.1.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: AI flavor scan and style-pattern
   self-check reports (scan reports are detection only), deterministic text cleanup
@@ -29,7 +29,11 @@ Bilingual (CN/EN) style naturalization for academic & medical writing: find stif
 templated or machine-flavored patterns, clean mechanical debris, revise for clarity
 and natural register — with integrity guardrails on every step.
 
-## Feature status (v3.0.0)
+> **Routing in one line**: grammar/fluency/journal-format polish → use a polisher
+> (paper-polisher-pro); de-templating, model-residue cleanup, AI-flavor style
+> self-check and rewriting → this tool. Need both? Polish first, then run this pipeline.
+
+## Feature status (v3.1.0)
 
 | Feature | Status | Since |
 |---|---|---|
@@ -45,7 +49,9 @@ and natural register — with integrity guardrails on every step.
 | Style profile (`stylecheck.py`: per-paragraph quantified guide audit) | Stable | v2.6 |
 | Best-practices handbook (7 real scenarios), stylecheck `--html`, `--terms auto` | Stable | v2.7 |
 | PDF extraction confidence self-report (`read_text_ex`, detect/pipeline annotation) — calibrated on 200 real-world PDFs, see `references/pdf_confidence.md` | Experimental | v2.8 |
-| Term guard packs (`check_terms --pack cardiovascular` — 8 domains, nesting-safe, `--list-packs`) | Stable | v3.0 |
+| Term guard variant groups (`check_terms --pack cardiovascular` — 8 domains, 27 groups / 55 variants, groups may hold >2 forms e.g. HF/心力衰竭/心衰; nesting-safe) | Stable | v3.0 / v3.1 |
+| Stats panel in style profile (`stylecheck --json` → `stats`: TTR / function-word ratio / sentence-length quantiles; informational, no bands) | Stable | v3.1 |
+| `--ci` gate alias on detect/compare/pipeline (same as `--exit-verdict`) | Stable | v3.1 |
 | Deep-rewrite handoff block (`plan.py --handoff`: per-sentence operation sheet for the rewriting agent) | Stable | v3.0 |
 | Batch accepts `.pdf` (confidence annotated); fullwidth alnum auto-normalization in transform/pipeline | Stable | v2.9 |
 | HTML reports, `--batch`, `--track` audit trail | Stable | v1.5–1.6 |
@@ -84,7 +90,29 @@ regression-tested offline on every release.
 | Integrity guard | `scripts/verify.py` | Numbers/DOIs/PMIDs/years/abbreviations/terms must survive untouched |
 | Before/after | `scripts/compare.py` | Pattern-score delta + integrity verdict |
 
+**What it can actually change (before → after)** — the capability promise at
+example granularity:
+
+| Changeable | Example | Done by |
+|---|---|---|
+| Ritual openers/closers | 「众所周知，…」 → straight to the point | transform `--deep` + agent |
+| Ballot-style frames | 「不仅X，而且Y」 → 「X，且Y」 | transform `--deep` |
+| Model residue | oaicite / turn0search / [cite: 1] tokens removed wholesale | transform |
+| Punctuation & fullwidth digits | half-width → full-width (decimal-safe); ２０２５→2025 | transform |
+| Jargon / translationese | 「进行…的研究」 → 「研究」 | agent (style guide) |
+| Rhythm | long-sentence runs → varied lengths; repeated openers → varied | agent + stylecheck |
+| Concreteness | vague appraisal → grounded statement (**never invents data**) | agent (guards flag invented numbers as W_NUM_ADDED warning — human removes them) |
+| Term consistency | HF/心力衰竭/心衰 mixed → unified to dominant form | `check_terms.py` groups |
+| Never changed | numbers, p-values, CIs, DOIs, PMIDs, years, terms, quoted content | verify.py blocks |
+
 ## Quick start
+
+**How to ask for this in plain words** (EN digest of the full phrase table in
+SKILL_ZH.md): "remove the AI flavor from this paper" / "this reads too templated" /
+"clean up oaicite and [cite:] residue" / "tell me which sentences to fix first" /
+"check my rewrite broke no numbers" / "give me a style profile" / "stop flagging
+this legitimate term" — each maps to the pipeline, `plan.py`, `transform.py`,
+`verify.py`+`compare.py`, `stylecheck.py` and `learn_guards.py` respectively.
 
 **Reading map** (this file is the hub; details live one click away):
 first time → Quick start + The workflow below · troubleshooting →
@@ -240,7 +268,8 @@ Scripts are automation-first: every verdict is machine-readable, two ways.
 - **Default contract (human flows)**: `verify.py` alone holds exit 0/1/2
   (1 = integrity FAIL); detect/transform/compare/pipeline finish with 0 and
   put the verdict in their report. Never branch on their default exit code.
-- **Machine contract** — add `--exit-verdict` to detect / compare / pipeline:
+- **Machine contract** — add `--exit-verdict` (or the shorter `--ci` alias, v3.1.0)
+  to detect / compare / pipeline:
   `0` clean (low, no residue) · `3` style patterns at medium or above (needs
   deep revision) · `4` model-residue hit (run transform first) · `1`
   integrity FAIL (pipeline only — same meaning as verify's 1) · `2` usage
