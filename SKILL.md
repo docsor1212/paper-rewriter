@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 3.1.0
+version: 3.2.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: AI flavor scan and style-pattern
   self-check reports (scan reports are detection only), deterministic text cleanup
@@ -33,7 +33,7 @@ and natural register — with integrity guardrails on every step.
 > (paper-polisher-pro); de-templating, model-residue cleanup, AI-flavor style
 > self-check and rewriting → this tool. Need both? Polish first, then run this pipeline.
 
-## Feature status (v3.1.0)
+## Feature status (v3.2.0)
 
 | Feature | Status | Since |
 |---|---|---|
@@ -52,6 +52,7 @@ and natural register — with integrity guardrails on every step.
 | Term guard variant groups (`check_terms --pack cardiovascular` — 8 domains, 27 groups / 55 variants, groups may hold >2 forms e.g. HF/心力衰竭/心衰; nesting-safe) | Stable | v3.0 / v3.1 |
 | Stats panel in style profile (`stylecheck --json` → `stats`: TTR / function-word ratio / sentence-length quantiles; informational, no bands) | Stable | v3.1 |
 | `--ci` gate alias on detect/compare/pipeline (same as `--exit-verdict`) | Stable | v3.1 |
+| Statistical consistency guard (`check_stats.py`: percent-list sums with partition cues only / per-group n conflicts / p-vs-P style mix — precision-first, under-reports rather than false-positives) | Stable | v3.2 |
 | Deep-rewrite handoff block (`plan.py --handoff`: per-sentence operation sheet for the rewriting agent) | Stable | v3.0 |
 | Batch accepts `.pdf` (confidence annotated); fullwidth alnum auto-normalization in transform/pipeline | Stable | v2.9 |
 | HTML reports, `--batch`, `--track` audit trail | Stable | v1.5–1.6 |
@@ -103,6 +104,7 @@ example granularity:
 | Rhythm | long-sentence runs → varied lengths; repeated openers → varied | agent + stylecheck |
 | Concreteness | vague appraisal → grounded statement (**never invents data**) | agent (guards flag invented numbers as W_NUM_ADDED warning — human removes them) |
 | Term consistency | HF/心力衰竭/心衰 mixed → unified to dominant form | `check_terms.py` groups |
+| Numeric self-consistency | percent lists not summing to 100 (partition-cued sentences) / same group with different n / p vs P style mix | `check_stats.py` |
 | Never changed | numbers, p-values, CIs, DOIs, PMIDs, years, terms, quoted content | verify.py blocks |
 
 ## Quick start
@@ -223,8 +225,13 @@ When invoked, decide the path first, then run it:
 - **Trigger words**: 写作风格自查 / 论文改写润色 / 去模板腔 / 翻译腔清理 /
   学术改写 / 段落改写 / 表达优化 / style self-check /
   style naturalization / naturalize academic writing / de-templating /
-  academic rewriting / passage rewrite / expression polish → run the pipeline
-  above.（中文变体触发词见 SKILL_ZH.md——CH 分寸词不入英文文件）
+  academic rewriting / passage rewrite / expression polish /
+  make my writing sound less machine-written / reduce the templated tone /
+  clean up model residue or stray citation tokens / fix stiff formal prose /
+  polish my draft for submission without changing the data /
+  check that numbers and citation IDs survived editing → run the pipeline
+  above.（中文变体触发词见 SKILL_ZH.md——CH 分寸词不入英文文件；
+  数字自洽/术语混用类请求路由到 check_stats.py / check_terms.py，见下）
   （Parameter cheat sheet lives in Quick start; exit-code tables in
   references/errors.md — both are linked from here to avoid hunting across
   sections.）
@@ -240,6 +247,9 @@ When invoked, decide the path first, then run it:
 - **Term inconsistency** (abbreviation vs full form, mixed synonyms) →
   `check_terms.py file --pack <domain>`; `--list-packs` shows all eight
   domain packs (v3.0.0).
+- **Numbers that don't agree** (percent list not summing to 100, same group
+  with two different n, p/P style mix) → `check_stats.py file` (v3.2.0;
+  exit codes match check_terms: 0 consistent / 1 issues found).
 - **User wants to know what to fix first** → `plan.py draft.txt -o plan.md`
   (P0 sentence queue + budget projection) before deep revision.
 - **User wants quantified acceptance of a rewrite** → `stylecheck.py 原稿 改稿

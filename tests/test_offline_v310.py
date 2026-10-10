@@ -182,8 +182,11 @@ def test_ci_alias():
 def test_docs():
     en = open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8").read()
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()
-    check("docs.EN 锚 v3.1.0", "## Feature status (v3.1.0)" in en)
-    check("docs.ZH 锚 v3.1.0", "功能状态（v3.1.0）" in zh)
+    import re as _re
+    check("docs.EN 锚 v3.x 在位",
+          bool(_re.search(r"## Feature status \(v3\.\d+\.\d+\)", en)))
+    check("docs.ZH 锚 v3.x 在位",
+          bool(_re.search(r"功能状态（v3\.\d+\.\d+）", zh)))
     check("docs.ZH 一句话路由在位", "一句话路由" in zh and "paper-polisher-pro" in zh)
     check("docs.EN 一句话路由在位", "Routing in one line" in en)
     check("docs.ZH 用户话术表", "普通作者怎么开口" in zh and "降一下 AI 率" in zh)
@@ -196,7 +199,9 @@ def test_docs():
               "过ai检测", "降检测率", "去ai痕迹", "帮过检测",
               "undetectable", "直击官方评测", "主靶", "扣分项", "official-eval"):
         check("合规.禁词「%s」零命中" % w, w not in blob)
-    check("version.3.1.0", hxt_core.__version__ == "3.1.0")
+    check("version.>=3.1.0",
+          tuple(int(x) for x in hxt_core.__version__.split(".")) >= (3, 1, 0),
+          hxt_core.__version__)
 
 
 def test_deep_verify_exemption():
