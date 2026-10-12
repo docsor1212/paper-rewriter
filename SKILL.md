@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 3.2.0
+version: 3.3.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: AI flavor scan and style-pattern
   self-check reports (scan reports are detection only), deterministic text cleanup
@@ -33,7 +33,7 @@ and natural register — with integrity guardrails on every step.
 > (paper-polisher-pro); de-templating, model-residue cleanup, AI-flavor style
 > self-check and rewriting → this tool. Need both? Polish first, then run this pipeline.
 
-## Feature status (v3.2.0)
+## Feature status (v3.3.0)
 
 | Feature | Status | Since |
 |---|---|---|
@@ -48,7 +48,8 @@ and natural register — with integrity guardrails on every step.
 | Scale envelope: 800K-char chunks (2K overlap) · 50MB file cap · 120s step budget | — | — |
 | Style profile (`stylecheck.py`: per-paragraph quantified guide audit) | Stable | v2.6 |
 | Best-practices handbook (7 real scenarios), stylecheck `--html`, `--terms auto` | Stable | v2.7 |
-| PDF extraction confidence self-report (`read_text_ex`, detect/pipeline annotation) — calibrated on 200 real-world PDFs, see `references/pdf_confidence.md` | Experimental | v2.8 |
+| PDF extraction + confidence self-report — `--pdf-min-confidence 高/中/低` hard gate option (v3.3.0); 200-file calibration table in `references/pdf_confidence.md` | Experimental | v1.6–3.3 |
+| Statistical consistency guard — pipeline `--check-stats` stage + `check_stats --batch` cross-file group-n aggregation (abstract-vs-methods n mismatches) | Stable | v3.3 |
 | Term guard variant groups (`check_terms --pack cardiovascular` — 8 domains, 27 groups / 55 variants, groups may hold >2 forms e.g. HF/心力衰竭/心衰; nesting-safe) | Stable | v3.0 / v3.1 |
 | Stats panel in style profile (`stylecheck --json` → `stats`: TTR / function-word ratio / sentence-length quantiles; informational, no bands) | Stable | v3.1 |
 | `--ci` gate alias on detect/compare/pipeline (same as `--exit-verdict`) | Stable | v3.1 |
@@ -249,7 +250,10 @@ When invoked, decide the path first, then run it:
   domain packs (v3.0.0).
 - **Numbers that don't agree** (percent list not summing to 100, same group
   with two different n, p/P style mix) → `check_stats.py file` (v3.2.0;
-  exit codes match check_terms: 0 consistent / 1 issues found).
+  exit codes match check_terms: 0 consistent / 1 issues found). Chaptered
+  manuscripts: `check_stats.py --batch 目录` aggregates group-n across files
+  (abstract-vs-methods mismatches, v3.3.0). Or run everything at once:
+  `pipeline.py draft --check-stats`.
 - **User wants to know what to fix first** → `plan.py draft.txt -o plan.md`
   (P0 sentence queue + budget projection) before deep revision.
 - **User wants quantified acceptance of a rewrite** → `stylecheck.py 原稿 改稿

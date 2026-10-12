@@ -61,6 +61,11 @@ def main():
     ap.add_argument("--track", help="输出修订记录（.md+.json）到此路径基名")
     ap.add_argument("--batch", help="批量模式：目录内全部 .txt/.md/.docx/.pdf 逐个「清理+守卫」，汇总 CSV 输出到 stdout/此路径")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--check-stats", action="store_true", dest="check_stats",
+                    help="统计一致性阶段（v3.3.0）：对原稿跑 check_stats 三查"
+                         "（百分比求和/分组 n/风格混用），结果进报告与 JSON；仅提示不改退出码")
+    ap.add_argument("--pdf-min-confidence", choices=["高", "中", "低"], default=None,
+                 help="PDF 最低置信度门闸（v3.3.0）：低于阈值即拒收并提示导出 UTF-8；缺省不拦截只标注")
     ap.add_argument("--exit-verdict", action="store_true",
                     help="自动化集成（CI/agent 门禁）：按判定设退出码——0=干净，"
                          "1=完整性 FAIL，3=风格特征中及以上，4=模型残留。缺省恒 0")
@@ -96,6 +101,11 @@ def main():
             try:
                 if fp.lower().endswith(".pdf"):
                     o, _pm = hxt_core.read_text_ex(fp)
+                    if _pm and not hxt_core.pdf_confidence_ok(
+                            _pm.get("confidence"), args.pdf_min_confidence):
+                        raise ValueError(
+                            "PDF 抽取置信度 %s 低于门闸 --pdf-min-confidence %s——请导出 UTF-8 文本/OCR 后重试，或调低门闸"
+                            % (_pm.get("confidence"), args.pdf_min_confidence))
                     pdf_conf = _pm.get("confidence", "")
                 else:
                     o = hxt_core.read_text(fp)
@@ -125,6 +135,11 @@ def main():
             try:
                 if fp.lower().endswith(".pdf"):
                     o, _pm = hxt_core.read_text_ex(fp)
+                    if _pm and not hxt_core.pdf_confidence_ok(
+                            _pm.get("confidence"), args.pdf_min_confidence):
+                        raise ValueError(
+                            "PDF 抽取置信度 %s 低于门闸 --pdf-min-confidence %s——请导出 UTF-8 文本/OCR 后重试，或调低门闸"
+                            % (_pm.get("confidence"), args.pdf_min_confidence))
                     pdf_conf = _pm.get("confidence", "")
                 else:
                     o = hxt_core.read_text(fp)
@@ -196,6 +211,12 @@ def main():
     if args.file.lower().endswith(".pdf"):
         try:
             orig, pdf_meta = hxt_core.read_text_ex(args.file)
+            if pdf_meta and not hxt_core.pdf_confidence_ok(
+                    pdf_meta.get("confidence"), args.pdf_min_confidence):
+                raise ValueError(
+                    "PDF 抽取置信度 %s 低于门闸 --pdf-min-confidence %s——请导出 UTF-8 文本/OCR 后重试，或调低门闸接受人工抽查（注记: %s）"
+                    % (pdf_meta.get("confidence"), args.pdf_min_confidence,
+                       "；".join(pdf_meta.get("notes") or []) or "无"))
         except (OSError, ValueError) as e:
             print("错误: %s" % e, file=sys.stderr)
             sys.exit(2)
@@ -297,6 +318,11 @@ def main():
             print("错误: 无法写入 %s（%s）" % (args.suggestions, e), file=sys.stderr)
             sys.exit(2)
 
+    stats_issues = None
+    if getattr(args, "check_stats", False):
+        import check_stats as _cst
+        _g, stats_issues = _cst.run_checks(orig)
+
     report = {
         "mode": mode,
         "before": {"score": ro["score"], "level": ro["level"], "critical": ro["critical_hit"]},
@@ -307,6 +333,10 @@ def main():
                                                    verify_ok=vr["ok"]),
         "hints": hxt_core.build_hints(new, rn, profile=profile),
         "terms_note": terms_note,
+        "stats_consistency": (
+            {"total": len(stats_issues), "issues": stats_issues,
+             "note": "内部一致性启发式，非统计审查；以原始数据为准"}
+            if stats_issues is not None else None),
         "pdf_meta": pdf_meta,
         "timings": ({"cleanup_s": round(cleanup_s, 2), "scan_s": round(scan_s, 2),
                      "verify_s": round(verify_s, 2),
@@ -364,6 +394,16 @@ def main():
                 print("错误: 无法写入 %s（%s）" % (args.html, e), file=sys.stderr)
                 sys.exit(2)
             print("HTML 报告: " + args.html)
+        sc = report.get("stats_consistency")
+        if sc is not None:
+            print("")
+            if sc["total"]:
+                print("统计一致性：%d 项" % sc["total"])
+                for x in sc["issues"]:
+                    print("  [%s] %s" % (x["kind"], x["detail"]))
+            else:
+                print("统计一致性：未发现问题")
+            print("口径: " + sc["note"])
         tm = report["timings"]
         clean_disp = "—" if tm["cleanup_s"] is None else "%.1fs" % tm["cleanup_s"]
         print("耗时: 清理 %s | 扫描 %.1fs | 守卫 %.1fs（合计 %.1fs，单步预算 %g 秒）"

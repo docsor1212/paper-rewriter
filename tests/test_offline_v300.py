@@ -231,13 +231,13 @@ def test_docs():
           "200" in open(os.path.join(ROOT, "references/pdf_confidence.md"),
                         encoding="utf-8").read())
     check("docs.ZH 状态表 ⚠️ 醒目实验性行",
-          "⚠️ **PDF 文本直读**" in zh and "⚠️ 实验性" in zh)
+          "⚠️ **PDF" in zh and "实验性" in zh)
     check("docs.ZH 阅读地图挂两份新指南",
           "deep_rewrite_guide.md" in zh and "pdf_confidence.md" in zh)
     check("docs.EN 阅读地图挂两份新指南",
           "deep_rewrite_guide.md" in en and "pdf_confidence.md" in en)
-    check("docs.ZH displayName 需求词改版",
-          "displayName: 论文改写·降AI率去AI味｜学术表达优化" in zh)
+    check("docs.ZH displayName 与现役 dn 一致（v3.2.1 起）",
+          "displayName: 降AI率·去AI味改写｜论文改写·学术表达优化" in zh)
     check("docs.ZH frontmatter desc 原样（语言铁律物料）",
           "论文降AI率、去AI味的风格自查与自然化改写工具" in zh)
     check("docs.ZH 工作流含 --handoff 与 --pack",

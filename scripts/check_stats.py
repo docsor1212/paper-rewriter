@@ -96,9 +96,14 @@ def check_percent_sums(text, tolerance=0.3):
     return results
 
 
-def check_group_ns(text):
-    """同一分组 label 前后出现不同 n → 报告。"""
+def check_group_ns(text, source=""):
+    """同一分组 label 前后出现不同 n → 报告。
+
+    source 非空时（--batch 跨文件模式）每处命中带来源，冲突可标注
+    「跨文件」——摘要/方法/结果分章写作时同一分组 n 前后打架是审稿
+    现场最常见的硬伤，单文件模式看不见。"""
     seen = {}
+    order = []
     for m in _GROUP_RX.finditer(text):
         raw_label = m.group(1) if m.group(1) else m.group(3)
         if raw_label and raw_label.lower() in _BARE_LABEL_STOP:
@@ -107,17 +112,32 @@ def check_group_ns(text):
         n = int(m.group(2) if m.group(2) else m.group(4))
         if len(label) < 2:
             continue  # 单字标签误配率高（如「共 n=」），宁少报
-        seen.setdefault(label, []).append(n)
+        if label not in seen:
+            seen[label] = []
+            order.append(label)
+        seen[label].append((n, source) if source else n)
     results = []
-    for label, ns in sorted(seen.items()):
-        uniq = sorted(set(ns))
-        if len(uniq) >= 2:
-            results.append({
-                "kind": "group_n_conflict",
-                "detail": "分组「%s」出现多个样本量：%s" % (
-                    label, " vs ".join("n=%d" % x for x in ns[:6])),
-                "label": label, "values": ns[:8],
-            })
+    for label in order:
+        vals = seen[label]
+        plain = [v[0] if isinstance(v, tuple) else v for v in vals]
+        uniq = sorted(set(plain))
+        if len(uniq) < 2:
+            continue
+        cross = any(isinstance(v, tuple) for v in vals)
+        if cross:
+            span = sorted({s2 for v in vals if isinstance(v, tuple) for s2 in v[1:]})
+            detail = "分组「%s」跨文件样本量不一致：%s（出现在 %s）" % (
+                label, " vs ".join("n=%d" % x for x in uniq[:6]),
+                "、".join(span[:5]))
+        else:
+            detail = "分组「%s」出现多个样本量：%s" % (
+                label, " vs ".join("n=%d" % x for x in plain[:6]))
+        results.append({
+            "kind": "group_n_conflict",
+            "detail": detail,
+            "label": label, "values": plain[:8],
+            "cross_file": cross,
+        })
     return results
 
 
@@ -155,6 +175,71 @@ def check_p_style(text):
                   % "、".join(forms),
         "counts": {"p_eq": lower, "P_eq": upper, "p_lt": lt_lower, "P_lt": lt_upper},
     }
+
+
+# 跨文件模式的加宽前缀表：时点修饰（入组/最终等）在分章写作里常造成
+# 同组不同写法；单文件保持保守不剥（防失访误报），跨文件放宽+显式免责
+_LABEL_PREFIX_WIDE_RX = re.compile(
+    r"^(共计|全部|其中|总计|最终|结束时|随访末|末次|入组时|入组|基线时|治疗后)+")
+_CROSS_CAVEAT = "（跨文件聚合会把不同时点的样本量也并组比对——若为随机化 vs 完成随访等时点差异请忽略）"
+
+
+def run_batch(paths, tolerance=0.3):
+    """跨文件批量（v3.3.0）：逐文件三类检查 + 跨文件 group_n 聚合。
+
+    跨文件聚合的意义：分章写作（摘要/方法/结果各一稿）时，同一分组
+    「摘要 n=120、结果 n=118」的打架单文件检查看不见——合并聚合才抓得住。"""
+    per_file = {}
+    texts = []
+    for p in paths:
+        text = load_text(p)
+        name = os.path.basename(p)
+        groups, issues = run_checks(text, tolerance=tolerance)
+        per_file[name] = {"issues": issues, "groups": groups}
+        texts.append((name, text))
+    agg = {}
+    order = []
+    merged = set()  # 剥离过时点/汇总前缀的 label（v3.3.0 评审：并组是候选而非定罪）
+    for name, text in texts:
+        for m in _GROUP_RX.finditer(text):
+            raw_label = m.group(1) if m.group(1) else m.group(3)
+            if raw_label and raw_label.lower() in _BARE_LABEL_STOP:
+                continue
+            normed = _norm_label(raw_label)
+            label = _LABEL_PREFIX_WIDE_RX.sub("", normed)
+            n = int(m.group(2) if m.group(2) else m.group(4))
+            if len(label) < 2:
+                continue
+            if label != normed:
+                merged.add(label)
+            if label not in agg:
+                agg[label] = []
+                order.append(label)
+            agg[label].append((n, name))
+    cross = []
+    for label in order:
+        vals = agg[label]
+        plain = [v[0] for v in vals]
+        uniq = sorted(set(plain))
+        if len(uniq) < 2:
+            continue
+        span = sorted({s2 for _, s2 in vals})
+        tp = label in merged
+        if tp:
+            detail = ("分组「%s」跨文件样本量不同，可能为时点口径差异（随机化 vs 完成随访等）"
+                      "——如确属同组同口径请核对原始数据（出现在 %s）" % (
+                          label, "、".join(span[:5])))
+        else:
+            detail = "分组「%s」跨文件样本量不一致：%s（出现在 %s）" % (
+                label, " vs ".join("n=%d" % x for x in uniq[:6]),
+                "、".join(span[:5]))
+        cross.append({
+            "kind": "group_n_conflict", "cross_file": True,
+            "timepoint_merged": tp,
+            "detail": detail,
+            "label": label, "values": plain[:8],
+        })
+    return per_file, cross
 
 
 def run_checks(text, tolerance=0.3):
@@ -208,11 +293,48 @@ def main():
     ap.add_argument("--version", action="version",
                     version="%(prog)s " + hxt_core.__version__)
     ap.add_argument("file", nargs="?", help="待检文档（.txt/.md/.docx）")
+    ap.add_argument("--batch", help="批量模式：检查目录下全部 .txt/.md/.docx，"
+                                     "并做跨文件分组 n 聚合（摘要/方法/结果分稿的数字打架）")
     ap.add_argument("--tolerance", type=float, default=0.3,
                     help="百分比合计容差（默认 0.3 个百分点）")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--report", help="生成 markdown 一致性报告")
     args = ap.parse_args()
+
+    if args.batch:
+        import glob as _glob
+        paths = sorted(
+            fp for fp in _glob.glob(os.path.join(args.batch, "*"))
+            if fp.lower().endswith((".txt", ".md", ".docx")))
+        if not paths:
+            ap.error("目录下无可检文件（.txt/.md/.docx）：%s" % args.batch)
+        per_file, cross = run_batch(paths, tolerance=args.tolerance)
+        hard = [x for x in cross if not x.get("timepoint_merged")]
+        cand = [x for x in cross if x.get("timepoint_merged")]
+        n_issues = sum(len(v["issues"]) for v in per_file.values()) + len(hard)
+        if args.report:
+            print("[提示] --batch 暂不支持 --report（单文件模式可用）", file=sys.stderr)
+        if args.json:
+            print(json.dumps({"files": per_file, "cross_file": cross,
+                              "total": n_issues,
+                              "disclaimer": "内部一致性启发式，非统计审查，不代表结果真伪"},
+                             ensure_ascii=False, indent=2))
+            sys.exit(0)
+        print("批量检查 %d 个文件：" % len(paths))
+        for name, v in per_file.items():
+            print("  %s：%d 项" % (name, len(v["issues"])))
+            for x in v["issues"]:
+                print("    [%s] %s" % (x["kind"], x["detail"]))
+        if hard:
+            print("跨文件聚合：%d 项" % len(hard))
+            for x in hard:
+                print("  [%s] %s" % (x["kind"], x["detail"]))
+        if cand:
+            print("跨文件时点候选（不计入退出码——时点差异属合法，请人工判断）：")
+            for x in cand:
+                print("  [%s] %s" % (x["kind"], x["detail"]))
+        print("（内部一致性提示，非统计审查——先核对原始数据是笔误还是口径差异，再改表述）")
+        sys.exit(1 if n_issues else 0)
 
     if not args.file:
         ap.error("缺少待检文档")

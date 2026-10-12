@@ -34,6 +34,8 @@ def main():
     ap.add_argument("--html", help="生成单文件 HTML 报告到此路径")
     ap.add_argument("--batch", help="批量模式：扫描目录内全部 .txt/.md/.docx/.pdf，输出逐文件评分汇总（stdout；--json/--html 可同用）")
     ap.add_argument("--review", help="生成结构化审稿报告（markdown）到此路径")
+    ap.add_argument("--pdf-min-confidence", choices=["高", "中", "低"], default=None,
+                 help="PDF 最低置信度门闸（v3.3.0）：低于阈值即拒收并提示导出 UTF-8；缺省不拦截只标注")
     ap.add_argument("--structure", action="store_true",
                     help="章节感知：识别论文结构（摘要/引言/方法/结果/讨论），分章节评分（方法/结果自动降权）")
     ap.add_argument("--exit-verdict", action="store_true",
@@ -59,6 +61,11 @@ def main():
             try:
                 if fp.lower().endswith(".pdf"):
                     t, _pm = hxt_core.read_text_ex(fp)
+                    if _pm and not hxt_core.pdf_confidence_ok(
+                            _pm.get("confidence"), args.pdf_min_confidence):
+                        raise ValueError(
+                            "PDF 抽取置信度 %s 低于门闸 --pdf-min-confidence %s——请导出 UTF-8 文本/OCR 后重试，或调低门闸"
+                            % (_pm.get("confidence"), args.pdf_min_confidence))
                     pdf_conf = _pm.get("confidence", "")
                 else:
                     t = hxt_core.read_text(fp)
@@ -89,6 +96,11 @@ def main():
                 pdf_conf = ""
                 if fp.lower().endswith(".pdf"):
                     t, _pm = hxt_core.read_text_ex(fp)
+                    if _pm and not hxt_core.pdf_confidence_ok(
+                            _pm.get("confidence"), args.pdf_min_confidence):
+                        raise ValueError(
+                            "PDF 抽取置信度 %s 低于门闸 --pdf-min-confidence %s——请导出 UTF-8 文本/OCR 后重试，或调低门闸"
+                            % (_pm.get("confidence"), args.pdf_min_confidence))
                     pdf_conf = _pm.get("confidence", "")
                 else:
                     t = hxt_core.read_text(fp)
@@ -156,6 +168,12 @@ def main():
         try:
             if args.file.lower().endswith(".pdf"):
                 text, pdf_meta = hxt_core.read_text_ex(args.file)
+                if pdf_meta and not hxt_core.pdf_confidence_ok(
+                        pdf_meta.get("confidence"), args.pdf_min_confidence):
+                    raise ValueError(
+                        "PDF 抽取置信度 %s 低于门闸 --pdf-min-confidence %s——请导出 UTF-8 文本/OCR 后重试，或调低门闸接受人工抽查（注记: %s）"
+                        % (pdf_meta.get("confidence"), args.pdf_min_confidence,
+                           "；".join(pdf_meta.get("notes") or []) or "无"))
             else:
                 text = hxt_core.read_text(args.file)
         except OSError as e:

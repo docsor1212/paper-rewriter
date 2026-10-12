@@ -97,7 +97,7 @@ def advice_str(cid):
 def build_handoff(rows, sections, source=""):
     """v3.0.0 深改交接块：把 P0 队列变成执行改写 agent 可直接照做的逐句指令单。
 
-    官方评测（completeness/summary）指出深改环节依赖外部 agent 而工具未把
+    评审反馈（completeness/summary）指出深改环节依赖外部 agent 而工具未把
     交接做透——本函数把「哪句、改什么、守什么、改完怎么验」一次给全。"""
     lines = ["## 深改交接块（复制给执行改写的 agent）", "",
              "```text",

@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "3.2.0"
+__version__ = "3.3.0"
 
 import json
 import os
@@ -93,6 +93,17 @@ _PDF_PROBE_WORDS = frozenset((
     "level change significant treatment patients model effect observed "
     "conclusion introduction discussion abstract keywords references et al"
 ).split())
+
+
+PDF_CONF_RANK = {"低": 0, "中": 1, "高": 2}
+
+
+def pdf_confidence_ok(confidence, min_confidence):
+    """--pdf-min-confidence 门闸（v3.3.0，stability 处方）：置信度低于阈值
+    返回 False——调用方据此拒收（低=乱码形态/中=需抽查），提示导出 UTF-8。"""
+    if not confidence or not min_confidence:
+        return True
+    return PDF_CONF_RANK.get(confidence, 0) >= PDF_CONF_RANK.get(min_confidence, 0)
 
 
 def _pdf_confidence(text, had_tounicode=False):
