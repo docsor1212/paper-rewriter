@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 3.3.0
+version: 3.4.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: AI flavor scan and style-pattern
   self-check reports (scan reports are detection only), deterministic text cleanup
@@ -33,7 +33,7 @@ and natural register — with integrity guardrails on every step.
 > (paper-polisher-pro); de-templating, model-residue cleanup, AI-flavor style
 > self-check and rewriting → this tool. Need both? Polish first, then run this pipeline.
 
-## Feature status (v3.3.0)
+## Feature status (v3.4.0)
 
 | Feature | Status | Since |
 |---|---|---|
@@ -50,6 +50,7 @@ and natural register — with integrity guardrails on every step.
 | Best-practices handbook (7 real scenarios), stylecheck `--html`, `--terms auto` | Stable | v2.7 |
 | PDF extraction + confidence self-report — `--pdf-min-confidence 高/中/低` hard gate option (v3.3.0); 200-file calibration table in `references/pdf_confidence.md` | Experimental | v1.6–3.3 |
 | Statistical consistency guard — pipeline `--check-stats` stage + `check_stats --batch` cross-file group-n aggregation (abstract-vs-methods n mismatches) | Stable | v3.3 |
+| Submission self-check bundle (`pipeline --bundle 目录`: report + revision log + profile delta + stats/terms consistency + integrity verdict, six files one command) | Stable | v3.4 |
 | Term guard variant groups (`check_terms --pack cardiovascular` — 8 domains, 27 groups / 55 variants, groups may hold >2 forms e.g. HF/心力衰竭/心衰; nesting-safe) | Stable | v3.0 / v3.1 |
 | Stats panel in style profile (`stylecheck --json` → `stats`: TTR / function-word ratio / sentence-length quantiles; informational, no bands) | Stable | v3.1 |
 | `--ci` gate alias on detect/compare/pipeline (same as `--exit-verdict`) | Stable | v3.1 |
@@ -391,7 +392,9 @@ For reviewers, security scanners and cautious users:
   (runs clean as of this release — the claim is reproducible, not rhetorical).
 - Writes **only** to output paths you pass explicitly: `-o`/`--output` on
   transform/compare/pipeline/plan/extract_terms, `--suggestions`, `--html`,
-  `--review` (detect.py's markdown report), `--report` (check_terms.py), and
+  `--review` (detect.py's markdown report), `--report` (check_terms.py /
+  check_stats.py), `--bundle DIR` (v3.4.0 submission self-check bundle: creates a
+  timestamped subdirectory in DIR with 8 files), and
   `--track` (`base.md` + `base.json`). One derived exception: with
   `pipeline --terms auto`, the tool also writes the auto-generated term draft
   `<output-basename>.terms.auto.txt` (tool-written, unreviewed — see the

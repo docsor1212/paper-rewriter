@@ -96,6 +96,7 @@ max_cjk_shift=0.12) -> {"ok": bool, "violations": [...], "warnings": [...], "sta
 | `check_stats.py <file> --tolerance 0.3 / --json / --report`（v3.2.0） | 统计一致性守卫：percent_sum（仅划分用语句）/ group_n_conflict（前缀归一化）/ p_style_mix；退出码 0/1/2 同 check_terms |
 | `check_stats.py --batch 目录`（v3.3.0） | 跨文件批量：逐文件三类检查+跨文件 group_n 聚合（只核 n= 记法；时点前缀加宽剥离，并组候选标 timepoint_merged 不计退出码）；--json 含 files/cross_file |
 | `pipeline.py --check-stats`（v3.3.0） | 管线统计一致性阶段：对原稿三查，JSON `stats_consistency` 字段；仅提示不改退出码 |
+| `pipeline.py --bundle 目录`（v3.4.0） | 投稿自查包：带时间戳子目录汇集 01 检测报告(.html)/02 修订记录(.md+.json)/03 画像对比/04 统计一致性/05 术语一致性/06 完整性判定(.json)+README |
 | `detect/pipeline --pdf-min-confidence 高/中/低`（v3.3.0） | PDF 置信度硬门闸：低于阈值拒收并提示导出 UTF-8；缺省仅标注 |
 | `hxt_core.pdf_confidence_ok(conf, min)` | 门闸秩比较（低<中<高） |
 | `learn_guards.py add/from-text/list/remove/test` | 误报→守卫固化；语义同内置 term_guards（±30 字符窗口豁免） |

@@ -61,6 +61,9 @@ def main():
     ap.add_argument("--track", help="输出修订记录（.md+.json）到此路径基名")
     ap.add_argument("--batch", help="批量模式：目录内全部 .txt/.md/.docx/.pdf 逐个「清理+守卫」，汇总 CSV 输出到 stdout/此路径")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--bundle", metavar="目录",
+                    help="投稿自查包（v3.4.0）：在指定目录下生成带时间戳子目录，汇集"
+                         "检测报告/修订记录/风格画像/统计一致性/术语一致性/完整性判定六件")
     ap.add_argument("--check-stats", action="store_true", dest="check_stats",
                     help="统计一致性阶段（v3.3.0）：对原稿跑 check_stats 三查"
                          "（百分比求和/分组 n/风格混用），结果进报告与 JSON；仅提示不改退出码")
@@ -166,6 +169,10 @@ def main():
                   file=sys.stderr)
         if getattr(args, "html", None):
             print("[提示] pipeline --batch 暂不生成 --html（可用 detect --batch --html）", file=sys.stderr)
+        if getattr(args, "bundle", None):
+            print("[提示] pipeline --batch 暂不生成 --bundle（可对关键单稿用 --bundle）", file=sys.stderr)
+        if getattr(args, "check_stats", False):
+            print("[提示] pipeline --batch 暂不跑 --check-stats（可用 check_stats --batch 目录）", file=sys.stderr)
         if getattr(args, "track", None):
             print("[提示] pipeline --batch 暂不生成 --track 修订记录", file=sys.stderr)
         if getattr(args, "suggestions", None):
@@ -223,6 +230,7 @@ def main():
     else:
         orig = _read(args.file)
     track_base = getattr(args, "track", None)
+    deep_changed = set()  # rewrite 分支无 --deep 改写（防 UnboundLocal，v3.4.0 审计）
     profile = args.profile
     terms = None
     terms_note = ""
@@ -264,6 +272,8 @@ def main():
         deep_ops = []
         if getattr(args, "deep", False):
             new, deep_ops, deep_changed = tf.deep_polish_ex(new)
+        else:
+            deep_changed = set()
             for op in deep_ops:
                 applied["深改档:%s" % op["op"]] = op["count"]
         if time.monotonic() > _deadline:
@@ -360,6 +370,71 @@ def main():
             sys.exit(2)
         print("修订记录: " + track_base + ".md/.json", file=sys.stderr)
 
+    if getattr(args, "bundle", None):
+        try:
+            import datetime as _dt
+            import check_stats as _cst
+            import check_terms as _ctm
+            import reporter as _rep
+            broot = args.bundle
+            os.makedirs(broot, exist_ok=True)
+            stamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+            bdir = os.path.join(broot, "自查包_" + stamp)
+            if os.path.exists(bdir):  # 同秒重跑：后缀避让，不静默覆盖
+                k = 2
+                while os.path.exists(bdir + "_%d" % k):
+                    k += 1
+                bdir += "_%d" % k
+            os.makedirs(bdir, exist_ok=True)
+            # ① 检测报告（改稿口径）
+            prof = hxt_core.style_profile(new)
+            with open(os.path.join(bdir, "01_风格自查报告.html"), "w", encoding="utf-8") as f:
+                f.write(_rep.render_style_profile(prof, os.path.basename(str(args.file or "stdin"))))
+            # ② 修订记录
+            md, jobj = hxt_core.build_revision_log(applied, removed, source=args.file)
+            with open(os.path.join(bdir, "02_修订记录.md"), "w", encoding="utf-8") as f:
+                f.write(md + "\n")
+            with open(os.path.join(bdir, "02_修订记录.json"), "w", encoding="utf-8") as f:
+                json.dump(jobj, f, ensure_ascii=False, indent=1)
+            # ③ 风格画像差值
+            with open(os.path.join(bdir, "03_风格画像对比.md"), "w", encoding="utf-8") as f:
+                f.write(_render_profile_compare(orig, new))
+            # ④ 统计一致性（原稿）
+            _g, st_issues = _cst.run_checks(orig)
+            with open(os.path.join(bdir, "04_统计一致性.md"), "w", encoding="utf-8") as f:
+                f.write(_cst.build_report(_g, st_issues, source=args.file) + "\n")
+            # ⑤ 术语一致性（原稿）
+            t_issues = _ctm.find_group_inconsistencies(
+                orig, [dict(g) for g in _ctm._TERM_GROUPS])
+            t_lines = ["# 术语一致性检查", ""]
+            if not t_issues:
+                t_lines.append("未发现术语不一致。")
+            else:
+                for x in t_issues:
+                    vs = " / ".join("%s(%d)" % (v, c) for v, c in sorted(
+                        x["variants"].items(), key=lambda kv: -kv[1]))
+                    t_lines.append("- [%s] %s → 建议「%s」" % (
+                        x.get("pack", ""), vs, x.get("suggestion", "")))
+            with open(os.path.join(bdir, "05_术语一致性.md"), "w", encoding="utf-8") as f:
+                f.write("\n".join(t_lines) + "\n")
+            # ⑥ 完整性判定
+            with open(os.path.join(bdir, "06_完整性判定.json"), "w", encoding="utf-8") as f:
+                json.dump(vr, f, ensure_ascii=False, indent=1)
+            with open(os.path.join(bdir, "README.txt"), "w", encoding="utf-8") as f:
+                f.write(
+                    "投稿自查包（paper-rewriter v%s，模式=%s）\n生成时间: %s\n原稿: %s\n\n"
+                    "六件说明：01 改稿风格自查报告（本地启发式口径，非任何官方检测）；"
+                    "02 机械清理修订记录（可审计；--rewrite 模式下本件为空属正常）；"
+                    "03 前后风格画像对比；04 统计一致性（以原始数据为准）；"
+                    "05 术语一致性；06 完整性守卫判定（ok=true 才算过）。\n"
+                    % (hxt_core.__version__, mode,
+                       _dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                       str(args.file)))
+            print("投稿自查包: %s（6 件）" % bdir, file=sys.stderr)
+        except Exception as e:  # 自查包是辅助产物：失败降级为警告，主报告照常输出
+            print("[提示] 自查包生成失败（%s），主流程结果不受影响" % str(e)[:80],
+                  file=sys.stderr)
+
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
         if args.exit_verdict:
@@ -423,6 +498,13 @@ def main():
     if args.exit_verdict:
         sys.exit(report["exit_verdict"])
     sys.exit(0)
+
+
+def _render_profile_compare(orig_text, new_text):
+    """--bundle 用：前后画像差值的轻量 markdown（复用 stylecheck 的渲染器）。"""
+    import stylecheck as _sc
+    pa, pb = hxt_core.style_profile(orig_text), hxt_core.style_profile(new_text)
+    return _sc.render_compare(pa, pb, "(原稿)", "(改稿)")
 
 
 if __name__ == "__main__":
