@@ -159,12 +159,12 @@ def test_docs():
     check("docs.ZH 锚 v3.x 在位",
           bool(_re.search(r"功能状态（v3\.\d+\.\d+）", zh)))
     check("docs.ZH 状态行 check_stats", "统计一致性守卫" in zh and "check_stats" in zh)
-    check("docs.ZH 能力行+话术行",
-          "数字自洽" in zh and "查查数字有没有前后打架" in zh)
+    check("docs.ZH 能力行+话术行（合并表更名统计一致性）",
+          "统计一致性" in zh and "查查数字有没有前后打架" in zh)
     check("docs.ZH 协议 bullet", "数字前后打架" in zh)
     check("docs.EN 状态行/能力行/协议",
           "Statistical consistency guard" in en
-          and "Numeric self-consistency" in en
+          and "Numeric consistency" in en
           and "check_stats.py file" in en)
     check("docs.EN 触发词扩容（新增自然口语短语）",
           "less machine-written" in en and "survived editing" in en)

@@ -1,3 +1,7 @@
+> **何时读我**：PDF 直读报错/置信度分档疑问。
+> **最短路径**：读分层判定流水线+校准表。
+> **回 [INDEX](INDEX.md)**
+
 # PDF 抽取置信度：分层口径与真实语料校准（v3.0.0）
 
 > EN summary: PDF direct-read is experimental. v3.0.0 replaces the blanket

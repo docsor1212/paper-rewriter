@@ -1,3 +1,7 @@
+> **何时读我**：拿到 plan 后不知道按什么流程改。
+> **最短路径**：照五步执行循环走。
+> **回 [INDEX](INDEX.md)**
+
 # 深改操作手册：从计划到验收的执行循环（v3.0.0）
 
 > EN summary: this is the *operational* layer of deep rewriting — how to turn a

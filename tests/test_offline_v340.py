@@ -117,15 +117,20 @@ def test_description():
         check("desc.禁词「%s」零命中" % w, w not in desc.lower())
     check("desc.displayName 钉住铁律⑤值",
           "displayName: 降AI率·去AI味改写｜论文改写·学术表达优化" in zh)
-    check("version.3.4.0", hxt_core.__version__ == "3.4.0")
+    check("version.>=3.4.0",
+          tuple(int(x) for x in hxt_core.__version__.split(".")) >= (3, 4, 0),
+          hxt_core.__version__)
 
 
 # ── 3. 文档锚 ────────────────────────────────────────────────
 def test_docs():
     en = open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8").read()
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()
-    check("docs.EN 锚 v3.4.0", "## Feature status (v3.4.0)" in en)
-    check("docs.ZH 锚 v3.4.0", "功能状态（v3.4.0）" in zh)
+    import re as _re
+    check("docs.EN 锚 v3.x 在位",
+          bool(_re.search(r"## Feature status \(v3\.\d+\.\d+\)", en)))
+    check("docs.ZH 锚 v3.x 在位",
+          bool(_re.search(r"功能状态（v3\.\d+\.\d+）", zh)))
     check("docs.ZH 状态行/工作流行/话术行",
           "投稿自查包" in zh and "--bundle 目录" in zh
           and "发给导师/编辑" in zh)

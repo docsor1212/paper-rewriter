@@ -420,6 +420,38 @@ def main():
             # ⑥ 完整性判定
             with open(os.path.join(bdir, "06_完整性判定.json"), "w", encoding="utf-8") as f:
                 json.dump(vr, f, ensure_ascii=False, indent=1)
+            # ⑦ 问题台账（v3.5.0 模块移植）：逐类 resolved/partial/unresolved + 预算行
+            _g0, st_b = _cst.run_checks(orig)
+            t_b = _ctm.find_group_inconsistencies(
+                orig, [dict(g) for g in _ctm._TERM_GROUPS])
+            led = []
+            for cid, c in (ro.get("categories") or {}).items():
+                before = c.get("count", 0)
+                if before <= 0:
+                    continue
+                after = (rn.get("categories") or {}).get(cid, {}).get("count", 0)
+                status = ("resolved" if after == 0 else
+                          "partially answered" if after < before else "unresolved")
+                led.append((cid, c.get("label", ""), before, after, status))
+            _g2, st_after = _cst.run_checks(new)
+            led.append(("stats_consistency", "统计一致性（求和/分组 n/风格）",
+                        len(st_b), len(st_after),
+                        "resolved" if not st_after else
+                        ("partially answered" if len(st_after) < len(st_b) else "unresolved")))
+            t_after = _ctm.find_group_inconsistencies(
+                new, [dict(g) for g in _ctm._TERM_GROUPS])
+            led.append(("terms_consistency", "术语一致性（变体组）",
+                        len(t_b), len(t_after),
+                        "resolved" if not t_after else
+                        ("partially answered" if len(t_after) < len(t_b) else "unresolved")))
+            with open(os.path.join(bdir, "07_问题台账.md"), "w", encoding="utf-8") as f:
+                f.write("# 问题台账（finding ledger）\n\n")
+                f.write("> 逐项标记 answered / partially answered / unresolved；"
+                        "预算台账：已用轮次 1（本次 pipeline），剩余轮次由作者决定"
+                        "——再跑一轮本命令即更新。\n\n")
+                f.write("| 问题 | 说明 | 改前 | 改后 | 状态 |\n|---|---|---|---|---|\n")
+                for cid, label, b, a, st in led:
+                    f.write("| %s | %s | %d | %d | %s |\n" % (cid, label, b, a, st))
             with open(os.path.join(bdir, "README.txt"), "w", encoding="utf-8") as f:
                 f.write(
                     "投稿自查包（paper-rewriter v%s，模式=%s）\n生成时间: %s\n原稿: %s\n\n"

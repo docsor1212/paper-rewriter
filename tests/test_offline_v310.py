@@ -190,8 +190,9 @@ def test_docs():
     check("docs.ZH 一句话路由在位", "一句话路由" in zh and "paper-polisher-pro" in zh)
     check("docs.EN 一句话路由在位", "Routing in one line" in en)
     check("docs.ZH 用户话术表", "普通作者怎么开口" in zh and "降一下 AI 率" in zh)
-    check("docs.ZH 能力承诺表", "能改什么（改前 → 改后实例）" in zh and "绝不编造数据" in zh)
-    check("docs.EN 能力承诺表", "What it can actually change" in en)
+    check("docs.ZH 能力×边界表（v3.5.0 合并表）",
+          "能力×边界" in zh and "绝不编造数据" in zh and "做不到（边界）" in zh)
+    check("docs.EN 能力×边界表", "Capability × boundary" in en)
     check("docs.ZH --ci 已入自动化节", "`--ci`" in zh)
     check("docs.ZH 统计面板入状态表", "统计面板" in zh and "TTR" in zh)
     blob = (en + zh).lower()

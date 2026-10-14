@@ -1,3 +1,7 @@
+> **何时读我**：想先看完整输入输出再动手。
+> **最短路径**：照第一个样例跑通再改。
+> **回 [INDEX](INDEX.md)**
+
 # 完整输入输出样例（End-to-End Examples）
 
 > 每个样例 = 真实命令 + 真实输出（来自回归语料，可复现）。样例中的数字/事实仅用于演示格式。
@@ -333,3 +337,30 @@ HTML 画像报告已写入 profile.html
 
 CJK 相邻缩写抽取修复（v2.7.0）：`IRAK4抑制剂` 里的 IRAK4 此前因 \b 在汉字旁
 失效而抽不到——与 verify.py v2.1.0 同族问题，本版统一为 CJK 安全 lookaround。
+
+## v3.3/v3.4 新能力速览
+
+### 统计一致性并入管线（--check-stats）
+
+```bash
+python scripts/pipeline.py draft.txt -o out.txt --check-stats
+# 报告尾部多一节「统计一致性：N 项」（JSON 字段 stats_consistency）；
+# 仅提示，不改退出码
+```
+
+### 跨文件分组 n 聚合（分章写作数字打架）
+
+```bash
+python scripts/check_stats.py --batch 章节目录
+# 输出逐文件问题 + 「跨文件聚合」段（摘要 n=120 vs 方法 n=118 类硬伤）；
+# 时点差异（随机化 vs 完成随访）标为候选，不计入退出码
+```
+
+### 投稿自查包（--bundle，六件套）
+
+```bash
+python scripts/pipeline.py draft.txt -o out.txt --bundle 自查材料
+# 生成 自查材料/自查包_YYYYMMDD_HHMMSS/：
+#   01_风格自查报告.html 02_修订记录.md/.json 03_风格画像对比.md
+#   04_统计一致性.md 05_术语一致性.md 06_完整性判定.json README.txt
+```

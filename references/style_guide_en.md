@@ -1,3 +1,7 @@
+> **何时读我**：要深改英文稿时。
+> **最短路径**：smaller words → plain clauses → rhythm 顺序读。
+> **回 [INDEX](INDEX.md)**
+
 # English Academic Style Manual (deep-rewrite guide for the agent)
 
 > Integrity note: this manual improves the writing quality of your own drafts —

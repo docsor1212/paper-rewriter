@@ -1,20 +1,21 @@
 ---
 name: paper-rewriter
-version: 3.4.0
+version: 3.5.0
 description: >
-  Academic writing style toolkit, bilingual CN/EN: AI flavor scan and style-pattern
-  self-check reports (scan reports are detection only), deterministic text cleanup
-  (model artifacts, punctuation, filler phrases), integrity
+  Academic writing style toolkit, bilingual CN/EN: paper rewriting with AI-flavor
+  self-check and style naturalization (scan reports are detection only),
+  deterministic cleanup (model artifacts, punctuation, filler phrases), integrity
   guardrails (numbers, DOIs, PMIDs, terminology must survive untouched), and
-  agent-guided style naturalization for clearer, more natural academic prose
-  (de-templating, de-translationese, rhythm, concreteness). Built for scholars whose
-  formal writing reads stiff, templated or machine-flavored — especially non-native
-  (ESL) authors. Includes AIGC-disclosure compliance checks (China 2025-09 labeling
-  rules) and academic-integrity guardrails: this tool improves writing quality for
+  agent-guided revision for clearer, more natural academic prose. Built for
+  scholars whose formal writing reads stiff, templated or machine-flavored —
+  especially non-native (ESL) authors. Skip when: pure grammar polish, full-text
+  translation, or rewriting unrelated to academic writing — use a dedicated tool.
+  Includes AIGC-disclosure compliance checks (China 2025-09 labeling rules) and
+  academic-integrity guardrails: this tool improves writing quality for
   self-review; it does not help misrepresent authorship, conceal required AI
   disclosure, or defeat integrity review. 100% local, zero upload, Python stdlib
-  only. Related: paper-polisher-pro (broad polishing), pubmed-verifier, cite-holmes,
-  academic-figures, cn-med-oa, doc-holmes.
+  only. Related: paper-polisher-pro (broad polishing), pubmed-verifier,
+  cite-holmes, academic-figures.
 allowed-tools:
   - Read
   - Write
@@ -33,32 +34,22 @@ and natural register — with integrity guardrails on every step.
 > (paper-polisher-pro); de-templating, model-residue cleanup, AI-flavor style
 > self-check and rewriting → this tool. Need both? Polish first, then run this pipeline.
 
-## Feature status (v3.4.0)
+## Feature status (v3.5.0)
 
-| Feature | Status | Since |
+⚠️ rows = experimental (may reject valid files; review output). Full history in references/errors.md and topic docs.
+
+| Capability | Status | Since |
 |---|---|---|
-| detect / transform / verify / compare / pipeline | Stable | v1.0 |
-| Section-aware scanning (`--structure`) | Stable | v1.7 |
-| `.docx` direct input; 50MB file guard; read retry | Stable | v1.3–1.8 |
-| Sentence-level rewrite plan (`plan.py`) | Stable | v2.2 |
-| User-learned term guards (`learn_guards.py`) | Stable | v2.2 |
-| `--exit-verdict` machine exit codes (detect/compare/pipeline) | Stable | v2.3 |
-| Deterministic deep polish (`--deep`), handling hints, scan time budget | Stable | v2.4 |
-| Centralized error layer (`CliError` + handling hints), batch retry, per-step timeout | Stable | v2.5 |
-| Scale envelope: 800K-char chunks (2K overlap) · 50MB file cap · 120s step budget | — | — |
-| Style profile (`stylecheck.py`: per-paragraph quantified guide audit) | Stable | v2.6 |
-| Best-practices handbook (7 real scenarios), stylecheck `--html`, `--terms auto` | Stable | v2.7 |
-| PDF extraction + confidence self-report — `--pdf-min-confidence 高/中/低` hard gate option (v3.3.0); 200-file calibration table in `references/pdf_confidence.md` | Experimental | v1.6–3.3 |
-| Statistical consistency guard — pipeline `--check-stats` stage + `check_stats --batch` cross-file group-n aggregation (abstract-vs-methods n mismatches) | Stable | v3.3 |
-| Submission self-check bundle (`pipeline --bundle 目录`: report + revision log + profile delta + stats/terms consistency + integrity verdict, six files one command) | Stable | v3.4 |
-| Term guard variant groups (`check_terms --pack cardiovascular` — 8 domains, 27 groups / 55 variants, groups may hold >2 forms e.g. HF/心力衰竭/心衰; nesting-safe) | Stable | v3.0 / v3.1 |
-| Stats panel in style profile (`stylecheck --json` → `stats`: TTR / function-word ratio / sentence-length quantiles; informational, no bands) | Stable | v3.1 |
-| `--ci` gate alias on detect/compare/pipeline (same as `--exit-verdict`) | Stable | v3.1 |
-| Statistical consistency guard (`check_stats.py`: percent-list sums with partition cues only / per-group n conflicts / p-vs-P style mix — precision-first, under-reports rather than false-positives) | Stable | v3.2 |
-| Deep-rewrite handoff block (`plan.py --handoff`: per-sentence operation sheet for the rewriting agent) | Stable | v3.0 |
-| Batch accepts `.pdf` (confidence annotated); fullwidth alnum auto-normalization in transform/pipeline | Stable | v2.9 |
-| HTML reports, `--batch`, `--track` audit trail | Stable | v1.5–1.6 |
-| PDF text extraction (text PDFs; v3.0.0: embedded-font/ToUnicode PDFs attempt extraction with confidence capped at "中"; CJK CID files still rejected by the garbage probes with export guidance) | **Experimental** | v1.6 |
+| ⚠️ **PDF direct-read + confidence self-report** (embedded-font/ToUnicode attempted, capped at "中"; `--pdf-min-confidence 高/中/低` hard gate; 200-file calibration in references/pdf_confidence.md) | ⚠️ Experimental | v1.6–3.3 |
+| Core five (detect/transform/verify/compare/pipeline) + section-aware + rewrite plan (--handoff) + learned guards | Stable | v1.0–3.0 |
+| Machine exit codes (--exit-verdict/--ci) · step timeout · batch retry · centralized errors · --deep · fullwidth normalization | Stable | v2.3–2.9 |
+| Style profile (stylecheck --html/--compare + stats panel) · best-practices handbook · --terms auto | Stable | v2.6–3.1 |
+| Term guard variant groups (8 domains / 27 groups / 55 variants, --pack) · deep-rewrite handoff block | Stable | v3.0–3.1 |
+| Statistical consistency guard (check_stats --batch cross-file + pipeline --check-stats stage) | Stable | v3.2–3.3 |
+| Submission self-check bundle (pipeline --bundle: six files one command) | Stable | v3.4 |
+| Batch .pdf mixed · HTML reports · --track audit | Stable | v1.5–2.8 |
+
+Scale envelope: 800K-char chunks (2K overlap) · 50MB file cap · 120s step budget.
 
 Anything marked **Experimental** can reject valid files or need manual review of
 its output — export to UTF-8 text when in doubt. Everything else is
@@ -83,31 +74,18 @@ regression-tested offline on every release.
   policies and arXiv policies are summarized in `references/compliance.md` — the
   obligation to disclose belongs to the author, not the tool.
 
-## Division of labor
+## Capability × boundary (division of labor + limits + where)
 
-| Layer | Who does it | What |
-|---|---|---|
-| Style self-check | `scripts/detect.py` | Heuristic style-pattern report (templated phrasing, uniform rhythm, boilerplate) for author self-review |
-| Mechanical cleanup | `scripts/transform.py` | Model artifacts, chatbot filler, punctuation normalization, safe filler swaps — grammar-safe only. **When to use directly**: you only need residue/filler cleanup without any stylistic diagnosis (fast, deterministic). |
-| **Quality revision** | **you (the agent)** | Follow `references/style_guide_zh.md` / `_en.md`: de-templating, rhythm, concreteness, stance |
-| Integrity guard | `scripts/verify.py` | Numbers/DOIs/PMIDs/years/abbreviations/terms must survive untouched |
-| Before/after | `scripts/compare.py` | Pattern-score delta + integrity verdict |
+| Capability | Does | Does NOT (boundary) | Where |
+|---|---|---|---|
+| Style self-check | heuristic report: boilerplate density, rhythm uniformity, officialese; section-aware | not an AI detector — barely triggers on fluent model text (low score ≠ no AI) | `detect.py`; see [honest_boundaries](references/honest_boundaries.md) |
+| Mechanical cleanup | model residue (oaicite/[cite:]), chat filler, punctuation normalization, fullwidth digits | no sentence rewriting — zero-information-loss layer only | `transform.py` (`--deep` for sentence-level) |
+| Quality deep rewrite | de-templating / rhythm / concreteness / stance (seven steps) | never invents data; invented numbers flagged (W_NUM_ADDED, human removes) | **you (the agent)** per style guide; handoff via `plan --handoff` |
+| Integrity guard | numbers/DOIs/PMIDs/years/terms must survive; tampering = exit 1 | no truth judgment — original data is the authority | `verify.py` |
+| Before/after | score delta + integrity verdict + profile diff | no substitute for human reading | `compare.py` / `stylecheck --compare` |
+| Term consistency | 8-domain 27 groups (HF/心力衰竭/心衰 one row) | no usage correctness — synonym unification only | `check_terms.py --pack` |
+| Numeric consistency | percent-list sums (partition-cued) / cross-file group-n / p-vs-P style | not a statistics review — original data is the authority | `check_stats.py` (`--batch`) |
 
-**What it can actually change (before → after)** — the capability promise at
-example granularity:
-
-| Changeable | Example | Done by |
-|---|---|---|
-| Ritual openers/closers | 「众所周知，…」 → straight to the point | transform `--deep` + agent |
-| Ballot-style frames | 「不仅X，而且Y」 → 「X，且Y」 | transform `--deep` |
-| Model residue | oaicite / turn0search / [cite: 1] tokens removed wholesale | transform |
-| Punctuation & fullwidth digits | half-width → full-width (decimal-safe); ２０２５→2025 | transform |
-| Jargon / translationese | 「进行…的研究」 → 「研究」 | agent (style guide) |
-| Rhythm | long-sentence runs → varied lengths; repeated openers → varied | agent + stylecheck |
-| Concreteness | vague appraisal → grounded statement (**never invents data**) | agent (guards flag invented numbers as W_NUM_ADDED warning — human removes them) |
-| Term consistency | HF/心力衰竭/心衰 mixed → unified to dominant form | `check_terms.py` groups |
-| Numeric self-consistency | percent lists not summing to 100 (partition-cued sentences) / same group with different n / p vs P style mix | `check_stats.py` |
-| Never changed | numbers, p-values, CIs, DOIs, PMIDs, years, terms, quoted content | verify.py blocks |
 
 ## Quick start
 
@@ -118,13 +96,15 @@ SKILL_ZH.md): "remove the AI flavor from this paper" / "this reads too templated
 this legitimate term" — each maps to the pipeline, `plan.py`, `transform.py`,
 `verify.py`+`compare.py`, `stylecheck.py` and `learn_guards.py` respectively.
 
-**Reading map** (this file is the hub; details live one click away):
-first time → Quick start + The workflow below · troubleshooting →
-`references/pitfalls.md` + `references/errors.md` · CI/agent integration →
-Automation section · capability limits → Honest boundaries · scenario how-tos →
-`references/best_practices.md` · deep-rewrite process →
-`references/deep_rewrite_guide.md` · PDF confidence tiers →
-`references/pdf_confidence.md` · programmatic use → `references/api.md`.
+**Reading map (30-second routing; equivalent of [references/INDEX.md](references/INDEX.md))**:
+first time → Quick start + workflow · troubleshooting →
+[references/pitfalls.md](references/pitfalls.md) + [references/errors.md](references/errors.md) ·
+CI/agent → Automation section · capability limits →
+[honest_boundaries](references/honest_boundaries.md) · scenario how-tos →
+[best_practices](references/best_practices.md) · deep-rewrite process →
+[deep_rewrite_guide](references/deep_rewrite_guide.md) · PDF confidence →
+[pdf_confidence](references/pdf_confidence.md) · permissions audit →
+[permissions](references/permissions.md) · programmatic use → [api](references/api.md).
 
 No agent is required — every capability below runs directly in a terminal.
 Every script has built-in `--help` (full flag reference) and `--version`;
@@ -145,40 +125,20 @@ One command (self-check → cleanup → revision brief → integrity guard):
 python scripts/pipeline.py draft.txt -o out.txt --terms terms.txt
 ```
 
-Visualization & batch (v1.5.0): add `--html report.html` to any of
-detect/pipeline/compare for a self-contained HTML report (score cards, category
-tables, revision worksheet, integrity verdict; compare adds sentence-level
-add/delete diff). Scan a whole directory with `--batch dir` (detect: per-file
-score summary; pipeline: per-file cleanup+integrity CSV).
-
-**Structure-aware scanning** (`detect --structure`, v1.7.0): detects paper
-sections (abstract/introduction/methods/results/discussion/conclusion/
-references, bilingual) and scores each separately. Methods/results weights
-normalize the aggregate only — raw per-section scores are always reported in
-full; the fixed phrasing of a Methods section is genre convention, not a
-machine signal. Missing-section hints included. Markdown headings are
-recognized since v2.2.0 (`## 摘要`, `**方法**`, numbered `2. Methods`).
-
-**Sentence-level rewrite plan** (`plan.py`, v2.2.0): ranks sentences by their
-weighted pattern contribution and produces a P0 rewrite queue with section
-attribution, per-sentence category hits, handling advice and a linear budget
-projection (fix the top-K offenders → projected score). `--json` for agent
-consumption. The projection is a local approximation for prioritization — not a
-promise, and not any external detector's score.
-
-Preparing the term list: `python scripts/extract_terms.py draft.txt -o terms.txt`
-auto-extracts candidates (abbreviations, quoted terms) into a draft you confirm
-by hand. Input formats: `.txt`/`.md` directly, **`.docx` (Word) directly** since
-v1.3.0; PDF direct-read is **experimental** (text PDFs; confidence self-report —
-a "低" tier means garbled extraction, export to UTF-8 text instead; see
-`references/pdf_confidence.md`). Ask for a
-revision worksheet alongside any run with `--suggestions path.md` (detect.py and
-pipeline.py both support it): category, sample, suggested handling and the guide
-section to read — the tool proposes, you and the guide decide.
-
-For non-academic text (blogs, posts, office documents), add `--profile general`
-to down-weight formal-boilerplate signals; the default `academic` profile is
-calibrated for scholarly manuscripts.
+- **Visualization / batch**: `--html report.html` on detect/pipeline/compare for a
+  self-contained report (compare adds sentence-level diff); `--batch dir` scans a
+  whole directory (pipeline writes a CSV).
+- **Section-aware**: `detect --structure` scores abstract/intro/methods/results
+  separately; methods/results phrasing is genre convention — normalized in the
+  aggregate only, raw per-section scores always shown.
+- **Rewrite plan**: `plan.py draft -o plan.md` ranks sentences (P0 queue +
+  budget projection); add `--handoff` for a per-sentence operation sheet.
+- **Inputs**: `.txt`/`.md` direct, `.docx` (Word) direct, PDF **experimental**
+  (confidence self-report; 低 = garbled — export to UTF-8;
+  [references/pdf_confidence.md](references/pdf_confidence.md)).
+- **Term list**: `python scripts/extract_terms.py draft.txt -o terms.txt` (confirm
+  by hand); any run accepts `--suggestions path.md` for a revision worksheet.
+- **Non-academic text**: add `--profile general` to down-weight formal boilerplate.
 
 Or run the steps individually (from the skill's own directory, or use absolute paths):
 
@@ -199,26 +159,13 @@ common-mistakes list (24 items): `references/pitfalls.md`** — read it before
 your first real run. Python API reference: `references/api.md`. FAQ:
 `references/faq.md`.
 
-**Revision tracking** (`--track base` on transform/pipeline): every change the
-mechanical layer makes is recorded to `base.md` + `base.json` — an auditable
-list of what the tool touched (rule, count, deleted sentences,
-flagged-for-review).
+- **Revision tracking**: `--track base` records every mechanical-layer change to
+  `base.md` + `base.json` (auditable: rule, count, deleted sentences, flagged).
+- **PDF (experimental)**: text PDFs incl. embedded-font/ToUnicode since v3.0.0 —
+  extraction attempted, confidence capped at "中" with a spot-check note; CJK CID
+  files still rejected by the garbage probes with export guidance. Scale: 800K-char
+  chunks (2K overlap) · 50MB cap · whole-document integrity guard.
 
-**PDF input (experimental, v1.6.0; confidence self-report since v2.8.0)**:
-English text PDFs (FlateDecode/WinAnsi, unencrypted) are extracted with the
-standard library only. Since v2.8.0 every PDF scan reports an extraction
-confidence (高/中/低) computed from four heuristics — common-word hit rate,
-control-character rate, average word length, extractable word count — so
-"review the output" becomes "the tool tells you how trustworthy this
-extraction is". 低 means garbled-form typical: export to UTF-8 text instead. PDFs with embedded
-font encodings (ToUnicode CMaps, typical for CJK) are rejected when detected —
-detection is best-effort: if one slips through, the output may be garbled, so
-**review extracted PDF text before relying on it**. When in doubt, export to
-UTF-8 text. Chunk threshold: 800,000 characters per chunk — since v2.2.0
-adjacent chunks share a 2,000-character overlap window, so patterns spanning a
-chunk boundary are captured and double-counts are reconciled (v2.1.x and
-earlier could miss boundary-spanning signals). File-size guard 50MB (scans
-auto-chunk at any size within the cap; the integrity guard is whole-document).
 
 ### Agent invocation protocol
 
@@ -346,83 +293,31 @@ Scripts are automation-first: every verdict is machine-readable, two ways.
    journal requires an AI-use disclosure, state it plainly — this report is a
    quality self-check, not a substitute for disclosure.
 
-## Honest boundaries
+## Honest boundaries (summary)
 
-- The style score is a local heuristic on writing patterns. It is not a
-  measurement produced by any external service, and it says nothing about
-  authorship. Never present it as one.
-- Formal academic prose and non-native writing are routinely misjudged by
-  automated reviewers; if you are the author, keep drafts, version history and
-  notes — process evidence, not style scores, settles authorship questions.
-- This tool does not interact with any external review system, does not remove
-  official content labels or watermarks, and does not assist concealment of
-  required disclosures. See `references/compliance.md`.
-- **Detection-capability boundary (measured, 2026-10)**: on fluent LLM-generated
-  text this toolkit's style channel barely fires — 128 real ChatGPT texts scored
-  below 28 in 98% of cases, and 60 samples of 2026-era models scored 0 (nothing
-  flagged). Style tools that do flag everything in that benchmark misfire on
-  ~50% of human forum prose. **A low score here does not mean "no AI was
-  involved"** — use this toolkit as a style self-check + integrity guard, not
-  as a judge of authorship.
-- **Statistical-channel experiment (2026-10, 373 files measured)**: sentence-
-  length band concentration is the strongest single statistical signal (AI
-  corpora 0.68/0.72 vs human 0.48/0.47). Integrated conservatively as a
-  "uniform rhythm flag" (≥8 sentences; band≥0.65 or cv≤0.30): 41% of 2023-era
-  AI corpus flagged @ 3% human flag rate (below the FP baseline). The flag is
-  informational only — regular genres (e.g. literature abstracts) trigger it
-  too; it is never a detection verdict.
-- Scale envelope: regression-tested up to ~1MB text files; the scanner is linear
-  (no catastrophic backtracking, bounded quantifiers only). Memory use is roughly
-  3x file size; for very long manuscripts, split by section for readable reports.
+The style score is a local heuristic over writing patterns — not any external
+detection service, and it says nothing about authorship; this toolkit never talks
+to external review systems and never helps conceal AI use; on fluent model text it
+barely triggers (**a low score ≠ no AI involvement**). Full boundaries and measured
+data: [references/honest_boundaries.md](references/honest_boundaries.md) (read
+before making any claim).
 
-## Permissions & environment statement
 
-For reviewers, security scanners and cautious users:
+## Permissions & environment (summary)
 
-- Reads **only** the file paths you pass as arguments (plus stdin, including the
-  `.txt`/`.md`/`.docx`/`.pdf` files inside a `--batch` directory) and its own
-  bundled wordlist files (`scripts/patterns_*.json`, plus
-  `scripts/user_guards.json` if you have created one with `learn_guards.py`).
-  Verify it yourself:
+Reads only explicitly passed paths + bundled pattern files; writes only explicitly
+passed output paths and user_guards.json; **zero network, zero third-party
+dependencies, no environment variables, no subprocesses**. Verification commands and
+the full statement: [references/permissions.md](references/permissions.md)
+(auditors and security scanners: read this first).
 
-  ```bash
-  grep -rnE "urllib|requests|socket|subprocess|os\.environ" scripts/ || echo "clean"
-  ```
 
-  (runs clean as of this release — the claim is reproducible, not rhetorical).
-- Writes **only** to output paths you pass explicitly: `-o`/`--output` on
-  transform/compare/pipeline/plan/extract_terms, `--suggestions`, `--html`,
-  `--review` (detect.py's markdown report), `--report` (check_terms.py /
-  check_stats.py), `--bundle DIR` (v3.4.0 submission self-check bundle: creates a
-  timestamped subdirectory in DIR with 8 files), and
-  `--track` (`base.md` + `base.json`). One derived exception: with
-  `pipeline --terms auto`, the tool also writes the auto-generated term draft
-  `<output-basename>.terms.auto.txt` (tool-written, unreviewed — see the
-  workflow note). One tool-owned data file on top of that:
-  `learn_guards.py add`/`from-text`/`remove` writes
-  `scripts/user_guards.json` (your learned term guards, via a transient
-  `.tmp` + atomic rename). No other writes.
-- **Zero network access** — no HTTP calls, no downloads, no API keys.
-- **Zero third-party dependencies** — Python standard library only.
-- Reads **no environment variables**; spawns **no subprocesses**; creates **no
-  scheduled tasks**; the only temp file ever written is the
-  `user_guards.json.tmp` rename target described above.
-- Test corpora and dev notes live in the development repo only, not in the
-  distributed package.
+## Customizing (summary)
 
-## Customizing
+Fix false positives with `learn_guards.py` (writes user_guards.json, survives
+upgrades — **never hand-edit patterns_*.json**). File locations and cautions:
+[references/customization.md](references/customization.md).
 
-- `scripts/patterns_zh.json` / `patterns_en.json` — pattern lists (+ rewrite
-  suggestions), regex signals, term_guards (legitimate academic collocations that
-  must not be flagged, e.g. "mutational landscape", "pivotal trial", CJK
-  "sequence alignment" and "precipitation reaction"), auto_fixes.
-- **User-learned guards** live in `scripts/user_guards.json` (managed by
-  `learn_guards.py` — do not hand-edit; `list` prints, `remove` deletes).
-  Keep them there rather than editing `patterns_*.json`: pattern files are
-  replaced on upgrade, your guards file is not.
-- Score calibration constants live in `scripts/hxt_core.py` (`_LANG_K`); the four
-  test corpora in the development repo's `tests/` (not shipped in the package)
-  document the intended separation.
 
 ## Related tools
 
