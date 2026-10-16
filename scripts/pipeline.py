@@ -57,6 +57,10 @@ def main():
                     help="academic=论文口径（默认）；general=非学术文本")
     ap.add_argument("--max-length-change", type=float, default=25.0)
     ap.add_argument("--suggestions", help="输出修订建议工作单（markdown 侧车）到此路径")
+    ap.add_argument("--handoff", metavar="文件",
+                    help="深改交接块（v3.8.0）：随管线一并生成句级改写指令单"
+                         "（哪句→什么操作→守什么→怎么验，plan --handoff 同款），"
+                         "执行改写的 agent 可直接照做——省去单独跑 plan 一步")
     ap.add_argument("--html", help="生成单文件 HTML 报告到此路径")
     ap.add_argument("--track", help="输出修订记录（.md+.json）到此路径基名")
     ap.add_argument("--batch", help="批量模式：目录内全部 .txt/.md/.docx/.pdf 逐个「清理+守卫」，汇总 CSV 输出到 stdout/此路径")
@@ -75,8 +79,10 @@ def main():
     ap.add_argument("--check-stats", action="store_true", dest="check_stats",
                     help="统计一致性阶段（v3.3.0）：对原稿跑 check_stats 三查"
                          "（百分比求和/分组 n/风格混用），结果进报告与 JSON；仅提示不改退出码")
-    ap.add_argument("--pdf-min-confidence", choices=["高", "中", "低"], default=None,
-                 help="PDF 最低置信度门闸（v3.3.0）：低于阈值即拒收并提示导出 UTF-8；缺省不拦截只标注")
+    ap.add_argument("--pdf-min-confidence", choices=["高", "中", "低"], default="中",
+                 help="PDF 最低置信度门闸（v3.3.0 引入；v3.8.0 起缺省=中）：低于阈值即拒收"
+                      "并给处置建议——乱码形态的抽取不再混进报告与守卫；"
+                      "--pdf-min-confidence 低 恢复「只标注不拦」旧行为")
     ap.add_argument("--exit-verdict", action="store_true",
                     help="自动化集成（CI/agent 门禁）：按判定设退出码——0=干净，"
                          "1=完整性 FAIL，3=风格特征中及以上，4=模型残留。缺省恒 0")
@@ -115,7 +121,8 @@ def main():
                 if _pm and not hxt_core.pdf_confidence_ok(
                         _pm.get("confidence"), args.pdf_min_confidence):
                     raise hxt_core.pdf_gate_error(_pm.get("confidence"),
-                                                  args.pdf_min_confidence)
+                                                  args.pdf_min_confidence,
+                                                  notes=_pm.get("notes"))
                 pdf_conf = _pm.get("confidence", "")
             else:
                 o = hxt_core.read_text(fp)
@@ -137,6 +144,7 @@ def main():
 
         rows_out = []
         pending = []  # (fp, 行索引)——二遍重试队列（v2.5.0 stability 处方）
+        gate_rej = 0  # 置信度门闸拒收计数（v3.8.0 批量熔断）
         done, state = hxt_core.batch_resume_prepare(root, args.resume, kind="pipeline", row_len=5)
         if args.resume and done:
             print("[续传] 跳过 %d 个已完成文件（进度 .pr_batch_state.json；"
@@ -154,6 +162,12 @@ def main():
                 rows_out.append(row)
                 if not hxt_core.batch_state_store(state, root, fn, fp, "done", row, kind="pipeline"):
                     n_state_fail += 1
+            except hxt_core.PdfGateRejected as e:
+                # 门闸拒收=确定性失败（v3.8.0）：不进重试队列，计入批级熔断
+                gate_rej += 1
+                rows_out.append((fn, "-", "-", "错误: %s" % str(e)[:200], "-"))
+                hxt_core.batch_state_store(state, root, fn, fp, "error",
+                                           rows_out[-1], kind="pipeline")
             except (OSError, ValueError):
                 # 首遍失败不放弃：进二遍重试队列（超时/IO 抖动多为瞬时态）
                 pending.append((fp, len(rows_out)))
@@ -167,6 +181,13 @@ def main():
                 retried[fn] = True
                 if not hxt_core.batch_state_store(state, root, fn, fp, "done", row, kind="pipeline"):
                     n_state_fail += 1
+            except hxt_core.PdfGateRejected as e:
+                # 门闸拒收在重试遍出现（首遍瞬时失败+重试遭拒）：同样终态+熔断计数
+                gate_rej += 1
+                rows_out[idx] = (fn, "-", "-", "错误: %s" % str(e)[:200], "-")
+                retried[fn] = False
+                if not hxt_core.batch_state_store(state, root, fn, fp, "error", rows_out[idx], kind="pipeline"):
+                    n_state_fail += 1
             except (OSError, ValueError) as e:
                 rows_out[idx] = (fn, "-", "-", "错误: %s（已重试 1 次）" % str(e)[:200], "-")
                 retried[fn] = False
@@ -179,6 +200,12 @@ def main():
         if n_state_fail:
             print("[提示] 断点进度写盘失败 %d 次（不影响本次结果，但本目录 --resume 不可用）"
                   % n_state_fail, file=sys.stderr)
+        if gate_rej >= 3:
+            # 批量熔断（v3.8.0）：同批多个 PDF 被拒=源头质量问题，不是逐文件偶发
+            print("[熔断] %d 个 PDF 低于置信度门闸被拒——疑似这批 PDF 源头质量问题"
+                  "（扫描件/嵌入字体缺失）。建议：检查来源，或统一导出 UTF-8 文本后重跑；"
+                  "确要逐个强收可加 --pdf-min-confidence 低（输出需人工复核）" % gate_rej,
+                  file=sys.stderr)
         if getattr(args, "html", None):
             print("[提示] pipeline --batch 暂不生成 --html（可用 detect --batch --html）", file=sys.stderr)
         if getattr(args, "bundle", None):
@@ -191,6 +218,8 @@ def main():
             print("[提示] pipeline --batch 暂不生成 --suggestions 工作单", file=sys.stderr)
         if getattr(args, "deep", False):
             print("[提示] --deep 在 --batch 下暂不生效（逐文件请单跑 pipeline --deep）", file=sys.stderr)
+        if getattr(args, "handoff", None):
+            print("[提示] pipeline --batch 暂不生成 --handoff（可对重点单稿单跑）", file=sys.stderr)
         writer = _csv.writer(sys.stdout)
         writer.writerow(["file", "before", "after", "integrity", "len_delta"])
         for row in rows_out:
@@ -263,6 +292,8 @@ def main():
     if args.rewrite:
         if getattr(args, "deep", False):
             print("[提示] --deep 在 --rewrite 下不生效（无清理阶段）", file=sys.stderr)
+        if getattr(args, "handoff", None):
+            print("[提示] --handoff 将基于你提供的改稿（--rewrite）生成指令单", file=sys.stderr)
         new = _read(args.rewrite)
         mode = "对已有改稿守卫"
         applied, removed = {}, []
@@ -487,6 +518,32 @@ def main():
         except Exception as e:  # 自查包是辅助产物：失败降级为警告，主报告照常输出
             print("[提示] 自查包生成失败（%s），主流程结果不受影响" % str(e)[:80],
                   file=sys.stderr)
+
+    if getattr(args, "handoff", None):
+        # 深改交接块（v3.8.0）：一句命令产出「清理+守卫+逐句指令单」，
+        # 深改不再需要单独跑 plan——usability 处方。
+        # v3.8.0 评测员 P1：指令单基于清理稿/改稿（new）而非原稿——深改的
+        # 操作对象是 new，基于 orig 会列出已被清理掉的句（与 best_practices
+        # 「对清理稿排计划」口径一致）
+        _note_dest = sys.stderr if args.json else sys.stdout
+        import plan as _plan
+        try:
+            _top, _secs, _full = _plan.build_queue(
+                new, lang=None if args.lang == "auto" else args.lang,
+                profile=args.profile,
+                source_ext=".txt")
+            _md = _plan.build_handoff(_top, _secs,
+                                      source=args.rewrite or args.file)
+            with open(args.handoff, "w", encoding="utf-8") as hf:
+                hf.write(_md + "\n")
+            _base = "改稿" if args.rewrite else "清理稿"
+            print("深改交接块: %s（基于%s，%d 句 P0 队列，执行改写的 agent 可直接照做）"
+                  % (args.handoff, _base, len(_top)), file=_note_dest)
+        except ValueError as e:
+            print("[提示] 交接块未生成（%s）" % str(e)[:140], file=sys.stderr)
+        except OSError as e:
+            print("错误: 无法写入 %s（%s）" % (args.handoff, e), file=sys.stderr)
+            sys.exit(2)
 
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))

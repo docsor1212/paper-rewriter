@@ -118,6 +118,37 @@ def build_handoff(rows, sections, source=""):
     return "\n".join(lines)
 
 
+def build_queue(text, lang=None, profile="academic", source_ext=".txt", top=15):
+    """v3.8.0 抽取：逐句风险排序核心（供 pipeline --handoff 复用；plan 主流程
+    保持独立不动）。返回 (top_rows, sections, full)；行结构与 --json 的 top
+    一致（另带 sent/off 原文与偏移）。超 MAX_PLAN_CHARS 抛 ValueError。"""
+    if len(text) > MAX_PLAN_CHARS:
+        raise ValueError(
+            "文本超过 %d 字符，逐句扫描成本过高——请按章节拆分后分别生成交接块"
+            % MAX_PLAN_CHARS)
+    full = (hxt_core.scan_chunked(text, lang=lang, profile=profile,
+                                  source_ext=source_ext)
+            if len(text) > 800_000 else
+            hxt_core.scan(text, lang=lang, profile=profile, source_ext=source_ext))
+    sections = hxt_core.detect_sections(text)
+    sents = locate_sentences(text)
+    if not sents:
+        return [], sections, full
+    rows = []
+    for sent, off in sents:
+        r = hxt_core.scan(sent, lang=full["lang"], profile=profile,
+                          source_ext=source_ext)
+        pts = sentence_pts(r)
+        if pts > 0:
+            rows.append({"sent": sent, "off": off, "pts": round(pts, 2),
+                         "cats": {cid: c["count"]
+                                  for cid, c in r["categories"].items() if c["count"]},
+                         "labels": {cid: c["label"]
+                                    for cid, c in r["categories"].items() if c["count"]}})
+    rows.sort(key=lambda x: (-x["pts"], x["off"]))
+    return rows[:max(1, top)], sections, full
+
+
 def main():
     ap = argparse.ArgumentParser(
         description="句级改写优先级计划：逐句风险排序 + 预算投影（本地启发式口径）")
@@ -129,6 +160,9 @@ def main():
     ap.add_argument("--json", action="store_true", help="输出 JSON（供 agent 消费）")
     ap.add_argument("--handoff", action="store_true",
                     help="输出深改交接块（逐句操作指令单，供执行改写的 agent 直接照做）")
+    ap.add_argument("--pdf-min-confidence", choices=["高", "中", "低"], default="中",
+                 help="PDF 最低置信度门闸（v3.8.0，与 detect/pipeline 同款同缺省）："
+                      "低于阈值拒收；「低」恢复仅标注旧行为")
     ap.add_argument("--version", action="version",
                     version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
@@ -138,8 +172,18 @@ def main():
             text = sys.stdin.read()
             source_ext = ".txt"
         else:
-            text = hxt_core.read_text(args.file)
             source_ext = os.path.splitext(args.file)[1].lower()
+            if source_ext == ".pdf":
+                # 门闸同款（v3.8.0 评测员 P0：宣称支持 .pdf 就不能旁路安全门——
+                # 乱码 PDF 进逐句队列会把深改 agent 引到乱码上）
+                text, _pm = hxt_core.read_text_ex(args.file)
+                if _pm and not hxt_core.pdf_confidence_ok(
+                        _pm.get("confidence"), args.pdf_min_confidence):
+                    raise hxt_core.pdf_gate_error(
+                        _pm.get("confidence"), args.pdf_min_confidence,
+                        notes=_pm.get("notes"))
+            else:
+                text = hxt_core.read_text(args.file)
         if len(text) > MAX_PLAN_CHARS:
             raise ValueError(
                 "文本超过 %d 字符，逐句扫描成本过高——请按章节拆分后分别执行 plan"

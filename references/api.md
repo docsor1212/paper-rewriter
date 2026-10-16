@@ -101,11 +101,13 @@ max_cjk_shift=0.12) -> {"ok": bool, "violations": [...], "warnings": [...], "sta
 | `check_stats.py --batch 目录`（v3.3.0） | 跨文件批量：逐文件三类检查+跨文件 group_n 聚合（只核 n= 记法；时点前缀加宽剥离，并组候选标 timepoint_merged 不计退出码）；--json 含 files/cross_file |
 | `detect.py / pipeline.py --batch 目录 --resume`（v3.7.0） | 批量断点续传：进度每文件原子落 `<目录>/.pr_batch_state.json`；`hxt_core.batch_resume_prepare(root, resume, kind, row_len)` / `batch_state_store(state, root, fn, fp, status, row, kind)` 公共件（kind 分区制，detect/pipeline 各认各的分区；指纹=[size, mtime_ns]） |
 | `check_terms.py --batch 目录`（v3.7.0） | 跨文件变体漂移：逐文件组内不一致 + 跨文件「主导变体」漂移检出（各文件各自一致、合起来不一致）；--json 结构 {files, load_errors, per_file, cross_file_drift, total} 恒 exit 0；全文件读取失败 exit 2、部分失败且零发现 exit 1（防假 clean） |
-| `hxt_core.pdf_gate_error(confidence, gate, notes=None)`（v3.7.0） | PDF 置信度门闸统一报错（ValueError）：4 处 CLI 调用点共用一处人话化文案（原因+已拒收+三条出路；「低于门闸」短语为测试锚） |
+| `plan.build_queue(text, lang, profile, source_ext, top)`（v3.8.0） | 逐句风险排序核心（plan 主流程抽取版）：返回 (top_rows, sections, full)，供 pipeline --handoff 复用；超 MAX_PLAN_CHARS 抛 ValueError |
+| `pipeline --handoff 文件`（v3.8.0） | 随管线产出深改交接块：build_queue(orig) + build_handoff 写盘；JSON 模式提示走 stderr 不污染 stdout |
+| `hxt_core.PdfGateRejected` / `pdf_gate_error`（v3.7.0/v3.8.0） | PDF 置信度门闸统一报错（ValueError）：4 处 CLI 调用点共用一处人话化文案（原因+已拒收+三条出路；「低于门闸」短语为测试锚） |
 | `hxt_core.strip_markdown(text)` / `scan_md(...)`（v3.6.0） | markdown 感知：结构剥离（代码块/表格行/标题/列表/粗体）+结构统计；detect/pipeline/stylecheck 对 .md/.markdown 自动启用，--raw-markdown 保留原样 |
 | `pipeline.py --check-stats`（v3.3.0） | 管线统计一致性阶段：对原稿三查，JSON `stats_consistency` 字段；仅提示不改退出码 |
 | `pipeline.py --bundle 目录`（v3.4.0） | 投稿自查包：带时间戳子目录汇集 01 检测报告(.html)/02 修订记录(.md+.json)/03 画像对比/04 统计一致性/05 术语一致性/06 完整性判定(.json)+README |
-| `detect/pipeline --pdf-min-confidence 高/中/低`（v3.3.0） | PDF 置信度硬门闸：低于阈值拒收并提示导出 UTF-8；缺省仅标注 |
+| `detect/pipeline/plan --pdf-min-confidence 高/中/低`（v3.3.0；v3.8.0 起缺省=中） | PDF 置信度硬门闸：低于阈值拒收并提示导出 UTF-8；「低」恢复仅标注旧行为 |
 | `hxt_core.pdf_confidence_ok(conf, min)` | 门闸秩比较（低<中<高） |
 | `learn_guards.py add/from-text/list/remove/test` | 误报→守卫固化；语义同内置 term_guards（±30 字符窗口豁免） |
 

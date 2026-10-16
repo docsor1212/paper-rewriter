@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 3.7.0
+version: 3.8.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: paper rewriting with AI-flavor
   self-check and style naturalization (scan reports are detection only),
@@ -34,16 +34,17 @@ and natural register — with integrity guardrails on every step.
 > (paper-polisher-pro); de-templating, model-residue cleanup, AI-flavor style
 > self-check and rewriting → this tool. Need both? Polish first, then run this pipeline.
 
-## Feature status (v3.7.0)
+## Feature status (v3.8.0)
 
 ⚠️ rows = experimental (may reject valid files; review output). Full history in references/errors.md and topic docs.
 
 | Capability | Status | Since |
 |---|---|---|
-| ⚠️ **PDF direct-read + confidence self-report** (embedded-font/ToUnicode attempted, capped at "中"; `--pdf-min-confidence` hard gate; calibration in references/pdf_confidence.md) | ⚠️ Experimental | v1.6–3.3 |
-| Core five · section-aware · rewrite plan (--handoff) · learned guards · machine exit codes · step timeout / batch retry · centralized errors · --deep · fullwidth normalization | Stable | v1.0–2.9 |
+| ⚠️ **PDF direct-read + confidence self-report** (embedded-font/ToUnicode attempted, capped at "中"; calibration in references/pdf_confidence.md; **default gate = 中 since v3.8.0** — garbled-typical extractions rejected by default, `--pdf-min-confidence 低` restores annotate-only) | ⚠️ Experimental | v1.6–3.8 |
+| Core five · section-aware · rewrite plan (plan --handoff) · learned guards · machine exit codes · step timeout / batch retry · centralized errors · --deep · fullwidth normalization | Stable | v1.0–2.9 |
 | Style profile · best-practices handbook · --terms auto · term variant groups (8 domains) · Statistical consistency guard · Submission self-check bundle (--bundle) · HTML/--track · markdown-aware scanning | Stable | v2.6–3.6 |
-| **Batch resume** (--batch + --resume: progress persisted to .pr_batch_state.json in the target directory; interrupted runs skip completed files) · **cross-file term drift** (check_terms --batch) · plain-language error messages (cause + next step) | Stable | v3.7 |
+| Batch resume (--batch + --resume) · cross-file term drift (check_terms --batch) · plain-language error messages | Stable | v3.7 |
+| **PDF default safe gate = 中 + batch circuit-breaker** (≥3 rejected PDFs in one batch → batch-level warning pointing at source quality) · **pipeline --handoff** (one command emits cleanup + guard + per-sentence deep-rewrite instruction sheet) · trigger conditions consolidated into this document | Stable | v3.8 |
 
 Scale envelope: 800K-char chunks (2K overlap) · 50MB file cap · 120s step budget.
 
@@ -130,7 +131,8 @@ python scripts/pipeline.py draft.txt -o out.txt --terms terms.txt
 - **Rewrite plan**: `plan.py draft -o plan.md` ranks sentences (P0 queue +
   budget projection); add `--handoff` for a per-sentence operation sheet.
 - **Inputs**: `.txt`/`.md` direct, `.docx` (Word) direct, PDF **experimental**
-  (confidence self-report; 低 = garbled — export to UTF-8;
+  (**default safe gate = medium since v3.8.0: garbled-typical PDFs rejected
+  outright**; `低` restores annotate-only;
   [references/pdf_confidence.md](references/pdf_confidence.md)).
 - **Term list**: `python scripts/extract_terms.py draft.txt -o terms.txt` (confirm
   by hand); any run accepts `--suggestions path.md` for a revision worksheet.
@@ -171,6 +173,8 @@ When invoked, decide the path first, then run it:
   学术改写 / 段落改写 / 表达优化 / style self-check /
   style naturalization / naturalize academic writing / de-templating /
   academic rewriting / passage rewrite / expression polish /
+  translationese cleanup (= Europeanized syntax: stacked passives, nominalization
+  chains, long attributives — see style_guide_en steps 1/3) /
   make my writing sound less machine-written / reduce the templated tone /
   clean up model residue or stray citation tokens / fix stiff formal prose /
   polish my draft for submission without changing the data /
@@ -182,13 +186,12 @@ When invoked, decide the path first, then run it:
   sections.）
 - **Disambiguation (this tool vs a polisher)**: 「论文改写润色」 here means
   style naturalization / de-templating (removing the machine flavor from
-  academic prose). Decision rule with examples —
-  route to a polisher (e.g. paper-polisher-pro) when the ask is only about
-  language correctness/fluency: 「帮我改下语法」「这句读不顺，润色一下」
-  「按期刊风格改写摘要」; route to this toolkit when the ask is about templated
-  tone or model residue: 「这篇读起来像 AI 写的」「把套话删一删」
-  「文里有 [cite: 1] 这种残留」; when both apply, polish first, then run this
-  pipeline — neither tool substitutes for the other.
+  academic prose). Decision rule — route to a polisher (paper-polisher-pro)
+  when the ask is only about language correctness/fluency: 「帮我改下语法」
+  「按期刊风格改写摘要」; route to this toolkit when it is about templated tone
+  or model residue: 「这篇读起来像 AI 写的」「文里有 [cite: 1] 这种残留」;
+  when both apply, polish first, then run this pipeline — neither substitutes
+  for the other.
 - **Term inconsistency** (abbreviation vs full form, mixed synonyms) →
   `check_terms.py file --pack <domain>`; `--list-packs` shows all eight
   domain packs (v3.0.0).
@@ -199,7 +202,8 @@ When invoked, decide the path first, then run it:
   (abstract-vs-methods mismatches, v3.3.0). Or run everything at once:
   `pipeline.py draft --check-stats`.
 - **User wants to know what to fix first** → `plan.py draft.txt -o plan.md`
-  (P0 sentence queue + budget projection) before deep revision.
+  (P0 sentence queue + budget projection); add `--handoff` to emit the
+  per-sentence instruction sheet (guards + acceptance commands, v3.0.0).
 - **User wants quantified acceptance of a rewrite** → `stylecheck.py 原稿 改稿
   --compare` (v2.6.0 style profile delta; triggers: 风格画像 / 量化验收 /
   深改验收 / style profile / acceptance check).
@@ -207,6 +211,11 @@ When invoked, decide the path first, then run it:
   `--batch 目录 --resume` (skips completed files; changed or previously failed
   files rerun automatically; progress lives in the batch directory as
   .pr_batch_state.json).
+- **Scenario shortcuts (v3.8.0 consolidation)**: CI/batch gating →
+  `--exit-verdict` (`--ci` alias; 0 clean / 3 deep-revise / 4 residue / 1
+  integrity fail, pipeline-only); false-positive remediation →
+  `learn_guards.py from-text 术语 样本.txt`; where to start deep revision →
+  `pipeline 原稿 -o 改稿 --handoff 交接块.md` (one command, no separate plan run).
 - **Multi-chapter term unification** → `check_terms.py --batch 目录` (cross-file
   variant drift: each file internally consistent, the set inconsistent).
 - **A scan flags a legitimate term** (false positive) → don't edit the pattern

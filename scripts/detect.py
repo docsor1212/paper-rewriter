@@ -39,8 +39,10 @@ def main():
                          "不加本旗标则从头重建进度；请以与首跑相同的参数续跑"
                          "（进度只存结果不存参数，换参续跑会混口径）")
     ap.add_argument("--review", help="生成结构化审稿报告（markdown）到此路径")
-    ap.add_argument("--pdf-min-confidence", choices=["高", "中", "低"], default=None,
-                 help="PDF 最低置信度门闸（v3.3.0）：低于阈值即拒收并提示导出 UTF-8；缺省不拦截只标注")
+    ap.add_argument("--pdf-min-confidence", choices=["高", "中", "低"], default="中",
+                 help="PDF 最低置信度门闸（v3.3.0 引入；v3.8.0 起缺省=中）：低于阈值即拒收"
+                      "并给处置建议——乱码形态的抽取不再混进报告；"
+                      "--pdf-min-confidence 低 恢复「只标注不拦」旧行为")
     ap.add_argument("--raw-markdown", action="store_true",
                     help="对 .md 输入保留 markdown 标记扫描（缺省 v3.6.0 起自动剥离"
                          "结构后扫描正文，结构统计单列不计分）")
@@ -72,7 +74,8 @@ def main():
                 if _pm and not hxt_core.pdf_confidence_ok(
                         _pm.get("confidence"), args.pdf_min_confidence):
                     raise hxt_core.pdf_gate_error(_pm.get("confidence"),
-                                                  args.pdf_min_confidence)
+                                                  args.pdf_min_confidence,
+                                                  notes=_pm.get("notes"))
                 pdf_conf = _pm.get("confidence", "")
             else:
                 t = (hxt_core.strip_markdown(hxt_core.read_text(fp))[0]
@@ -95,6 +98,7 @@ def main():
 
         rows_out = []
         pending = []  # (fp, 行索引)——二遍重试队列（v2.5.0 stability 处方）
+        gate_rej = 0  # 置信度门闸拒收计数（v3.8.0 批量熔断）
         done, state = hxt_core.batch_resume_prepare(root, args.resume, kind="detect", row_len=5)
         if args.resume and done:
             print("[续传] 跳过 %d 个已完成文件（进度 .pr_batch_state.json；"
@@ -112,6 +116,12 @@ def main():
                 rows_out.append(row)
                 if not hxt_core.batch_state_store(state, root, fn, fp, "done", row, kind="detect"):
                     n_state_fail += 1
+            except hxt_core.PdfGateRejected as e:
+                # 门闸拒收=确定性失败（v3.8.0）：不进重试队列，计入批级熔断
+                gate_rej += 1
+                rows_out.append((fn, -1, "错误: %s" % str(e)[:200], False, "-"))
+                hxt_core.batch_state_store(state, root, fn, fp, "error",
+                                           rows_out[-1], kind="detect")
             except (OSError, ValueError):
                 # 首遍失败不放弃：进二遍重试队列（超时/IO 抖动多为瞬时态）
                 pending.append((fp, len(rows_out)))
@@ -125,6 +135,13 @@ def main():
                 retried[fn] = True
                 if not hxt_core.batch_state_store(state, root, fn, fp, "done", row, kind="detect"):
                     n_state_fail += 1
+            except hxt_core.PdfGateRejected as e:
+                # 门闸拒收在重试遍出现（首遍瞬时失败+重试遭拒）：同样终态+熔断计数
+                gate_rej += 1
+                rows_out[idx] = (fn, -1, "错误: %s" % str(e)[:200], False, "-")
+                retried[fn] = False
+                if not hxt_core.batch_state_store(state, root, fn, fp, "error", rows_out[idx], kind="detect"):
+                    n_state_fail += 1
             except (OSError, ValueError) as e:
                 rows_out[idx] = (fn, -1, "错误: %s（已重试 1 次）" % str(e)[:200], False, "-")
                 retried[fn] = False
@@ -137,6 +154,11 @@ def main():
         if n_state_fail:
             print("[提示] 断点进度写盘失败 %d 次（不影响本次结果，但本目录 --resume 不可用）"
                   % n_state_fail, file=sys.stderr)
+        if gate_rej >= 3:
+            print("[熔断] %d 个 PDF 低于置信度门闸被拒——疑似这批 PDF 源头质量问题"
+                  "（扫描件/嵌入字体缺失）。建议：检查来源，或统一导出 UTF-8 文本后重跑；"
+                  "确要逐个强收可加 --pdf-min-confidence 低（输出需人工复核）" % gate_rej,
+                  file=sys.stderr)
         if args.json:
             print(json.dumps([{"file": f, "score": s, "level": l, "critical": c, "lang": g,
                                "retried": retried.get(f, False)}

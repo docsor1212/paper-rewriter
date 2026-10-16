@@ -19,7 +19,8 @@
 | 1 | check_terms.py（独立口径） | 发现术语不一致（报变体对与次数） | 按「建议统一为」人工统一；`--report` 出 markdown 明细 |
 | 1 | check_terms.py --batch 目录（v3.7.0） | 跨文件变体漂移或文件内不一致（files→变体映射） | 按建议变体跨文件统一；`--report` 含逐文件明细 |
 | 1 | check_stats.py（同 check_terms 口径） | 发现统计一致性问题（求和/分组 n/风格混用；--batch 含跨文件聚合） | 核对原始数据后改稿；`--report` 出 markdown 明细 |
-| 2 | detect/pipeline --pdf-min-confidence | PDF 置信度低于门闸被拒 | 按注记导出 UTF-8 文本/OCR 后重试，或调低门闸接受人工抽查 |
+| 2 | detect/pipeline（PDF 输入） | PDF 置信度低于门闸被拒（v3.8.0 起缺省门=中） | 按建议导出 UTF-8 文本/OCR 后重试；`--pdf-min-confidence 低` 恢复仅标注旧行为 |
+| 0（附警告） | detect/pipeline --batch | 同批 ≥3 个 PDF 被门闸拒收→批级熔断警告 | 查 PDF 来源质量（扫描件/导出器），勿逐个硬调门闸 |
 
 > pipeline.py / compare.py 的守卫判定在输出报告的「完整性守卫: PASS/FAIL」行；按退出码分支的脚本请调 verify.py。check_terms.py 的 0/1/2 是自己的契约（0=一致），与 verify 的 1=FAIL 语义不同表，勿混用。
 

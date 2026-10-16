@@ -365,6 +365,16 @@ python scripts/pipeline.py draft.txt -o out.txt --bundle 自查材料
 #   04_统计一致性.md 05_术语一致性.md 06_完整性判定.json README.txt
 ```
 
+### 一句命令出深改指令单（v3.8.0 pipeline --handoff）
+
+```bash
+python scripts/pipeline.py draft.txt -o out.txt --handoff 交接块.md
+# 报告照常输出之外，另得逐句指令单（plan --handoff 同款）：
+#   1. [摘要] 众所周知，本研究具有重要意义。
+#      操作：模板结构：删仪式感开场/拆投票式列举（指南第 1 步）；翻译腔：改为直接陈述
+#   深改 agent 照单执行，每 3-5 句跑一次 verify——省去单独跑 plan 一步
+```
+
 ### 批量断点续传（v3.7.0 --resume）
 
 ```bash

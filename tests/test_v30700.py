@@ -198,9 +198,11 @@ def test_docs_wiring():
     pits = open(os.path.join(ROOT, "references", "pitfalls.md"), encoding="utf-8").read()
     ex = open(os.path.join(ROOT, "references", "examples.md"), encoding="utf-8").read()
     idx = open(os.path.join(ROOT, "references", "INDEX.md"), encoding="utf-8").read()
-    check("docs.SKILL_ZH 功能状态 v3.7.0 行", "功能状态（v3.7.0）" in zh
+    # 版本锚用正则（v3.8.0 机制化：版本前缀随 bump 漂移，行内容才是稳定契约）
+    import re as _re
+    check("docs.SKILL_ZH 功能状态行", bool(_re.search(r"功能状态（v3\.\d+\.\d+）", zh))
           and "批量断点续传" in zh and "跨文件术语漂移" in zh)
-    check("docs.SKILL_EN 功能状态 v3.7.0 行", "Feature status (v3.7.0)" in en
+    check("docs.SKILL_EN 功能状态行", bool(_re.search(r"Feature status \(v3\.\d+\.\d+\)", en))
           and "Batch resume" in en and "cross-file term drift" in en)
     check("docs.permissions 写点核对", ".pr_batch_state.json" in perm
           and "--resume" in perm and "原子替换" in perm)

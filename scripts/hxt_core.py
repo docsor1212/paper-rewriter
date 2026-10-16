@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "3.7.0"
+__version__ = "3.8.0"
 
 import json
 import os
@@ -151,9 +151,15 @@ def pdf_confidence_ok(confidence, min_confidence):
     return PDF_CONF_RANK.get(confidence, 0) >= PDF_CONF_RANK.get(min_confidence, 0)
 
 
+class PdfGateRejected(ValueError):
+    """PDF 置信度门闸拒收（v3.8.0）：确定性失败——批量模式据此跳过重试
+    队列并计入熔断计数（同批 ≥3 个被拒=源头质量问题，输出批级警告）。"""
+
+
 def pdf_gate_error(confidence, gate, notes=None):
     """PDF 置信度门闸统一报错（v3.7.0 收拢）：全部 4 处调用点共用一处文案，
-    改文案只改这里。面向非技术用户说清「为什么拒收 + 该怎么办」；
+    改文案只改这里。返回 PdfGateRejected（ValueError 子类，存量捕获兼容）。
+    面向非技术用户说清「为什么拒收 + 该怎么办」；
     文案含「低于门闸」短语——离线测试按此锚点断言。"""
     msg = ("这份 PDF 的文字层质量低（抽取置信度 %s，低于门闸 %s）——直接抽取会得到"
            "乱码或缺字，低质量输入会连带破坏完整性守卫的可靠性，已拒收。"
@@ -162,7 +168,7 @@ def pdf_gate_error(confidence, gate, notes=None):
            "OCR；确要继续可调低 --pdf-min-confidence（输出需人工复核）")
     if notes:
         msg += "（检测注记: %s）" % ("；".join(notes) or "无")
-    return ValueError(msg + "——" + act)
+    return PdfGateRejected(msg + "——" + act)
 
 
 def _pdf_confidence(text, had_tounicode=False):
@@ -170,7 +176,7 @@ def _pdf_confidence(text, had_tounicode=False):
 
     高：常用词命中率 >=25% 且控制字符率 <0.3% 且词均长 3-9；
     低：命中率 <8% 或控制字符率 >=2% 或词均长 >14（乱码典型形态）；
-    其余中。置信度只标注不拦截——内容判断仍是启发式口径。
+    其余中。置信度自评与门闸判定仍是启发式口径（v3.8.0 起缺省门=中，低置信默认拒收）。
     had_tounicode（v3.0.0）：源 PDF 含 ToUnicode CMap 时「高」封顶为「中」——
     嵌入字体子集存在字面替换风险，乱码探针无法发现语义级错映射。"""
     words = re.findall(r"[A-Za-z]+", text)

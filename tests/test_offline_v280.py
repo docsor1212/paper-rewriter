@@ -91,7 +91,12 @@ rc, out, _ = run_cli([DET, f_good, "-j"])
 j = json.loads(out) if out.strip().startswith("{") else {}
 check("pdf_2a_detect_json_meta",
       rc == 0 and j.get("pdf_meta", {}).get("confidence") == "高", str(j.get("pdf_meta")))
-rc, out, _ = run_cli([DET, f_bad])
+rc, out, err = run_cli([DET, f_bad])
+# v3.8.0 行为规格变更：缺省门=中，乱码形态（低置信）默认拒收——
+# 看低置信标注请显式 --pdf-min-confidence 低（拒收提示在 stderr）
+check("pdf_2b_detect_default_gate_reject",
+      rc == 2 and "低于门闸" in (out + err), (out + err)[:120])
+rc, out, _ = run_cli([DET, f_bad, "--pdf-min-confidence", "低"])
 check("pdf_2b_detect_human_line",
       rc == 0 and "PDF 抽取置信度: 低" in out, out[:120])
 outp = os.path.join(tmpdir, "o.txt")

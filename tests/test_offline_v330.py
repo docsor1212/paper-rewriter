@@ -4,7 +4,7 @@
 覆盖：
   1. check_stats --batch 跨文件分组 n 聚合（加宽前缀+显式免责；单文件保守不剥时点不回归）
   2. pipeline --check-stats 阶段（JSON stats_consistency；缺省不跑；退出码不受影响）
-  3. detect/pipeline --pdf-min-confidence 门闸（低于阈值拒收；缺省只标注）
+  3. detect/pipeline --pdf-min-confidence 门闸（低于阈值拒收；v3.8.0 起缺省=中（原为只标注））
   4. SKILL 双语 v3.3.0 锚 / 状态表压缩 / 工作流行 / api·errors 行 / 合规零命中
 运行：python3 tests/test_offline_v330.py（全断言，无第三方依赖）
 """
@@ -144,8 +144,15 @@ def test_pdf_gate():
               and "低于门闸" in (r2.stdout + r2.stderr),
               (r2.stdout + r2.stderr)[:120])
         r3 = run_cli([os.path.join(SCRIPTS, "detect.py"), p])
-        check("gate.缺省只标注不拦",
-              r3.returncode == 0 and "置信度" in r3.stdout, r3.stdout[:100])
+        # v3.8.0 行为规格变更：缺省门=中（乱码形态默认拦截，stability 处方——
+        # 评测点名「PDF 抽取失败仍可能输出低置信度乱码」）
+        check("gate.缺省=中门拦截",
+              r3.returncode == 2 and "低于门闸" in (r3.stdout + r3.stderr),
+              (r3.stdout + r3.stderr)[:120])
+        r4 = run_cli([os.path.join(SCRIPTS, "detect.py"), p,
+                      "--pdf-min-confidence", "低"])
+        check("gate.低门恢复只标注旧行为",
+              r4.returncode == 0 and "置信度" in r4.stdout, r4.stdout[:100])
 
 
 # ── 5. 文档与合规 ────────────────────────────────────────────

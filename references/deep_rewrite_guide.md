@@ -21,6 +21,7 @@
 ① 计划     python scripts/plan.py draft.txt --top 15 -o plan.md
               ↳ P0 句级队列（章节归属+命中类别+处理原则+预算投影）
 ② 交接     python scripts/plan.py draft.txt --top 15 --handoff
+          （或 v3.8.0 一句命令：python scripts/pipeline.py draft.txt -o clean.txt --handoff 交接块.md）
               ↳ 深改交接块：逐句「原句+操作指令」，含守卫铁律与验收命令
 ③ 逐句深改  按交接块顺序改——每句只做指令列出的操作，不顺手加戏
 ④ 校验节拍  每改 3-5 句：python scripts/verify.py draft.txt step2.txt --terms terms.txt
