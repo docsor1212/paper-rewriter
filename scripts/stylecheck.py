@@ -123,6 +123,9 @@ def main():
     ap.add_argument("--compare", action="store_true",
                     help="对比模式：file=改前，file2=改后，输出画像差值")
     ap.add_argument("--json", action="store_true", help="JSON 输出（单文件画像）")
+    ap.add_argument("--raw-markdown", action="store_true",
+                    help="对 .md 输入保留 markdown 标记扫描（缺省 v3.6.0 起自动剥离；"
+                         "--compare 恒为原文口径）")
     ap.add_argument("--html", help="生成单文件 HTML 画像报告到此路径（单文件与 --compare 均可用）")
     ap.add_argument("--version", action="version",
                     version="%(prog)s " + hxt_core.__version__)
@@ -158,7 +161,17 @@ def main():
         src = args.file
     if not t.strip():
         hxt_core.fail("输入为空", hint="请传入 .txt/.md/.docx 文件或通过管道给文本")
-    profile = hxt_core.style_profile(t)
+    md_struct = None
+    if (not getattr(args, "raw_markdown", False)
+            and (args.file or "").lower().endswith((".md", ".markdown"))):
+        t, md_struct = hxt_core.strip_markdown(t)
+        if not t.strip():
+            hxt_core.fail("剥离 markdown 结构后正文为空（纯结构文档）",
+                          hint="--raw-markdown 可保留原样扫描")
+        profile = hxt_core.style_profile(t)
+        profile["md_struct"] = md_struct
+    if "profile" not in dir():
+        profile = hxt_core.style_profile(t)
     if args.html:
         import reporter
         try:

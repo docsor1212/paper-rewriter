@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "3.5.0"
+__version__ = "3.7.0"
 
 import json
 import os
@@ -58,14 +58,18 @@ def _read_text_impl(path, max_mb):
         data = f.read()
     if 0 in data:
         raise ValueError(
-            "输入疑似二进制文件（含 NUL 字节）——请转存为 UTF-8 纯文本（.txt/.md）再处理")
+            "输入疑似二进制或损坏文件（无法作为可读文本打开）——常见原因：Word/网页"
+            "「另存为」时格式选错（.doc/.rtf/.mht），或文件在传输中损坏。"
+            "处置：Word 文档请直接用 .docx 输入（支持直读）；其他文件用文本编辑器"
+            "打开并另存为 UTF-8 编码的 .txt")
     text = data.decode("utf-8-sig", errors="replace")
     # 乱码守卫：非 UTF-8 文本（GBK/UTF-16 等）解码后大量 U+FFFD，
     # 「垃圾进→干净出」是对信任判断工具最坏的失败态，必须拒绝
     if text.count(chr(0xFFFD)) / max(1, len(text)) > 0.02:
         raise ValueError(
-            "输入文件解码后乱码占比过高（疑似 GBK/UTF-16 等非 UTF-8 编码）——"
-            "请转存为 UTF-8 纯文本后重试")
+            "输入文件不是 UTF-8 编码（解码后乱码过多，疑似 GBK/UTF-16）——"
+            "继续处理会得到成片乱码。处置：用文本编辑器打开后「另存为」UTF-8 编码"
+            "再试（Windows 记事本「另存为」对话框右下角可选编码）")
     return text
 
 
@@ -95,6 +99,47 @@ _PDF_PROBE_WORDS = frozenset((
 ).split())
 
 
+# ── markdown 感知（v3.6.0，医学知识库场景：隔壁产出 .md 文档扫描假阳性根治）──
+# 2026-10-14 实测：风湿免疫知识库 21 篇（27 万字符正文）原始分 26-100 全由
+# markdown 标记贡献（×25,782 占命中 99.9%），剥离后 0-1 分/低档——正文是干净的。
+_MD_CODE_FENCE_RX = re.compile(r"```.*?```", re.S)
+_MD_TABLE_ROW_RX = re.compile(r"^\|.*\|$", re.M)
+_MD_HEAD_RX = re.compile(r"^#{1,6}\s*", re.M)
+_MD_UL_RX = re.compile(r"^\s*[-*+]\s+", re.M)
+_MD_OL_RX = re.compile(r"^\s*\d+\.\s+", re.M)
+_MD_BOLD_RX = re.compile(r"\*\*([^*]+)\*\*")
+
+
+def strip_markdown(text):
+    """剥离 markdown 结构标记（代码块/表格行/标题井号/列表符/粗体），返回 (正文, 结构统计)。
+
+    表格行整行剥离——表格是数据不是散文；统计随报告单列（不计风格分）。"""
+    stats = {"code_blocks": len(_MD_CODE_FENCE_RX.findall(text)),
+             "table_rows": len(_MD_TABLE_ROW_RX.findall(text)),
+             "headings": len(_MD_HEAD_RX.findall(text))}
+    t = _MD_CODE_FENCE_RX.sub("", text)
+    stats["table_rows"] = len(_MD_TABLE_ROW_RX.findall(t))
+    t = _MD_TABLE_ROW_RX.sub("", t)
+    stats["headings"] = len(_MD_HEAD_RX.findall(t))
+    t = _MD_HEAD_RX.sub("", t)
+    t = _MD_UL_RX.sub("", t)
+    t = _MD_OL_RX.sub("", t)
+    t = _MD_BOLD_RX.sub(r"\1", t)
+    t = t.replace("|", "，")
+    return re.sub(r"\n{3,}", "\n\n", t).strip(), stats
+
+
+def scan_md(text, lang=None, profile="academic", source_ext=""):
+    """markdown 感知扫描：结构剥离后扫描正文；结果附 md_struct 统计与
+    md_stripped=True 标记（detect/pipeline/stylecheck/plan 对 .md 输入自动启用，
+    --raw-markdown 可保留旧行为）。"""
+    body, stats = strip_markdown(text)
+    r = scan(body, lang=lang, profile=profile, source_ext=source_ext)
+    r["md_stripped"] = True
+    r["md_struct"] = stats
+    return r
+
+
 PDF_CONF_RANK = {"低": 0, "中": 1, "高": 2}
 
 
@@ -104,6 +149,20 @@ def pdf_confidence_ok(confidence, min_confidence):
     if not confidence or not min_confidence:
         return True
     return PDF_CONF_RANK.get(confidence, 0) >= PDF_CONF_RANK.get(min_confidence, 0)
+
+
+def pdf_gate_error(confidence, gate, notes=None):
+    """PDF 置信度门闸统一报错（v3.7.0 收拢）：全部 4 处调用点共用一处文案，
+    改文案只改这里。面向非技术用户说清「为什么拒收 + 该怎么办」；
+    文案含「低于门闸」短语——离线测试按此锚点断言。"""
+    msg = ("这份 PDF 的文字层质量低（抽取置信度 %s，低于门闸 %s）——直接抽取会得到"
+           "乱码或缺字，低质量输入会连带破坏完整性守卫的可靠性，已拒收。"
+           % (confidence, gate))
+    act = ("处置：优先从原编辑器（Word/LaTeX/Overleaf）导出 UTF-8 纯文本；扫描件先做 "
+           "OCR；确要继续可调低 --pdf-min-confidence（输出需人工复核）")
+    if notes:
+        msg += "（检测注记: %s）" % ("；".join(notes) or "无")
+    return ValueError(msg + "——" + act)
 
 
 def _pdf_confidence(text, had_tounicode=False):
@@ -467,12 +526,14 @@ def _extract_pdf(path):
         cjk = sum(1 for ch in gbk if "\u4e00" <= ch <= "\u9fff")
         if cjk / max(1, len(gbk)) > 0.2:
             raise ValueError(
-                "PDF 抽取文本经 GBK 回程探测命中 CJK（疑中文嵌入字体编码）——"
-                "请导出为 UTF-8 文本后重试")
+                "这份 PDF 抽出来的文本疑似中文嵌入字体编码错乱（GBK 回程探测命中 CJK）——"
+                "直接使用会得到乱码。处置：从原编辑器导出 UTF-8 纯文本后重试")
     except (UnicodeEncodeError, UnicodeDecodeError):
         pass
     if text.count(chr(0xFFFD)) / max(1, len(text)) > 0.02:
-        raise ValueError("PDF 抽取文本乱码占比过高——请导出为 UTF-8 文本")
+        raise ValueError(
+            "这份 PDF 的文字层抽出来大量乱码（嵌入字体缺映射的典型形态）——"
+            "直接继续会污染守卫判定。处置：从原编辑器导出 UTF-8 纯文本，或先 OCR")
     return re.sub(r"\n{3,}", "\n\n", text).strip() + "\n"
 
 
@@ -651,7 +712,9 @@ def _extract_docx(path):
     # 乱码守卫与纯文本路径同款（docx 内嵌非 UTF-8 XML 的最坏失败态）
     if text.count(chr(0xFFFD)) / max(1, len(text)) > 0.02:
         raise ValueError(
-            "docx 抽取文本乱码占比过高（内嵌 XML 疑非 UTF-8）——请另存为 .docx 或转存 UTF-8 文本")
+            "这个 .docx 的内嵌文本疑似非 UTF-8（常见于旧版转换或第三方工具生成）——"
+            "直接继续会得到乱码。处置：用 Word/WPS 打开另存为常规 .docx，"
+            "或导出 UTF-8 纯文本")
     return text
 
 
@@ -1150,6 +1213,98 @@ class CliError(Exception):
 def fail(msg, hint=""):
     """抛 CliError 的快捷方式：fail("输入为空", hint="请传入 .txt/.md/.docx 文件")"""
     raise CliError(msg, hint)
+
+
+# ---------------------------------------------------------------------------
+# 批量断点续传（v3.7.0，stability 处方——评测指名缺口「缺少断点续传」）：
+# --batch 每处理完一个文件就把该文件的结果原子落进 <目录>/.pr_batch_state.json，
+# 中断（Ctrl+C/断电/超时）后用 --resume 重跑：已完成且文件未变的直接复用，
+# 失败与变更过的自动重跑。detect/pipeline 两个 CLI 共用本节实现；
+# 状态文件写失败只降级提示、绝不拖主流程（辅助产物纪律）。
+# ---------------------------------------------------------------------------
+BATCH_STATE_NAME = ".pr_batch_state.json"
+
+
+def batch_state_path(root):
+    return os.path.join(root, BATCH_STATE_NAME)
+
+
+def batch_state_fingerprint(fp):
+    """文件指纹 [size, mtime]：resume 时用它判断「文件是否还是上次那个」。
+    拿不到 stat 返回 None（调用方视为未完成，重跑）。"""
+    try:
+        st = os.stat(fp)
+        # mtime_ns（v3.7.0 审计 P1）：秒级 mtime + 同尺寸改写会误复用——
+        # 纳秒粒度把同秒窗口关掉
+        return [st.st_size, st.st_mtime_ns]
+    except OSError:
+        return None
+
+
+def batch_state_load(root):
+    """读状态文件。结构 = {"kinds": {kind: {"files": {fn: 记录}}}}——
+    detect/pipeline 各占一个 kind 分区，互不覆盖（v3.7.0）。
+    旧扁平结构或损坏文件一律按空白处理。"""
+    try:
+        with open(batch_state_path(root), "r", encoding="utf-8") as f:
+            st = json.load(f)
+        if isinstance(st, dict) and isinstance(st.get("kinds"), dict):
+            return st
+    except (OSError, ValueError):
+        pass
+    return {"kinds": {}}
+
+
+def batch_state_save(root, state):
+    tmp = batch_state_path(root) + ".tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False)
+        os.replace(tmp, batch_state_path(root))
+        return True
+    except OSError:
+        return False
+
+
+def batch_resume_prepare(root, resume, kind="", row_len=None):
+    """进入批量循环前调用：返回 (done_map, state)。
+
+    done_map = {fn: row}——仅当 resume=True 且本 kind 分区内记录为 done 且
+    指纹与当前文件一致才收录。kind 分区（v3.7.0 机制）：detect 与 pipeline
+    行结构不同（detect=[fn,int,str,bool,str] / pipeline=[fn,str×4]），共用
+    单一分区会跨 CLI 复用错误 schema；分区后各 CLI 只重置/读写自己的分区，
+    交叉运行互不覆盖进度。row_len 双保险校验行长度。"""
+    state = batch_state_load(root)
+    own = state["kinds"].get(kind)
+    if not isinstance(own, dict) or not isinstance(own.get("files"), dict):
+        own = {"files": {}}
+    if not resume:
+        own = {"files": {}}          # 非续传：只重置本 kind 分区，不动别的 CLI
+    state["kinds"][kind] = own
+    done = {}
+    if resume:
+        for fn, rec in own["files"].items():
+            fp = os.path.join(root, fn)
+            if (isinstance(rec, dict) and rec.get("status") == "done"
+                    and isinstance(rec.get("row"), list)
+                    and (row_len is None or len(rec["row"]) == row_len)
+                    and os.path.isfile(fp)
+                    and batch_state_fingerprint(fp) == rec.get("fp")):
+                done[fn] = rec["row"]
+    return done, state
+
+
+def batch_state_store(state, root, fn, fp, status, row, kind=""):
+    """把单文件结果写进本 kind 分区并整文件原子落盘——每文件一次，
+    中断最多丢当前文件。返回落盘是否成功（失败仅提示，不抛异常）。"""
+    own = state["kinds"].setdefault(kind, {"files": {}})
+    own.setdefault("files", {})[fn] = {
+        "status": status,
+        "fp": batch_state_fingerprint(fp),
+        "row": list(row),
+        "ts": int(time.time()),
+        "tool": "paper-rewriter %s" % __version__}
+    return batch_state_save(root, state)
 
 
 # ---------------------------------------------------------------------------

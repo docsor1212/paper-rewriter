@@ -150,6 +150,9 @@ def main():
     ap.add_argument("--version", action="version",
                     version="%(prog)s " + hxt_core.__version__)
     ap.add_argument("file", nargs="?", help="待检文档（.txt/.md/.docx）")
+    ap.add_argument("--batch", help="跨文件模式（v3.7.0）：检查目录内全部 .txt/.md/.docx（不含 .pdf）——"
+                                    "逐文件组内不一致 + 跨文件变体漂移（各文件各自用词一致、"
+                                    "合起来不一致，如摘要用「肝功能」正文用「肝功」）；与 file 互斥")
     ap.add_argument("--pairs", help="用户自定义术语对文件（每行 A|B）")
     ap.add_argument("--pack", help="只跑指定域包（如 心血管）；默认全量")
     ap.add_argument("--list-packs", action="store_true",
@@ -163,17 +166,13 @@ def main():
             n = sum(len(v) for v in _TERM_PACKS[pk])
             print("%s（%d 组 / %d 变体）" % (pk, len(_TERM_PACKS[pk]), n))
         sys.exit(0)
-    if not args.file:
-        ap.error("缺少待检文档")
+    if not args.file and not args.batch:
+        ap.error("缺少待检文档（或用 --batch 目录做跨文件检查）")
+    if args.file and args.batch:
+        ap.error("--batch 与单文件模式互斥（只传其一）")
     if args.pack and args.pack not in _TERM_PACKS:
         ap.error("未知域包 %r；--list-packs 查看（%s）"
                  % (args.pack, "/".join(sorted(_TERM_PACKS))))
-
-    try:
-        text = hxt_core.read_text(args.file)
-    except (OSError, ValueError) as e:
-        print("错误: %s" % e, file=sys.stderr)
-        sys.exit(2)
 
     groups = ([{"pack": args.pack, "variants": list(vs)}
                for vs in _TERM_PACKS[args.pack]] if args.pack
@@ -185,6 +184,134 @@ def main():
             if _pair_in_builtin(a, b):
                 continue
             groups.append({"pack": "用户自定义", "variants": [a, b]})
+
+    # ── 跨文件模式（v3.7.0）：逐文件组内不一致 + 跨文件变体漂移 ──
+    if args.batch:
+        root = args.batch
+        if not os.path.isdir(root):
+            print("错误: --batch 需要目录（%s）" % root, file=sys.stderr)
+            sys.exit(2)
+        texts, load_errs = {}, []
+        for fn in sorted(os.listdir(root)):
+            if not fn.lower().endswith((".txt", ".md", ".docx")):
+                continue
+            fp = os.path.join(root, fn)
+            try:
+                texts[fn] = hxt_core.read_text(fp)
+            except (OSError, ValueError) as e:
+                load_errs.append((fn, str(e)[:80]))
+        if not texts:
+            if load_errs:
+                # 全部文件读取失败≠「一致」——fail-closed（误报 clean 是最坏的失败态）
+                print("错误: 目录内 %d 个文件全部读取失败（%s）" % (len(load_errs), root),
+                      file=sys.stderr)
+                for fn, msg in load_errs:
+                    print("  %s：%s" % (fn, msg), file=sys.stderr)
+                sys.exit(2)
+            print("错误: 目录内没有 .txt/.md/.docx 文件（%s）" % root, file=sys.stderr)
+            sys.exit(2)
+        per_file = {fn: find_group_inconsistencies(tx, groups)
+                    for fn, tx in texts.items()}
+        # 跨文件漂移：各文件「主导变体」（出现最多的）构成集合，≥2 个不同 → 漂移。
+        # 单文件各自一致、合起来不一致是多章节论文最隐蔽的术语病，单文件模式看不见。
+        drift = []
+        for g in groups:
+            dominant = {}
+            for fn, tx in texts.items():
+                counts = {v: len(re.findall(re.escape(v), tx)) for v in g["variants"]}
+                present = {v: c for v, c in counts.items() if c > 0}
+                if present:
+                    dominant[fn] = max(present.items(), key=lambda x: x[1])
+            if len({v for v, _c in dominant.values()}) >= 2:
+                total = {}
+                for v, c in dominant.values():
+                    total[v] = total.get(v, 0) + c
+                drift.append({
+                    "pack": g["pack"], "canonical": g["variants"][0],
+                    "files": {fn: v for fn, (v, _c) in sorted(dominant.items())},
+                    "suggestion": max(total.items(), key=lambda x: x[1])[0]})
+        n_issues = sum(len(v) for v in per_file.values()) + len(drift)
+        if args.json:
+            # 与单文件 --json 同口径：恒 exit 0，机器分支读 total 字段
+            print(json.dumps({"files": len(texts), "load_errors": load_errs,
+                              "per_file": per_file, "cross_file_drift": drift,
+                              "total": n_issues},
+                             ensure_ascii=False, indent=2))
+            sys.exit(0)
+        if args.report:
+            lines = ["# 术语一致性检查（跨文件）：%s" % root, "",
+                     "> 自动生成（%s） · %d 个文件" % (
+                         datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), len(texts)), ""]
+            if load_errs:
+                lines.append("## 读取失败（跳过）")
+                lines.extend("- %s：%s" % (fn, msg) for fn, msg in load_errs)
+                lines.append("")
+            lines.append("## 跨文件变体漂移（%d 组）" % len(drift))
+            if not drift:
+                lines.append("未发现跨文件漂移。")
+            else:
+                lines.append("")
+                lines.append("| 域 | 文件 → 主导变体 | 建议统一为 |")
+                lines.append("| --- | --- | --- |")
+                for d in drift:
+                    fmap = " / ".join("%s→%s" % (fn, v)
+                                      for fn, v in d["files"].items())
+                    lines.append("| %s | %s | %s |" % (d["pack"], fmap, d["suggestion"]))
+            lines.append("")
+            lines.append("## 各文件内部不一致")
+            any_internal = False
+            for fn in sorted(per_file):
+                rs = per_file[fn]
+                if not rs:
+                    continue
+                any_internal = True
+                lines.append("")
+                lines.append("### %s（%d 组）" % (fn, len(rs)))
+                for r in rs:
+                    vs = " / ".join("%s(%d)" % (v, c) for v, c in sorted(
+                        r["variants"].items(), key=lambda x: -x[1]))
+                    lines.append("- [%s] %s → 建议「%s」" % (
+                        r.get("pack", ""), vs, r["suggestion"]))
+            if not any_internal:
+                lines.append("各文件内部均一致。")
+            try:
+                with open(args.report, "w", encoding="utf-8") as rf:
+                    rf.write("\n".join(lines) + "\n")
+                print("报告已写入 %s" % args.report, file=sys.stderr)
+            except OSError as e:
+                print("错误: 无法写入报告（%s）" % e, file=sys.stderr)
+        for fn, msg in load_errs:
+            print("[跳过] %s 读取失败：%s" % (fn, msg), file=sys.stderr)
+        if drift:
+            print("发现 %d 组跨文件变体漂移：" % len(drift))
+            for d in drift:
+                fmap = " / ".join("%s→%s" % (fn, v)
+                                  for fn, v in d["files"].items())
+                print("  [%s] %s → 建议「%s」" % (d["pack"], fmap, d["suggestion"]))
+        else:
+            print("未发现跨文件变体漂移。")
+        n_bad = sum(1 for rs in per_file.values() if rs)
+        if n_bad:
+            print("%d 个文件内部存在术语不一致（--report 看逐文件明细）：" % n_bad)
+            for fn in sorted(per_file):
+                if per_file[fn]:
+                    print("  %s（%d 组）" % (fn, len(per_file[fn])))
+        elif not drift:
+            print("各文件内部均一致。")
+        if load_errs and n_issues == 0:
+            # 部分文件读取失败且幸存文件零发现：不判「一致」（跳过的一半漂移对
+            # 会伪装成 clean）——exit 1 让调用方看到 [跳过] 明细后人工定夺
+            print("有 %d 个文件读取失败被跳过，暂不判定「一致」；排除故障后重跑"
+                  % len(load_errs), file=sys.stderr)
+            sys.exit(1)
+        sys.exit(0 if n_issues == 0 else 1)
+
+    try:
+        text = hxt_core.read_text(args.file)
+    except (OSError, ValueError) as e:
+        print("错误: %s" % e, file=sys.stderr)
+        sys.exit(2)
+
     results = find_group_inconsistencies(text, groups)
 
     if args.json:

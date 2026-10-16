@@ -17,6 +17,7 @@
 | 1 | **仅 verify.py** | 完整性守卫 FAIL——改稿动了数字/引用/术语 | **修改改稿**，不是改守卫、不是换参数 |
 | 2 | 全部 | 用法或文件错误 | 看 stderr 提示：路径错/文件空/二进制/编码/超限，每条提示自带处置建议 |
 | 1 | check_terms.py（独立口径） | 发现术语不一致（报变体对与次数） | 按「建议统一为」人工统一；`--report` 出 markdown 明细 |
+| 1 | check_terms.py --batch 目录（v3.7.0） | 跨文件变体漂移或文件内不一致（files→变体映射） | 按建议变体跨文件统一；`--report` 含逐文件明细 |
 | 1 | check_stats.py（同 check_terms 口径） | 发现统计一致性问题（求和/分组 n/风格混用；--batch 含跨文件聚合） | 核对原始数据后改稿；`--report` 出 markdown 明细 |
 | 2 | detect/pipeline --pdf-min-confidence | PDF 置信度低于门闸被拒 | 按注记导出 UTF-8 文本/OCR 后重试，或调低门闸接受人工抽查 |
 
@@ -32,6 +33,10 @@
 | 4 | 命中模型残留（critical） | 先跑 transform.py 清理 |
 | 2 | 用法/文件错误（不受 --exit-verdict 影响） | 修调用 |
 
+> `--batch + --exit-verdict` 聚合口径（v3.7.0 备案）：detect 逐行取最坏档输出
+> 0/3/4，扫描不出的文件 fail-closed 直接 2；pipeline 聚合最坏行——integrity
+> FAIL 优先 1、错误行 2、其余按分数档 0/3/4。
+
 > detect/compare 的 `--exit-verdict` 只出 0/3/4（完整性仍只写报告——exit 1 契约专属 verify/pipeline）；
 > **pipeline 是唯一 1/3/4 全档判定命令**，CI 门禁推荐 `pipeline.py 原稿 --rewrite 改稿 --exit-verdict`。
 
@@ -42,6 +47,17 @@
 exit 2 结束。`CliError(msg, hint)` 是脚本内主动报错的规范方式；SystemExit
 原样穿透，各脚本语义化退出码不受影响。程序内部 bug 仍带完整 traceback
 冒出（宁可吵，不可吞）。
+
+### 批量断点续传（v3.7.0）
+
+`detect/pipeline --batch` 每完成一个文件即把结果原子落进批量目录的
+`.pr_batch_state.json`；中断后 `--resume` 跳过「已完成且文件未变」的文件，
+失败与已变更的自动重跑；不加 `--resume` 只重置本 CLI 的进度分区。detect 与
+pipeline 在状态文件内各占一个分区（kind 分区制），交叉运行互不覆盖、互不串读
+（两 CLI 行结构不同，跨 CLI 复用会污染输出 schema）。状态文件可随时删除
+（等价全部重置）；写盘失败只提示不中断主流程。续跑请使用与首跑相同的
+参数（--profile/--lang/--terms/--pdf-min-confidence 等）——进度只存结果不存参数，
+换参续跑会把两种口径的行混进一张汇总表。
 
 ## 二、verify.py 违规类别（exit 1 = violations；WARN = 告警继续）
 
@@ -68,8 +84,8 @@ exit 2 结束。`CliError(msg, hint)` 是脚本内主动报错的规范方式；
 |---|---|---|
 | 文件不存在 | 无法读取 | 核对路径（相对路径基于技能目录） |
 | 输入为空 | 输入为空 | 文件无内容或只传了空白 |
-| 二进制文件 | 疑似二进制（含 NUL 字节） | 转存 UTF-8 纯文本；Word 用 .docx 直读 |
-| 编码错误 | 乱码占比过高 | 文件是 GBK/UTF-16 等——转存 UTF-8 |
+| 二进制/损坏文件 | 疑似二进制或损坏文件 | Word 用 .docx 直读；其他用编辑器另存 UTF-8 .txt（.doc/.rtf/.mht 不支持） |
+| 编码错误 | 不是 UTF-8 编码 | 文件是 GBK/UTF-16 等——编辑器「另存为」UTF-8 编码 |
 | 文件超限 | 超过 50MB 上限 | 拆分文件分批处理 |
 | docx 缺部件 | 缺少正文部件 | 可能只是改了扩展名——另存为真正 .docx |
 | docx 加密 | 受密码保护 | 解除密码后另存 |

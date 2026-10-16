@@ -33,9 +33,17 @@ def main():
     ap.add_argument("--suggestions", help="输出修订建议工作单（markdown 侧车）到此路径")
     ap.add_argument("--html", help="生成单文件 HTML 报告到此路径")
     ap.add_argument("--batch", help="批量模式：扫描目录内全部 .txt/.md/.docx/.pdf，输出逐文件评分汇总（stdout；--json/--html 可同用）")
+    ap.add_argument("--resume", action="store_true",
+                    help="断点续传（v3.7.0，配 --batch）：跳过上次已完成的文件（进度存于目录下 "
+                         ".pr_batch_state.json）；文件有变动（大小/修改时间）或上次失败的自动重跑。"
+                         "不加本旗标则从头重建进度；请以与首跑相同的参数续跑"
+                         "（进度只存结果不存参数，换参续跑会混口径）")
     ap.add_argument("--review", help="生成结构化审稿报告（markdown）到此路径")
     ap.add_argument("--pdf-min-confidence", choices=["高", "中", "低"], default=None,
                  help="PDF 最低置信度门闸（v3.3.0）：低于阈值即拒收并提示导出 UTF-8；缺省不拦截只标注")
+    ap.add_argument("--raw-markdown", action="store_true",
+                    help="对 .md 输入保留 markdown 标记扫描（缺省 v3.6.0 起自动剥离"
+                         "结构后扫描正文，结构统计单列不计分）")
     ap.add_argument("--structure", action="store_true",
                     help="章节感知：识别论文结构（摘要/引言/方法/结果/讨论），分章节评分（方法/结果自动降权）")
     ap.add_argument("--exit-verdict", action="store_true",
@@ -47,44 +55,63 @@ def main():
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
 
+    if getattr(args, "resume", False) and not args.batch:
+        print("[提示] --resume 仅在 --batch 下生效（本次按普通单文件/ stdin 处理）",
+              file=sys.stderr)
     if args.batch:
         root = args.batch
         if not os.path.isdir(root):
             print("错误: --batch 需要目录（%s）" % root, file=sys.stderr)
             sys.exit(2)
+
+        def _scan_one(fp, fn, time_budget):
+            """单文件读入+扫描（v3.7.0 收拢：首遍/重试遍共用）。返回行元组；
+            失败抛 OSError/ValueError 由调用方处置。"""
+            if fp.lower().endswith(".pdf"):
+                t, _pm = hxt_core.read_text_ex(fp)
+                if _pm and not hxt_core.pdf_confidence_ok(
+                        _pm.get("confidence"), args.pdf_min_confidence):
+                    raise hxt_core.pdf_gate_error(_pm.get("confidence"),
+                                                  args.pdf_min_confidence)
+                pdf_conf = _pm.get("confidence", "")
+            else:
+                t = (hxt_core.strip_markdown(hxt_core.read_text(fp))[0]
+                     if (not getattr(args, "raw_markdown", False)
+                         and fp.lower().endswith((".md", ".markdown")))
+                     else hxt_core.read_text(fp))
+                pdf_conf = ""
+            if not t.strip():
+                return (fn, -1, "空文件", False, "-")
+            _ext = os.path.splitext(fn)[1].lower()
+            rr = (hxt_core.scan_chunked(t, lang=None if args.lang == "auto" else args.lang,
+                                        profile=args.profile, source_ext=_ext,
+                                        time_budget=time_budget)
+                  if len(t) > 1_000_000 else
+                  hxt_core.scan(t, lang=None if args.lang == "auto" else args.lang,
+                                profile=args.profile, source_ext=_ext,
+                                time_budget=time_budget))
+            lvl = rr["level"] + (" [置信度:%s]" % pdf_conf if pdf_conf else "")
+            return (fn, rr["score"], lvl, rr["critical_hit"], rr["lang"])
+
         rows_out = []
         pending = []  # (fp, 行索引)——二遍重试队列（v2.5.0 stability 处方）
+        done, state = hxt_core.batch_resume_prepare(root, args.resume, kind="detect", row_len=5)
+        if args.resume and done:
+            print("[续传] 跳过 %d 个已完成文件（进度 .pr_batch_state.json；"
+                  "文件有变动或上次失败的会重跑）" % len(done), file=sys.stderr)
+        n_state_fail = 0
         for fn in sorted(os.listdir(root)):
             if not fn.lower().endswith((".txt", ".md", ".docx", ".pdf")):
                 continue
             fp = os.path.join(root, fn)
+            if fn in done:
+                rows_out.append(tuple(done[fn]))
+                continue
             try:
-                if fp.lower().endswith(".pdf"):
-                    t, _pm = hxt_core.read_text_ex(fp)
-                    if _pm and not hxt_core.pdf_confidence_ok(
-                            _pm.get("confidence"), args.pdf_min_confidence):
-                        raise ValueError(
-                            "PDF 抽取置信度 %s 低于门闸 --pdf-min-confidence %s——请导出 UTF-8 文本/OCR 后重试，或调低门闸"
-                            % (_pm.get("confidence"), args.pdf_min_confidence))
-                    pdf_conf = _pm.get("confidence", "")
-                else:
-                    t = hxt_core.read_text(fp)
-                    pdf_conf = ""
-                if not t.strip():
-                    rows_out.append((fn, -1, "空文件", False, "-"))
-                    continue
-                _ext = os.path.splitext(fn)[1].lower()
-                rr = (hxt_core.scan_chunked(t, lang=None if args.lang == "auto" else args.lang,
-                                            profile=args.profile, source_ext=_ext)
-                      if len(t) > 1_000_000 else
-                      hxt_core.scan(t, lang=None if args.lang == "auto" else args.lang,
-                                    profile=args.profile, source_ext=_ext))
-                if pdf_conf:
-                    mark_pdf = " [置信度:%s]" % pdf_conf
-                    rows_out.append((fn, rr["score"], rr["level"] + mark_pdf,
-                                     rr["critical_hit"], rr["lang"]))
-                else:
-                    rows_out.append((fn, rr["score"], rr["level"], rr["critical_hit"], rr["lang"]))
+                row = _scan_one(fp, fn, hxt_core.SCAN_TIME_BUDGET)
+                rows_out.append(row)
+                if not hxt_core.batch_state_store(state, root, fn, fp, "done", row, kind="detect"):
+                    n_state_fail += 1
             except (OSError, ValueError):
                 # 首遍失败不放弃：进二遍重试队列（超时/IO 抖动多为瞬时态）
                 pending.append((fp, len(rows_out)))
@@ -93,35 +120,23 @@ def main():
         for fp, idx in pending:
             fn = rows_out[idx][0]
             try:
-                pdf_conf = ""
-                if fp.lower().endswith(".pdf"):
-                    t, _pm = hxt_core.read_text_ex(fp)
-                    if _pm and not hxt_core.pdf_confidence_ok(
-                            _pm.get("confidence"), args.pdf_min_confidence):
-                        raise ValueError(
-                            "PDF 抽取置信度 %s 低于门闸 --pdf-min-confidence %s——请导出 UTF-8 文本/OCR 后重试，或调低门闸"
-                            % (_pm.get("confidence"), args.pdf_min_confidence))
-                    pdf_conf = _pm.get("confidence", "")
-                else:
-                    t = hxt_core.read_text(fp)
-                _ext = os.path.splitext(fn)[1].lower()
-                rr = (hxt_core.scan_chunked(t, lang=None if args.lang == "auto" else args.lang,
-                                            profile=args.profile, source_ext=_ext,
-                                            time_budget=hxt_core.SCAN_TIME_BUDGET * 2)
-                      if len(t) > 1_000_000 else
-                      hxt_core.scan(t, lang=None if args.lang == "auto" else args.lang,
-                                    profile=args.profile, source_ext=_ext,
-                                    time_budget=hxt_core.SCAN_TIME_BUDGET * 2))
-                lvl = rr["level"] + (" [置信度:%s]" % pdf_conf if pdf_conf else "")
-                rows_out[idx] = (fn, rr["score"], lvl, rr["critical_hit"], rr["lang"])
+                row = _scan_one(fp, fn, hxt_core.SCAN_TIME_BUDGET * 2)
+                rows_out[idx] = row
                 retried[fn] = True
+                if not hxt_core.batch_state_store(state, root, fn, fp, "done", row, kind="detect"):
+                    n_state_fail += 1
             except (OSError, ValueError) as e:
-                rows_out[idx] = (fn, -1, "错误: %s（已重试 1 次）" % str(e)[:60], False, "-")
+                rows_out[idx] = (fn, -1, "错误: %s（已重试 1 次）" % str(e)[:200], False, "-")
                 retried[fn] = False
+                if not hxt_core.batch_state_store(state, root, fn, fp, "error", rows_out[idx], kind="detect"):
+                    n_state_fail += 1
         if retried:
             n_ok = sum(1 for v in retried.values() if v)
             print("[重试] 二遍扫描：%d 个失败文件重试，%d 个恢复" % (len(retried), n_ok),
                   file=sys.stderr)
+        if n_state_fail:
+            print("[提示] 断点进度写盘失败 %d 次（不影响本次结果，但本目录 --resume 不可用）"
+                  % n_state_fail, file=sys.stderr)
         if args.json:
             print(json.dumps([{"file": f, "score": s, "level": l, "critical": c, "lang": g,
                                "retried": retried.get(f, False)}
@@ -133,6 +148,10 @@ def main():
                 if retried.get(f):
                     mark += "（重试成功）"
                 print("  %-36s%s" % (f, mark))
+        if getattr(args, "suggestions", None):
+            print("[提示] detect --batch 暂不生成 --suggestions（可对重点单稿单跑）", file=sys.stderr)
+        if getattr(args, "review", None):
+            print("[提示] detect --batch 暂不生成 --review（可对重点单稿单跑）", file=sys.stderr)
         if args.html:
             import reporter
             trs = "".join("<tr><td>%s</td><td>%s</td></tr>" % (
@@ -164,16 +183,20 @@ def main():
         sys.exit(0)
 
     pdf_meta = None
+    md_struct = None
     if args.file:
         try:
             if args.file.lower().endswith(".pdf"):
                 text, pdf_meta = hxt_core.read_text_ex(args.file)
                 if pdf_meta and not hxt_core.pdf_confidence_ok(
                         pdf_meta.get("confidence"), args.pdf_min_confidence):
-                    raise ValueError(
-                        "PDF 抽取置信度 %s 低于门闸 --pdf-min-confidence %s——请导出 UTF-8 文本/OCR 后重试，或调低门闸接受人工抽查（注记: %s）"
-                        % (pdf_meta.get("confidence"), args.pdf_min_confidence,
-                           "；".join(pdf_meta.get("notes") or []) or "无"))
+                    raise hxt_core.pdf_gate_error(
+                        pdf_meta.get("confidence"), args.pdf_min_confidence,
+                        notes=pdf_meta.get("notes"))
+            elif (not getattr(args, "raw_markdown", False)
+                  and args.file.lower().endswith((".md", ".markdown"))):
+                # markdown 感知（v3.6.0）：结构剥离后扫描正文，结构统计单列不计分
+                text, md_struct = hxt_core.strip_markdown(hxt_core.read_text(args.file))
             else:
                 text = hxt_core.read_text(args.file)
         except OSError as e:
@@ -207,6 +230,8 @@ def main():
             sys.exit(2)
         if pdf_meta:
             rs["pdf_meta"] = pdf_meta
+        if md_struct:
+            rs["md_struct"] = md_struct
         if args.html:
             import reporter
             try:
@@ -230,6 +255,11 @@ def main():
         print("=" * 62)
         if rs.get("pdf_meta"):
             print("PDF 抽取置信度: %s" % rs["pdf_meta"]["confidence"])
+        if rs.get("md_struct"):
+            m = rs["md_struct"]
+            print("Markdown 结构: 标题 %d · 表格行 %d · 代码块 %d（已剥离，不计风格分）"
+                  % (m["headings"], m["table_rows"], m["code_blocks"]))
+        if rs.get("pdf_meta"):
             for note in rs["pdf_meta"]["notes"]:
                 print("  ⚠ %s" % note)
         print("综合: %d [%s]" % (rs["overall_score"], rs["overall_level"]))
@@ -259,6 +289,8 @@ def main():
 
     if pdf_meta:
         r["pdf_meta"] = pdf_meta
+    if md_struct:
+        r["md_struct"] = md_struct
     r["hints"] = hxt_core.build_hints(text, r, profile=args.profile)
 
     if args.suggestions:

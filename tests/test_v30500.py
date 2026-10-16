@@ -105,10 +105,11 @@ def test_ledger():
 
 
 def test_rules():
-    check("rules.版本 3.5.0", hxt_core.__version__ == "3.5.0")
     M, mi, pa = (int(x) for x in hxt_core.__version__.split("."))
-    check("rules.本套件文件名=固定位命名", os.path.basename(__file__) ==
-          f"test_v{M:01d}{mi:02d}{pa:02d}.py", os.path.basename(__file__))
+    check("rules.本套件文件名=固位命名对应该版本（3.5.0→v30500）",
+          os.path.basename(__file__) == "test_v30500.py")
+    check("rules.全局版本≥3.5.0", (M, mi, pa) >= (3, 5, 0),
+          hxt_core.__version__)
 
 
 def main():

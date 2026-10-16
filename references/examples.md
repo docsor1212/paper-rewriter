@@ -364,3 +364,23 @@ python scripts/pipeline.py draft.txt -o out.txt --bundle 自查材料
 #   01_风格自查报告.html 02_修订记录.md/.json 03_风格画像对比.md
 #   04_统计一致性.md 05_术语一致性.md 06_完整性判定.json README.txt
 ```
+
+### 批量断点续传（v3.7.0 --resume）
+
+```bash
+python scripts/detect.py --batch 全部章节/            # 中途 Ctrl+C / 断电
+python scripts/detect.py --batch 全部章节/ --resume   # 跳过已完成，只补没跑的
+# stderr 提示: [续传] 跳过 N 个已完成文件（进度 .pr_batch_state.json；…）
+# 规则：文件未变（大小+修改时间）→ 复用结果；变更过/上次失败 → 自动重跑
+# detect 与 pipeline 进度互不干扰（同目录各认各的记录）；删 .pr_batch_state.json = 重置
+```
+
+### 跨文件术语漂移（v3.7.0 check_terms --batch）
+
+```bash
+python scripts/check_terms.py --batch 全部章节/
+# 发现 1 组跨文件变体漂移：
+#   [通用] 摘要.txt→患者 / 讨论.txt→病人 → 建议「患者」
+# exit 1=有漂移或文件内不一致；--report 出逐文件明细；--json 出机器口径
+# 场景：多章节论文各章分头改写后，「各章内部一致、合起来不一致」的术语病
+```

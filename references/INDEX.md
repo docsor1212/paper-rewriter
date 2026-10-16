@@ -9,6 +9,8 @@
 | 命令报错/看不懂退出码 | [errors.md](errors.md) → [pitfalls.md](pitfalls.md) | `python scripts/verify.py 原稿 改稿` |
 | 扫描误报正当术语 | [faq.md](faq.md) Q8 | `python scripts/learn_guards.py from-text 术语 样本` |
 | 术语称谓混用（HF/心力衰竭） | [api.md](api.md) check_terms 行 | `python scripts/check_terms.py 文稿 --pack 心血管` |
+| 多章节文件术语要统一（跨文件漂移） | [faq.md](faq.md) Q11 + [examples.md](examples.md) | `python scripts/check_terms.py --batch 章节目录` |
+| 批量跑到一半中断要续跑 | [errors.md](errors.md) 断点续传段 + [faq.md](faq.md) Q12 | `python scripts/detect.py --batch 目录 --resume` |
 | 数字打架（百分比/n 不一致） | [api.md](api.md) check_stats 行 | `python scripts/check_stats.py 文稿` |
 | PDF 读不出/置信度含义 | [pdf_confidence.md](pdf_confidence.md) | `python scripts/detect.py 文件.pdf --json` |
 | 能不能保证检测/过审 | [honest_boundaries.md](honest_boundaries.md) | ——（先读再对外发言） |

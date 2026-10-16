@@ -21,11 +21,13 @@
   报告）、`--report`（check_terms.py / check_stats.py 的一致性报告）、`--track`（写 base.md +
   base.json 双文件）、`--bundle 目录`（v3.4.0 投稿自查包：在指定目录下创建带时间戳
   子目录，写 8 个文件）。一个派生例外：`pipeline --terms auto` 会额外写自动术语
-  草稿 `<输出基名>.terms.auto.txt`（工具生成、未经人工确认，见工作流说明）。外加一个工具自有数据文件：`learn_guards.py
+  草稿 `<输出基名>.terms.auto.txt`（工具生成、未经人工确认，见工作流说明）。外加两个工具自有数据文件：`learn_guards.py
   add/from-text/remove` 写 `scripts/user_guards.json`（你自学的术语守卫，
-  经瞬时 `.tmp` 原子替换落盘）。除此之外无任何写入。
+  经瞬时 `.tmp` 原子替换落盘）；`--batch` 运行在**批量目录自身**写
+  `.pr_batch_state.json`（v3.7.0 断点续传进度：每文件一条记录，
+  经瞬时 `.tmp` 原子替换落盘；`--resume` 读取它，删掉即从头重建）。除此之外无任何写入。
 - **零网络访问**——无 HTTP 请求、无下载、无任何 API 密钥。
 - **零第三方依赖**——仅 Python 标准库。
 - **不读任何环境变量**；不创建子进程；不创建定时任务；唯一会写的临时文件
-  是上述 `user_guards.json` 原子替换用的瞬时 `.tmp`。
+  是上述 `user_guards.json` 与 `.pr_batch_state.json` 原子替换各用的瞬时 `.tmp`。
 - 测试语料与开发笔记仅存在于开发仓库，不随发布包分发。

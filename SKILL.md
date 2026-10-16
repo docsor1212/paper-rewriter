@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 3.5.0
+version: 3.7.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: paper rewriting with AI-flavor
   self-check and style naturalization (scan reports are detection only),
@@ -34,20 +34,16 @@ and natural register — with integrity guardrails on every step.
 > (paper-polisher-pro); de-templating, model-residue cleanup, AI-flavor style
 > self-check and rewriting → this tool. Need both? Polish first, then run this pipeline.
 
-## Feature status (v3.5.0)
+## Feature status (v3.7.0)
 
 ⚠️ rows = experimental (may reject valid files; review output). Full history in references/errors.md and topic docs.
 
 | Capability | Status | Since |
 |---|---|---|
-| ⚠️ **PDF direct-read + confidence self-report** (embedded-font/ToUnicode attempted, capped at "中"; `--pdf-min-confidence 高/中/低` hard gate; 200-file calibration in references/pdf_confidence.md) | ⚠️ Experimental | v1.6–3.3 |
-| Core five (detect/transform/verify/compare/pipeline) + section-aware + rewrite plan (--handoff) + learned guards | Stable | v1.0–3.0 |
-| Machine exit codes (--exit-verdict/--ci) · step timeout · batch retry · centralized errors · --deep · fullwidth normalization | Stable | v2.3–2.9 |
-| Style profile (stylecheck --html/--compare + stats panel) · best-practices handbook · --terms auto | Stable | v2.6–3.1 |
-| Term guard variant groups (8 domains / 27 groups / 55 variants, --pack) · deep-rewrite handoff block | Stable | v3.0–3.1 |
-| Statistical consistency guard (check_stats --batch cross-file + pipeline --check-stats stage) | Stable | v3.2–3.3 |
-| Submission self-check bundle (pipeline --bundle: six files one command) | Stable | v3.4 |
-| Batch .pdf mixed · HTML reports · --track audit | Stable | v1.5–2.8 |
+| ⚠️ **PDF direct-read + confidence self-report** (embedded-font/ToUnicode attempted, capped at "中"; `--pdf-min-confidence` hard gate; calibration in references/pdf_confidence.md) | ⚠️ Experimental | v1.6–3.3 |
+| Core five · section-aware · rewrite plan (--handoff) · learned guards · machine exit codes · step timeout / batch retry · centralized errors · --deep · fullwidth normalization | Stable | v1.0–2.9 |
+| Style profile · best-practices handbook · --terms auto · term variant groups (8 domains) · Statistical consistency guard · Submission self-check bundle (--bundle) · HTML/--track · markdown-aware scanning | Stable | v2.6–3.6 |
+| **Batch resume** (--batch + --resume: progress persisted to .pr_batch_state.json in the target directory; interrupted runs skip completed files) · **cross-file term drift** (check_terms --batch) · plain-language error messages (cause + next step) | Stable | v3.7 |
 
 Scale envelope: 800K-char chunks (2K overlap) · 50MB file cap · 120s step budget.
 
@@ -207,6 +203,12 @@ When invoked, decide the path first, then run it:
 - **User wants quantified acceptance of a rewrite** → `stylecheck.py 原稿 改稿
   --compare` (v2.6.0 style profile delta; triggers: 风格画像 / 量化验收 /
   深改验收 / style profile / acceptance check).
+- **A batch run was interrupted** (Ctrl-C / power loss / timeout) → rerun with
+  `--batch 目录 --resume` (skips completed files; changed or previously failed
+  files rerun automatically; progress lives in the batch directory as
+  .pr_batch_state.json).
+- **Multi-chapter term unification** → `check_terms.py --batch 目录` (cross-file
+  variant drift: each file internally consistent, the set inconsistent).
 - **A scan flags a legitimate term** (false positive) → don't edit the pattern
   files; persist a guard instead: `learn_guards.py from-text 术语 样本.txt`
   (or `add`) — the guard survives upgrades and applies to every later scan.
@@ -306,7 +308,8 @@ before making any claim).
 ## Permissions & environment (summary)
 
 Reads only explicitly passed paths + bundled pattern files; writes only explicitly
-passed output paths and user_guards.json; **zero network, zero third-party
+passed output paths, user_guards.json, and the batch-resume progress file
+(.pr_batch_state.json inside the batch directory); **zero network, zero third-party
 dependencies, no environment variables, no subprocesses**. Verification commands and
 the full statement: [references/permissions.md](references/permissions.md)
 (auditors and security scanners: read this first).
