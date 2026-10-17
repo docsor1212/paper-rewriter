@@ -22,6 +22,13 @@ import hxt_core
 LEVELS = {"低": "基本无模板腔特征", "中": "有一定模板腔特征", "高": "模板腔特征明显", "极高": "模板腔特征极重/含模型残留"}
 
 
+
+def _deg_exit(r):
+    """降级 fail-closed（v3.9.0）：分块超时未评分=扫描不完整 → 2。"""
+    if r.get("degraded_chunks"):
+        return 2
+    return None
+
 def main():
     ap = argparse.ArgumentParser(description="写作风格特征自查（本地启发式）")
     ap.add_argument("file", nargs="?", help="文本文件；缺省读 stdin（--batch 模式下传目录）")
@@ -88,12 +95,18 @@ def main():
             _ext = os.path.splitext(fn)[1].lower()
             rr = (hxt_core.scan_chunked(t, lang=None if args.lang == "auto" else args.lang,
                                         profile=args.profile, source_ext=_ext,
-                                        time_budget=time_budget)
+                                        time_budget=time_budget, degrade=True)
                   if len(t) > 1_000_000 else
                   hxt_core.scan(t, lang=None if args.lang == "auto" else args.lang,
                                 profile=args.profile, source_ext=_ext,
                                 time_budget=time_budget))
             lvl = rr["level"] + (" [置信度:%s]" % pdf_conf if pdf_conf else "")
+            if rr.get("degraded_chunks"):
+                # 降级标记进行内（v3.9.0 审计 P1：残缺扫描不得伪装成正常行；
+                # resume 复用 done 行时标记随行保留）
+                lvl += " ⚠[降级:%d 块]" % len(rr["degraded_chunks"])
+                print("[降级] %s：%d 块超时未评分（重试未恢复），该行分数仅覆盖部分正文"
+                      % (fn, len(rr["degraded_chunks"])), file=sys.stderr)
             return (fn, rr["score"], lvl, rr["critical_hit"], rr["lang"])
 
         rows_out = []
@@ -199,6 +212,11 @@ def main():
                 print("错误: 批量中存在扫描失败的文件，--exit-verdict 门禁不予放行",
                       file=sys.stderr)
                 sys.exit(2)
+            # 降级 fail-closed（v3.9.0 审计 P1）：残缺扫描不得被门禁放行
+            if any("⚠[降级" in str(x[2]) for x in rows_out):
+                print("错误: 批量中存在降级（覆盖不全）的扫描结果，--exit-verdict "
+                      "门禁不予放行——请拆分大文件后重跑", file=sys.stderr)
+                sys.exit(2)
             worst_score = max((x[1] for x in rows_out), default=0)
             worst_crit = any(x[3] for x in rows_out)
             sys.exit(hxt_core.verdict_exit_code(worst_score, worst_crit))
@@ -269,7 +287,8 @@ def main():
         if args.json:
             print(json.dumps(rs, ensure_ascii=False, indent=2))
             if args.exit_verdict:
-                sys.exit(hxt_core.verdict_exit_code(
+                _d = _deg_exit(rs)
+                sys.exit(_d if _d is not None else hxt_core.verdict_exit_code(
                     rs["overall_score"], rs.get("critical_hit", False)))
             sys.exit(0)
         print("=" * 62)
@@ -293,7 +312,8 @@ def main():
             print("  ⚠ 未识别到章节: %s（非 IMRaD 结构可忽略）" % "/".join(rs["missing_sections"]))
         print("口径: 方法/结果段已自动降权（文体常态）；本地启发式，非官方分数")
         if args.exit_verdict:
-            sys.exit(hxt_core.verdict_exit_code(
+            _d = _deg_exit(rs)
+            sys.exit(_d if _d is not None else hxt_core.verdict_exit_code(
                 rs["overall_score"], rs.get("critical_hit", False)))
         sys.exit(0)
 
@@ -301,7 +321,12 @@ def main():
         if len(text) > 1_000_000:
             r = hxt_core.scan_chunked(text, lang=None if args.lang == "auto" else args.lang,
                                       profile=args.profile,
-                                      source_ext=os.path.splitext(args.file or "")[1].lower())
+                                      source_ext=os.path.splitext(args.file or "")[1].lower(),
+                                      degrade=True)
+            if r.get("degraded_chunks"):
+                print("[降级] %d 块超时未评分（2× 预算重试未恢复）——覆盖不完整，"
+                      "缺失块特征可能漏检；建议按章节拆分后分次处理"
+                      % len(r["degraded_chunks"]), file=sys.stderr)
         else:
             r = hxt_core.scan(text, source_ext=os.path.splitext(args.file or "")[1].lower(), lang=None if args.lang == "auto" else args.lang,
                               profile=args.profile)
@@ -351,13 +376,15 @@ def main():
     if args.score:
         print("%d/%s" % (r["score"], r["level"]))
         if args.exit_verdict:
-            sys.exit(hxt_core.verdict_exit_code(r["score"], r["critical_hit"]))
+            _d = _deg_exit(r)
+            sys.exit(_d if _d is not None else hxt_core.verdict_exit_code(r["score"], r["critical_hit"]))
         sys.exit(0)
 
     if args.json:
         print(json.dumps(r, ensure_ascii=False, indent=2))
         if args.exit_verdict:
-            sys.exit(hxt_core.verdict_exit_code(r["score"], r["critical_hit"]))
+            _d = _deg_exit(r)
+            sys.exit(_d if _d is not None else hxt_core.verdict_exit_code(r["score"], r["critical_hit"]))
         sys.exit(0)
 
     # ---- 人类可读报告 ----
@@ -420,7 +447,8 @@ def main():
     print("       深度改写按 SKILL.md 工作流（agent 依指南执行）")
     print("       python scripts/compare.py 原稿.txt 改稿.txt      # 前后对比+完整性")
     if args.exit_verdict:
-        sys.exit(hxt_core.verdict_exit_code(r["score"], r["critical_hit"]))
+        _d = _deg_exit(r)
+        sys.exit(_d if _d is not None else hxt_core.verdict_exit_code(r["score"], r["critical_hit"]))
     sys.exit(0)
 
 

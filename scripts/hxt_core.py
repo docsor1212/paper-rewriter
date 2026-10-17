@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "3.8.0"
+__version__ = "3.9.0"
 
 import json
 import os
@@ -277,8 +277,15 @@ def _merge_cat_counts(r, merged, weighted, sign=1):
 
 
 def scan_chunked(text, lang=None, profile="academic", source_ext="",
-                 max_chars=800_000, overlap=2000, time_budget=None):
+                 max_chars=800_000, overlap=2000, time_budget=None, degrade=False):
     """分块扫描（v2.2.0 重叠缝合口径）：各块独立 scan 后合并。
+
+    degrade（v3.9.0 降级机制，评测 stability 点名「单块超时导致整体失败」）：
+    True 时单块超时先以 2× 预算重试一次，仍超时则把该块标记为降级（跳过其
+    命中、继续其余块），结果带 degraded_chunks=[{start,end,chars,retried}]，
+    不再抛异常中止整体。False 保持 v2.2-3.8 行为（单块超时=整体 ValueError）。
+    降级是「部分覆盖」而非完整扫描——调用方必须显著标注（detect/pipeline
+    的报告与 --exit-verdict 均按 fail-closed 处理）。
 
     块间 2000 字符重叠窗让跨块边界的结构信号完整进入下一块；完全落在重叠窗内
     的命中会被相邻两块各计一次，通过「对重叠窗单独扫描一次并扣减」保持总量
@@ -300,23 +307,54 @@ def scan_chunked(text, lang=None, profile="academic", source_ext="",
     weighted = {}
     all_guards = []
     all_sug = {}
+    degraded_chunks = []
+
+    def _scan_or_degrade(segment, s, e, is_overlap):
+        """单块扫描 + 降级（v3.9.0）：超时→2×预算重试一次→仍超时按 degrade
+        处置（is_overlap 的重叠窗超时按无降级扫描处理——重叠窗只影响扣减，
+        跳过它只是保守多计，不影响「继续跑完」）。返回结果 dict 或 None(降级)。"""
+        try:
+            return scan(segment, lang=lang, profile=profile,
+                        source_ext=source_ext, time_budget=time_budget)
+        except ValueError:
+            if not degrade:
+                raise
+        try:
+            return scan(segment, lang=lang, profile=profile,
+                        source_ext=source_ext, time_budget=time_budget * 2)
+        except ValueError:
+            if is_overlap:
+                return None
+            degraded_chunks.append({"start": s, "end": e, "chars": e - s,
+                                    "retried": True})
+            return None
+
     for s, e, ov in spans:
         # 带重叠头扫描（v2.2.0 缝合核心）：块 i>0 从重叠窗起点开始，
         # 跨块骑缝信号在块内完整重现；随后对重叠窗 [ov:s] 单独扫描一次并扣减，
         # 抵消重叠区被相邻两块各计一次的重复量（公式：合并 = Σ(带重叠块) − Σ重叠窗）。
-        r = scan(text[ov if ov is not None else s:e], lang=lang,
-                 profile=profile, source_ext=source_ext, time_budget=time_budget)
-        total_units += r["units"]
-        _merge_cat_counts(r, merged, weighted, sign=1)
-        for g in r["guards_applied"]:
-            all_guards.append(g)
-        for su in r["suggestions"]:
-            all_sug[su["from"]] = su
-        if ov is not None:
-            ro = scan(text[ov:s], lang=lang, profile=profile, source_ext=source_ext,
-                      time_budget=time_budget)
-            total_units = max(0.0, total_units - ro["units"])
-            _merge_cat_counts(ro, merged, weighted, sign=-1)
+        r = _scan_or_degrade(text[ov if ov is not None else s:e], s, e, is_overlap=False)
+        if r is not None:
+            total_units += r["units"]
+            _merge_cat_counts(r, merged, weighted, sign=1)
+            for g in r["guards_applied"]:
+                all_guards.append(g)
+            for su in r["suggestions"]:
+                all_sug[su["from"]] = su
+        # 重叠窗扣减仅在本块扫描成功时执行（v3.9.0 审计 P1）：块降级时其窗内
+        # 特征从未被加过，再扣减会把上一块贡献的窗内特征静默清零（非保守漏检）
+        if r is not None and ov is not None:
+            ro = _scan_or_degrade(text[ov:s], s, e, is_overlap=True)
+            if ro is not None:
+                total_units = max(0.0, total_units - ro["units"])
+                _merge_cat_counts(ro, merged, weighted, sign=-1)
+    if degraded_chunks and len(degraded_chunks) == len(spans):
+        # 全部分块超时（含 2× 重试）——没有可报告的内容，部分覆盖的降级语义
+        # 不成立，响亮失败（fail-closed）比输出空报告诚实
+        raise ValueError(
+            "全部分块扫描超时（预算 %.0f 秒，已自动以 2× 预算重试仍未恢复）——"
+            "文件可能过大或内容病态，请按章节拆分后分节处理，或调大 --step-timeout"
+            % time_budget)
     pts = sum(weighted.values())
     critical = any(k.startswith(("model_artifact", "chatbot", "cutoff")) and c["count"]
                    for k, c in merged.items())
@@ -325,6 +363,12 @@ def scan_chunked(text, lang=None, profile="academic", source_ext="",
     stats["notes"].append(
         "超大文本已自动分块（%d 块，块间 2000 字符重叠缝合）——跨块边界信号已缝合，"
         "恰骑重叠窗两端的极端信号仍可能少量偏差" % len(spans))
+    if degraded_chunks:
+        missed = sum(c["chars"] for c in degraded_chunks)
+        cov = 100.0 * (1.0 - missed / max(1, len(text)))
+        stats["notes"].append(
+            "⚠ 降级：%d 块超时未评分（重试未恢复），本报告实际覆盖约 %.0f%% 正文——"
+            "缺失块内特征可能漏检，勿当完整报告使用" % (len(degraded_chunks), cov))
     score, level, _ = _score(pts, stats, total_units, merged, lang or "zh")
     return {
         "lang_detected": lang or "zh",
@@ -340,6 +384,7 @@ def scan_chunked(text, lang=None, profile="academic", source_ext="",
         "stats": stats,
         "suggestions": list(all_sug.values())[:12],
         "chunked": len(spans),
+        "degraded_chunks": degraded_chunks,
         "honest_note": "本地启发式风格特征评分，非任何官方检测分数",
     }
 

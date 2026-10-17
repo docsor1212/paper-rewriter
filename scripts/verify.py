@@ -243,6 +243,73 @@ def load_terms(path):
         sys.exit(2)
 
 
+# v3.9.0 处方化输出（评测 usability 点名「频繁 exit 1 需要人工判断」）：
+# 每类违规附「怎么修」处方，数字丢失类附原句上下文——修什么、怎么修一次说清。
+_REMEDY = {
+    "numbers": "把上述原句里的数字/统计量原样恢复进改稿对应位置（学术红线，不可放宽口径绕过）",
+    "fullwidth": "把改稿中的全角数字/字母（２０２５ 类）改回半角后重跑",
+    "comparison": "比较方向被反转（如 P<0.05→P>0.05）——恢复原文方向，并核对两臂顺序",
+    "doi": "恢复被删/改的 DOI（逐字符核对，含连字符与大小写）",
+    "pmid": "恢复被删/改的 PMID（纯数字编号）",
+    "latin_abbr": "恢复被中文化或删除的缩写（首次出现处保留「全称（缩写）」格式）",
+    "terms": "恢复术语表中被替换的术语；确认非术语再从术语表移除（勿改守卫）",
+    "cjk_ratio": "疑似整段被删或被译——对照原稿恢复缺失段落",
+    "length": "内容被整段删除——核对删减是否有意，恢复非有意删除的部分",
+    "sentences_added": "逐句核对新增内容：删除无原文依据的新增句（编造防线）",
+    "numbers_added": "删除凭空新增的数字，或补注来源",
+    "number_context": "数字上下文/顺序变化——人工核对两臂与方向后恢复",
+    "years": "核对年份引用是否被误删，恢复",
+}
+_REMEDY_WARN = {
+    "sentences_added": "逐句核对新增句：删除无原文依据的新增句",
+    "numbers_added": "删除凭空新增的数字，或补注来源",
+    "number_context": "人工核对两臂/方向",
+    "years": "核对年份引用是否被误删",
+}
+
+
+def _context_sentences(orig, numbers, limit=2, width=60):
+    """数字丢失处方（v3.9.0）：在原稿里定位含丢失数字的句子，给修复锚点。
+
+    切句保护（v3.9.0 评审 P1）：英文句点仅在后随空白时才视为句界——
+    小数（0.003）与缩写点（e.g./Dr.）不再把句子切碎；数字匹配带
+    前后界（找 5 不得命中 15/0.5），防子串误锚。"""
+    import re as _re
+    out, seen = [], set()
+    sents = _re.split(r"(?<=[。！？!?])|(?<=\.)\s+|\n", orig)
+    for num in numbers[:3]:
+        pat = _re.compile(r"(?<![\d.])%s(?![\d])" % _re.escape(num))
+        for sent in sents:
+            s = sent.strip()
+            if s and s not in seen and pat.search(s):
+                seen.add(s)
+                out.append(s[:width] + ("…" if len(s) > width else ""))
+                break
+        if len(out) >= limit:
+            break
+    return out
+
+
+def build_remedies(orig, r):
+    """处方清单（v3.9.0）：违规→[{check, remedy, context}]；JSON 报告同款字段。"""
+    import re as _re
+    remedies = []
+    for v in r["violations"]:
+        item = {"check": v["check"],
+                "remedy": _REMEDY.get(v["check"], "对照原稿恢复被动过的内容")}
+        if v["check"] == "numbers":
+            nums = _re.findall(r"\d+(?:\.\d+)?", v.get("detail", ""))
+            ctx = _context_sentences(orig, nums)
+            if ctx:
+                item["context"] = ctx
+        remedies.append(item)
+    for w in r["warnings"]:
+        remedies.append({"check": w["check"],
+                         "remedy": _REMEDY_WARN.get(w["check"], "按告警说明人工核对"),
+                         "warning": True})
+    return remedies
+
+
 def main():
     ap = argparse.ArgumentParser(description="完整性守卫（改写不得动数据/引用/术语）")
     ap.add_argument("orig", help="原稿")
@@ -260,8 +327,10 @@ def main():
         sys.exit(2)
     terms = load_terms(args.terms) if args.terms else None
     r = verify(orig, new, terms, args.max_length_change, args.max_cjk_shift)
+    remedies = build_remedies(orig, r)
 
     if args.json:
+        r["remedies"] = remedies
         print(json.dumps(r, ensure_ascii=False, indent=2))
     else:
         print("=" * 62)
@@ -272,11 +341,21 @@ def main():
                  r["stats"]["length_delta_pct"], r["stats"]["cjk_shift"]))
         for v in r["violations"]:
             print("  ✗ [%s] %s" % (v["check"], v["detail"]))
+            rem = next((x for x in remedies if x["check"] == v["check"]
+                        and not x.get("warning")), None)
+            if rem:
+                for ctx in rem.get("context", [])[:2]:
+                    print("      原句锚点: %s" % ctx)
+                print("      怎么修: %s" % rem["remedy"])
         for w in r["warnings"]:
             print("  ⚠ [%s] %s" % (w["check"], w["detail"]))
         if r["ok"] and not r["warnings"]:
             print("  数字/DOI/PMID/缩写/术语 全部保全。")
         print("判定: %s" % ("通过" if r["ok"] else "未通过——请修复改稿后重跑"))
+        if not r["ok"]:
+            print("修复三步: ①按上方「怎么修」逐条恢复改稿（术语误伤用 learn_guards.py "
+                  "固化豁免，不要绕守卫）")
+            print("          ②重跑本命令至 PASS ③交付前建议再跑 compare.py 留档")
     sys.exit(0 if r["ok"] else 1)
 
 

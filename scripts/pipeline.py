@@ -332,7 +332,12 @@ def main():
                 print("错误: 无法写入 %s（%s）" % (args.output, e), file=sys.stderr)
                 sys.exit(2)
 
-    scan_fn = hxt_core.scan_chunked if max(len(orig), len(new)) > 1_000_000 else hxt_core.scan
+    if max(len(orig), len(new)) > 1_000_000:
+        def scan_fn(txt, **kw):
+            # v3.9.0 降级机制：单块超时→2×重试→标记降级继续（degraded_chunks 透出）
+            return hxt_core.scan_chunked(txt, degrade=True, **kw)
+    else:
+        scan_fn = hxt_core.scan
     # markdown 感知（v3.6.0）：风格扫描基于剥离结构后的正文；清理与 verify 仍用原文
     # （双口径：风格看散文，守卫看全文档）；--raw-markdown 保留原样
     _is_md = (args.file or "").lower().endswith((".md", ".markdown"))
@@ -349,6 +354,11 @@ def main():
         print("错误: %s" % e, file=sys.stderr)
         sys.exit(2)
     scan_s = time.monotonic() - t_scan
+    _deg = (ro.get("degraded_chunks") or []) + (rn.get("degraded_chunks") or [])
+    for _d in _deg:
+        print("[降级] 分块 %d–%d 字符超时未评分（2× 预算重试未恢复）——报告覆盖不全，"
+              "缺失块特征可能漏检；建议按章节拆分后分次处理" % (_d["start"], _d["end"]),
+              file=sys.stderr)
     t_ver = time.monotonic()
     vr = vf.verify(orig, new, terms, args.max_length_change,
                    expected_new=(deep_changed if args.deep else None))
@@ -390,11 +400,19 @@ def main():
         "after": {"score": rn["score"], "level": rn["level"], "critical": rn["critical_hit"]},
         "verify": vr,
         "agent_brief": brief,
-        "exit_verdict": hxt_core.verdict_exit_code(rn["score"], rn["critical_hit"],
-                                                   verify_ok=vr["ok"]),
+        # 降级 fail-closed（v3.9.0）：分块超时未评分=扫描不完整，CI 门禁不放行
+        "exit_verdict": (2 if ((ro.get("degraded_chunks") or [])
+                               + (rn.get("degraded_chunks") or []))
+                         else hxt_core.verdict_exit_code(rn["score"], rn["critical_hit"],
+                                                         verify_ok=vr["ok"])),
         "hints": hxt_core.build_hints(new, rn, profile=profile),
         "terms_note": terms_note,
         "md_struct": _md_struct,
+        # 降级信息（v3.9.0 审计 P0：赋值必须在 report 字面量之后，否则
+        # 部分降级场景 UnboundLocalError 崩溃——降级以崩溃形式复活）
+        **({"degraded": {"chunks": _deg,
+                         "note": "部分分块超时未评分（已重试）；覆盖不完整，"
+                                 "勿当完整报告使用"}} if _deg else {}),
         "stats_consistency": (
             {"total": len(stats_issues), "issues": stats_issues,
              "note": "内部一致性启发式，非统计审查；以原始数据为准"}
@@ -554,12 +572,22 @@ def main():
         print("=" * 62)
         print("一键管线报告（%s）" % mode)
         print("=" * 62)
+        if _deg:
+            print("⚠ 降级：%d 块超时未评分（已重试）——覆盖不完整，勿当完整报告使用"
+                  % len(_deg))
         print("风格特征分: %d [%s] → %d [%s]%s" % (
             ro["score"], ro["level"], rn["score"], rn["level"],
             "  ⚠ 仍含模型残留" if rn["critical_hit"] else ""))
         print("完整性守卫: %s" % ("PASS ✓" if vr["ok"] else "FAIL ✗"))
+        _remedies = vf.build_remedies(orig, vr)
         for v in vr["violations"]:
             print("  ✗ [%s] %s" % (v["check"], v["detail"]))
+            rem = next((x for x in _remedies if x["check"] == v["check"]
+                        and not x.get("warning")), None)
+            if rem:
+                for ctx in rem.get("context", [])[:1]:
+                    print("      原句锚点: %s" % ctx)
+                print("      怎么修: %s" % rem["remedy"])
         for w in vr["warnings"]:
             print("  ⚠ [%s] %s" % (w["check"], w["detail"]))
         print("深改任务简报:")

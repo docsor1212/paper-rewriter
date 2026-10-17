@@ -101,6 +101,8 @@ max_cjk_shift=0.12) -> {"ok": bool, "violations": [...], "warnings": [...], "sta
 | `check_stats.py --batch 目录`（v3.3.0） | 跨文件批量：逐文件三类检查+跨文件 group_n 聚合（只核 n= 记法；时点前缀加宽剥离，并组候选标 timepoint_merged 不计退出码）；--json 含 files/cross_file |
 | `detect.py / pipeline.py --batch 目录 --resume`（v3.7.0） | 批量断点续传：进度每文件原子落 `<目录>/.pr_batch_state.json`；`hxt_core.batch_resume_prepare(root, resume, kind, row_len)` / `batch_state_store(state, root, fn, fp, status, row, kind)` 公共件（kind 分区制，detect/pipeline 各认各的分区；指纹=[size, mtime_ns]） |
 | `check_terms.py --batch 目录`（v3.7.0） | 跨文件变体漂移：逐文件组内不一致 + 跨文件「主导变体」漂移检出（各文件各自一致、合起来不一致）；--json 结构 {files, load_errors, per_file, cross_file_drift, total} 恒 exit 0；全文件读取失败 exit 2、部分失败且零发现 exit 1（防假 clean） |
+| `hxt_core.scan_chunked(..., degrade=True)`（v3.9.0） | 分块降级：单块超时→2× 重试→标记 degraded_chunks=[{start,end,chars,retried}] 继续；全块失败抛 ValueError；结果 stats.notes 带覆盖率注记。≤max_chars 单块文本直接 scan，degrade 不生效（CLI 不可达，仅 API 直调注意） |
+| `verify.build_remedies(orig, r)`（v3.9.0） | 处方清单：每类违规→{check, remedy, context[原句锚点], warning}；verify JSON 报告带 remedies 字段 |
 | `plan.build_queue(text, lang, profile, source_ext, top)`（v3.8.0） | 逐句风险排序核心（plan 主流程抽取版）：返回 (top_rows, sections, full)，供 pipeline --handoff 复用；超 MAX_PLAN_CHARS 抛 ValueError |
 | `pipeline --handoff 文件`（v3.8.0） | 随管线产出深改交接块：build_queue(orig) + build_handoff 写盘；JSON 模式提示走 stderr 不污染 stdout |
 | `hxt_core.PdfGateRejected` / `pdf_gate_error`（v3.7.0/v3.8.0） | PDF 置信度门闸统一报错（ValueError）：4 处 CLI 调用点共用一处人话化文案（原因+已拒收+三条出路；「低于门闸」短语为测试锚） |

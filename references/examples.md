@@ -365,6 +365,27 @@ python scripts/pipeline.py draft.txt -o out.txt --bundle 自查材料
 #   04_统计一致性.md 05_术语一致性.md 06_完整性判定.json README.txt
 ```
 
+### verify FAIL 的处方化输出（v3.9.0）
+
+```bash
+python scripts/verify.py 原稿.txt 改稿.txt
+#   ✗ [numbers] 数字丢失/被改: 120, 24
+#       原句锚点: 研究纳入 120 例患者，随访 24 个月。
+#       怎么修: 把上述原句里的数字/统计量原样恢复进改稿对应位置（学术红线，不可放宽口径绕过）
+#   判定: 未通过——请修复改稿后重跑
+#   修复三步: ①按「怎么修」逐条恢复（术语误伤用 learn_guards.py 固化豁免）
+#             ②重跑至 PASS ③交付前再跑 compare.py 留档
+# --json 时报告带 remedies 字段（agent/CI 可程序化消费）
+
+### 分块扫描降级（v3.9.0）
+
+```bash
+python scripts/detect.py 超大文本.txt
+# stderr: [降级] 1 块超时未评分（2× 预算重试未恢复），该行分数仅覆盖部分正文（detect）
+#         [降级] 分块 800000–1600000 字符超时未评分…（pipeline）；行内带 ⚠[降级:N 块] 标记
+# JSON: degraded_chunks:[{start,end,chars,retried}]；--exit-verdict 对降级 exit 2
+```
+
 ### 一句命令出深改指令单（v3.8.0 pipeline --handoff）
 
 ```bash

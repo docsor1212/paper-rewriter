@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 3.8.0
+version: 3.9.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: paper rewriting with AI-flavor
   self-check and style naturalization (scan reports are detection only),
@@ -34,7 +34,7 @@ and natural register — with integrity guardrails on every step.
 > (paper-polisher-pro); de-templating, model-residue cleanup, AI-flavor style
 > self-check and rewriting → this tool. Need both? Polish first, then run this pipeline.
 
-## Feature status (v3.8.0)
+## Feature status (v3.9.0)
 
 ⚠️ rows = experimental (may reject valid files; review output). Full history in references/errors.md and topic docs.
 
@@ -45,12 +45,12 @@ and natural register — with integrity guardrails on every step.
 | Style profile · best-practices handbook · --terms auto · term variant groups (8 domains) · Statistical consistency guard · Submission self-check bundle (--bundle) · HTML/--track · markdown-aware scanning | Stable | v2.6–3.6 |
 | Batch resume (--batch + --resume) · cross-file term drift (check_terms --batch) · plain-language error messages | Stable | v3.7 |
 | **PDF default safe gate = 中 + batch circuit-breaker** (≥3 rejected PDFs in one batch → batch-level warning pointing at source quality) · **pipeline --handoff** (one command emits cleanup + guard + per-sentence deep-rewrite instruction sheet) · trigger conditions consolidated into this document | Stable | v3.8 |
+| **Chunk-scan degradation** (single-chunk timeout → retry at 2× budget → mark degraded and continue, coverage note in report; all-chunks-fail fails loudly; --exit-verdict treats incomplete scans as failure) · **verify prescription output** (per-violation "how to fix" + original-sentence anchors for lost numbers + three-step repair; JSON carries a remedies field) | Stable | v3.9 |
 
 Scale envelope: 800K-char chunks (2K overlap) · 50MB file cap · 120s step budget.
 
-Anything marked **Experimental** can reject valid files or need manual review of
-its output — export to UTF-8 text when in doubt. Everything else is
-regression-tested offline on every release.
+Anything marked **Experimental** can reject valid files or need manual review —
+export to UTF-8 text when in doubt; everything else is regression-tested offline.
 
 ## Integrity guardrails — read first
 
@@ -78,7 +78,7 @@ regression-tested offline on every release.
 | Style self-check | heuristic report: boilerplate density, rhythm uniformity, officialese; section-aware | not an AI detector — barely triggers on fluent model text (low score ≠ no AI) | `detect.py`; see [honest_boundaries](references/honest_boundaries.md) |
 | Mechanical cleanup | model residue (oaicite/[cite:]), chat filler, punctuation normalization, fullwidth digits | no sentence rewriting — zero-information-loss layer only | `transform.py` (`--deep` for sentence-level) |
 | Quality deep rewrite | de-templating / rhythm / concreteness / stance (seven steps) | never invents data; invented numbers flagged (W_NUM_ADDED, human removes) | **you (the agent)** per style guide; handoff via `plan --handoff` |
-| Integrity guard | numbers/DOIs/PMIDs/years/terms must survive; tampering = exit 1 | no truth judgment — original data is the authority | `verify.py` |
+| Integrity guard | numbers/DOIs/PMIDs/years/terms must survive; tampering = exit 1 (FAIL output prescribes fixes with anchors) | no truth judgment — original data is the authority | `verify.py` |
 | Before/after | score delta + integrity verdict + profile diff | no substitute for human reading | `compare.py` / `stylecheck --compare` |
 | Term consistency | 8-domain 27 groups (HF/心力衰竭/心衰 one row) | no usage correctness — synonym unification only | `check_terms.py --pack` |
 | Numeric consistency | percent-list sums (partition-cued) / cross-file group-n / p-vs-P style | not a statistics review — original data is the authority | `check_stats.py` (`--batch`) |
@@ -153,7 +153,7 @@ letters, batch, CI gates, false-positive handling, CN punctuation):
 `references/best_practices.md`.
 Worked end-to-end examples: `references/examples.md`. Unified exit codes,
 violation categories and remedies: `references/errors.md`. **Centralized
-common-mistakes list (24 items): `references/pitfalls.md`** — read it before
+common-mistakes list (27 items): `references/pitfalls.md`** — read it before
 your first real run. Python API reference: `references/api.md`. FAQ:
 `references/faq.md`.
 
