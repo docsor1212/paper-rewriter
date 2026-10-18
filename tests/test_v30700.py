@@ -130,12 +130,20 @@ def test_error_humanize():
         blob = r.stdout + r.stderr
         check("humanize.二进制文案", "疑似二进制或损坏文件" in blob and ".docx" in blob, blob[:160])
         check("humanize.二进制不带 NUL 术语", "NUL" not in blob)
-        # GBK 乱码 → 新文案
+        # GBK → v4.0.0 编码自适应：透明转码成功（旧行为=拒收文案）
         g = os.path.join(td, "gbk.txt")
         open(g, "wb").write("患者，男，六十五岁。".encode("gbk") * 40)
         r2 = run_cli([os.path.join(SCRIPTS, "detect.py"), g])
         blob2 = r2.stdout + r2.stderr
-        check("humanize.编码文案", "不是 UTF-8 编码" in blob2 and "另存为" in blob2, blob2[:160])
+        check("humanize.GBK 转码", r2.returncode == 0
+              and "已自动转码" in blob2, blob2[:160])
+        # 彻底不可识别编码 → 拒收+可识别清单文案
+        g2 = os.path.join(td, "junk.txt")
+        open(g2, "wb").write("正常文本。".encode("utf-8") + b"\xff" * 40)
+        r2b = run_cli([os.path.join(SCRIPTS, "detect.py"), g2])
+        blob2b = r2b.stdout + r2b.stderr
+        check("humanize.不可识别文案", r2b.returncode == 2
+              and "可识别文本编码" in blob2b and "另存为" in blob2b, blob2b[:160])
         # PDF 门闸：单元断言（含 v330 测试锚「低于门闸」+ 新增人话成分）
         e = hxt_core.pdf_gate_error("低", "中", notes=["控制字符率高"])
         s = str(e)
@@ -200,9 +208,9 @@ def test_docs_wiring():
     idx = open(os.path.join(ROOT, "references", "INDEX.md"), encoding="utf-8").read()
     # 版本锚用正则（v3.8.0 机制化：版本前缀随 bump 漂移，行内容才是稳定契约）
     import re as _re
-    check("docs.SKILL_ZH 功能状态行", bool(_re.search(r"功能状态（v3\.\d+\.\d+）", zh))
+    check("docs.SKILL_ZH 功能状态行", bool(_re.search(r"功能状态（v\d+\.\d+\.\d+）", zh))
           and "批量断点续传" in zh and "跨文件术语漂移" in zh)
-    check("docs.SKILL_EN 功能状态行", bool(_re.search(r"Feature status \(v3\.\d+\.\d+\)", en))
+    check("docs.SKILL_EN 功能状态行", bool(_re.search(r"Feature status \(v\d+\.\d+\.\d+\)", en))
           and "Batch resume" in en and "cross-file term drift" in en)
     check("docs.permissions 写点核对", ".pr_batch_state.json" in perm
           and "--resume" in perm and "原子替换" in perm)

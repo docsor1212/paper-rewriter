@@ -100,10 +100,9 @@ def test_docs():
     ex = open(os.path.join(ROOT, "references", "examples.md"), encoding="utf-8").read()
     api = open(os.path.join(ROOT, "references", "api.md"), encoding="utf-8").read()
     pits = open(os.path.join(ROOT, "references", "pitfalls.md"), encoding="utf-8").read()
-    check("docs.ZH v3.9.0 行", "功能状态（v3.9.0）" in zh
-          and "分块扫描降级" in zh and "verify 处方化输出" in zh)
-    check("docs.EN v3.9.0 行", "Feature status (v3.9.0)" in en
-          and "Chunk-scan degradation" in en and "verify prescription" in en)
+    check("docs.ZH 降级/处方行", "分块扫描降级" in zh and "verify 处方化输出" in zh)
+    check("docs.EN 降级/处方行", "Chunk-scan degradation" in en
+          and "verify prescription" in en)
     check("docs.errors 降级节", "分块扫描降级（v3.9.0）" in errs and "remedies" in errs)
     check("docs.faq Q16b", "Q16b：超大规模文件扫描超时" in faq and "degraded_chunks" in faq)
     check("docs.examples", "怎么修" in ex and "degraded_chunks" in ex)

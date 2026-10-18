@@ -146,7 +146,7 @@ def test_cli():
     # --version 跟全局版本走（泛化：3.x 均可）
     import re as _re2
     vout = run_cli([os.path.join(SCRIPTS, "check_stats.py"), "--version"]).stdout
-    check("cli.--version=全局版本", bool(_re2.search(r"3\.\d+\.\d+", vout)), vout[:60])
+    check("cli.--version=全局版本", bool(_re2.search(r"\d+\.\d+\.\d+", vout)), vout[:60])
 
 
 # ── 2/3/4. 文档与合规 ─────────────────────────────────────────
@@ -155,9 +155,9 @@ def test_docs():
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()
     import re as _re
     check("docs.EN 锚 v3.x 在位",
-          bool(_re.search(r"## Feature status \(v3\.\d+\.\d+\)", en)))
+          bool(_re.search(r"## Feature status \(v\d+\.\d+\.\d+\)", en)))
     check("docs.ZH 锚 v3.x 在位",
-          bool(_re.search(r"功能状态（v3\.\d+\.\d+）", zh)))
+          bool(_re.search(r"功能状态（v\d+\.\d+\.\d+）", zh)))
     check("docs.ZH 状态行 check_stats", "统计一致性守卫" in zh and "check_stats" in zh)
     check("docs.ZH 能力行+话术行（合并表更名统计一致性）",
           "统计一致性" in zh and "查查数字有没有前后打架" in zh)

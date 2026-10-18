@@ -102,6 +102,8 @@ max_cjk_shift=0.12) -> {"ok": bool, "violations": [...], "warnings": [...], "sta
 | `detect.py / pipeline.py --batch 目录 --resume`（v3.7.0） | 批量断点续传：进度每文件原子落 `<目录>/.pr_batch_state.json`；`hxt_core.batch_resume_prepare(root, resume, kind, row_len)` / `batch_state_store(state, root, fn, fp, status, row, kind)` 公共件（kind 分区制，detect/pipeline 各认各的分区；指纹=[size, mtime_ns]） |
 | `check_terms.py --batch 目录`（v3.7.0） | 跨文件变体漂移：逐文件组内不一致 + 跨文件「主导变体」漂移检出（各文件各自一致、合起来不一致）；--json 结构 {files, load_errors, per_file, cross_file_drift, total} 恒 exit 0；全文件读取失败 exit 2、部分失败且零发现 exit 1（防假 clean） |
 | `hxt_core.scan_chunked(..., degrade=True)`（v3.9.0） | 分块降级：单块超时→2× 重试→标记 degraded_chunks=[{start,end,chars,retried}] 继续；全块失败抛 ValueError；结果 stats.notes 带覆盖率注记。≤max_chars 单块文本直接 scan，degrade 不生效（CLI 不可达，仅 API 直调注意） |
+| `hxt_core.read_text` 编码自适应（v4.0.0） | UTF-16 BOM / GB18030 自动转码+stderr 标注；`read_text_ex` meta 带 encoding 字段；`_transcode_sane` 卫生检查（控制字符率）|
+| `hxt_core.batch_state_store` 并发锁（v4.0.0） | flock（.pr_batch_state.json.lock）内重读-合并-落盘；双进程同目录进度互不覆盖；Windows 无 fcntl 退化为无锁 |
 | `verify.build_remedies(orig, r)`（v3.9.0） | 处方清单：每类违规→{check, remedy, context[原句锚点], warning}；verify JSON 报告带 remedies 字段 |
 | `plan.build_queue(text, lang, profile, source_ext, top)`（v3.8.0） | 逐句风险排序核心（plan 主流程抽取版）：返回 (top_rows, sections, full)，供 pipeline --handoff 复用；超 MAX_PLAN_CHARS 抛 ValueError |
 | `pipeline --handoff 文件`（v3.8.0） | 随管线产出深改交接块：build_queue(orig) + build_handoff 写盘；JSON 模式提示走 stderr 不污染 stdout |

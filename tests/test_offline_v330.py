@@ -161,8 +161,8 @@ def test_docs():
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()
     import re as _re
     check("docs.EN 锚 v3.x 在位",
-          bool(_re.search(r"## Feature status \(v3\.\d+\.\d+\)", en)))
-    m_anchor = _re.search(r"功能状态（v3\.\d+\.\d+）", zh)
+          bool(_re.search(r"## Feature status \(v\d+\.\d+\.\d+\)", en)))
+    m_anchor = _re.search(r"功能状态（v\d+\.\d+\.\d+）", zh)
     check("docs.ZH 锚 v3.x 在位", bool(m_anchor))
     if m_anchor:
         gap = abs(zh.find("规模上限") - m_anchor.start())

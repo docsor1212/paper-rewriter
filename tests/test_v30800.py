@@ -122,9 +122,9 @@ def test_docs():
     ex = open(os.path.join(ROOT, "references", "examples.md"), encoding="utf-8").read()
     api = open(os.path.join(ROOT, "references", "api.md"), encoding="utf-8").read()
     import re as _re
-    check("docs.ZH 功能状态行", bool(_re.search(r"功能状态（v3\.\d+\.\d+）", zh))
+    check("docs.ZH 功能状态行", bool(_re.search(r"功能状态（v\d+\.\d+\.\d+）", zh))
           and "缺省门=中" in zh and "批量熔断" in zh and "pipeline --handoff" in zh)
-    check("docs.EN 功能状态行", bool(_re.search(r"Feature status \(v3\.\d+\.\d+\)", en))
+    check("docs.EN 功能状态行", bool(_re.search(r"Feature status \(v\d+\.\d+\.\d+\)", en))
           and "default gate = 中" in en and "batch circuit-breaker" in en)
     check("docs.触发收拢", "场景直达" in zh and "翻译腔清理（=欧化句式" in zh
           and "translationese cleanup" in en)

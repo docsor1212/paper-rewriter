@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "3.9.0"
+__version__ = "4.0.0"
 
 import json
 import os
@@ -54,37 +54,152 @@ def _read_text_impl(path, max_mb):
         return _extract_docx(path)
     if path.lower().endswith(".pdf"):
         return _extract_pdf(path)
+    global _last_encoding
+    _last_encoding = None  # 每次读入清位（v4.0.0 评测 P2：防跨文件泄漏到下一次 read_text_ex）
     with open(path, "rb") as f:
         data = f.read()
+    # 编码自适应（v4.0.0，HXT completeness 评测点名「极端编码依赖外部工具导出」）：
+    # UTF-16 BOM 判定最前（UTF-16 的交错 NUL 是合法编码而非二进制特征）→
+    # UTF-8 严格解码 → 二进制 NUL 拒收 → GB18030（GBK/GB2312 超集）严格解码+卫生
+    # 检查——中文 Windows 记事本/旧导出的 GBK 文件直接透明转码，不再要求用户
+    # 手工「另存为 UTF-8」。转码是显式标注的（stderr 提示 + read_text_ex meta），
+    # 不做静默改写。全部失败才走旧拒收路径。
+    if data[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        try:
+            text = data.decode("utf-16")
+            if _transcode_sane(text):  # 卫生检查同款：垃圾字节解码成控制字符=拒绝
+                _note_encoding("UTF-16")
+                return text
+        except UnicodeDecodeError:
+            pass
+    try:
+        text = data.decode("utf-8-sig")
+        # NUL 是合法 UTF-8 码点——二进制判据必须作用在解码后的文本上
+        # （v4.0.0 回归修复：原字节级 `0 in data` 会把 UTF-16 误杀，挪后别把二进制放进）
+        if "\x00" in text:
+            raise ValueError(
+                "输入疑似二进制或损坏文件（无法作为可读文本打开）——常见原因：Word/网页"
+                "「另存为」时格式选错（.doc/.rtf/.mht），或文件在传输中损坏。"
+                "处置：Word 文档请直接用 .docx 输入（支持直读）；其他文件用文本编辑器"
+                "打开并另存为 UTF-8 编码的 .txt")
+        return text
+    except UnicodeDecodeError:
+        pass
     if 0 in data:
         raise ValueError(
             "输入疑似二进制或损坏文件（无法作为可读文本打开）——常见原因：Word/网页"
             "「另存为」时格式选错（.doc/.rtf/.mht），或文件在传输中损坏。"
             "处置：Word 文档请直接用 .docx 输入（支持直读）；其他文件用文本编辑器"
             "打开并另存为 UTF-8 编码的 .txt")
+    _sample = data if len(data) <= 262144 else data[8192:262144]
+    high = sum(1 for b in _sample if b >= 0x80)
+    if high >= max(1, len(_sample)) * 0.02:
+        try:
+            text = data.decode("gb18030")  # GBK/GB2312 的超集，严格解码
+        except (UnicodeDecodeError, ValueError):
+            text = None
+        if (text is not None and _transcode_sane(text)
+                and _gbk_prose_signal(text)):
+            _note_encoding("GBK/GB18030")
+            return text
     text = data.decode("utf-8-sig", errors="replace")
+    # replace 兜底里的少量 U+FFFD（v4.0.0 评测 P1-4：低密度 GBK/损坏尾部
+    # 不足以拒收，但也不该静默）——标注后放行
+    n_fffd = text.count(chr(0xFFFD))
+    if 0 < n_fffd <= max(1, len(text)) * 0.02:
+        try:
+            sys.stderr.write(
+                "[提示] 文件含 %d 处无法解码的字节（已用占位符标出）——"
+                "常见于编码混杂或尾部损坏，建议核对占位符附近内容\n" % n_fffd)
+        except Exception:
+            pass
     # 乱码守卫：非 UTF-8 文本（GBK/UTF-16 等）解码后大量 U+FFFD，
     # 「垃圾进→干净出」是对信任判断工具最坏的失败态，必须拒绝
     if text.count(chr(0xFFFD)) / max(1, len(text)) > 0.02:
         raise ValueError(
-            "输入文件不是 UTF-8 编码（解码后乱码过多，疑似 GBK/UTF-16）——"
-            "继续处理会得到成片乱码。处置：用文本编辑器打开后「另存为」UTF-8 编码"
-            "再试（Windows 记事本「另存为」对话框右下角可选编码）")
+            "输入文件不是 UTF-8/GBK/UTF-16 等可识别文本编码（解码后乱码过多）——"
+            "继续处理会得到成片乱码。处置：确认文件是纯文本（Word 请用 .docx 直读），"
+            "或用文本编辑器打开后「另存为」UTF-8 编码再试（Windows 记事本「另存为」"
+            "对话框右下角可选编码）")
     return text
+
+
+_GBK_PUNCT = "，。、；：！？「」『』（）《》\u201c\u201d\u2018\u2019"
+
+
+def _gbk_prose_signal(text):
+    """GBK 接受的行文信号（v4.0.0 审计 P1）：真实 GBK 中文几乎必含全角标点
+    （，。等）；而「损坏 UTF-8 被误读成 GB18030」的 mojibake 恰好会把标点
+    字节拆成怪 CJK——行文信号消失。无任何中文标点的 GB18030 严格解码结果
+    不接受（宁可拒收给指引，不静默产出整篇 mojibake）。"""
+    # 密度制：短文 1 个即可，长文按 1/500 递增（mojibake 实测标点数=0，
+    # 真 GBK 行文几乎必有标点；中文测试。类短句只有 1 个标点也要放行）
+    n_punct = sum(1 for ch in text if ch in _GBK_PUNCT)
+    return n_punct >= max(1, len(text) // 500)
+
+
+def _transcode_sane(text):
+    """转码卫生检查（v4.0.0）：解码结果须像人读文本——常规文字（ASCII 可见/
+    中文/中文标点/全角/日文/常用标点）占比 ≥70% 且控制字符（除 \t\n\r）
+    占比 <1%。不满足=解码出来的是垃圾（如 \x00\x01 序列读成 U+0100 类怪
+    字母），转码失败走旧拒收路径。"""
+    sample = text[:20000] or text
+    normal = bad = 0
+    for ch in sample:
+        o = ord(ch)
+        if o < 32 and ch not in "\t\n\r":
+            bad += 1
+            continue
+        if 0xE000 <= o <= 0xF8FF:
+            # PUA 私有区（v4.0.0 审计 P1）：GBK 误转码损坏 UTF-8 的伴生怪字
+            # ——乱码 CJK 本身落在 CJK 白名单内拦不住，PUA 是可靠的坏指纹
+            bad += 1
+            continue
+        if (0x20 <= o <= 0x7E or 0x4E00 <= o <= 0x9FFF or 0x3400 <= o <= 0x4DBF
+                or 0x3000 <= o <= 0x303F or 0xFF00 <= o <= 0xFFEF
+                or 0x3040 <= o <= 0x30FF or 0x2000 <= o <= 0x206F
+                or 0xA0 <= o <= 0xFF or o in (9, 10, 13)):
+            normal += 1
+    if not sample:
+        return True
+    # 两个比值同用 sample 口径（v4.0.0 评测 P1：normal 全文累计÷采样长会让
+    # 大文件的 70% 检查失效）；控制字符率另按全文兜底
+    bad_all = sum(1 for ch in text if ord(ch) < 32 and ch not in "\t\n\r")
+    return normal / len(sample) >= 0.7 and bad_all / max(1, len(text)) < 0.01
+
+
+_last_encoding = None  # v4.0.0：_read_text_impl 记录非 UTF-8 转码事件（read_text_ex 消费）
+
+
+def _note_encoding(enc):
+    """转码标注（v4.0.0）：stderr 提示（全部 CLI 经 _read_text_impl 可见）；
+    记录到 _last_encoding 供 read_text_ex 带进 meta（结构化消费方）。"""
+    global _last_encoding
+    _last_encoding = enc
+    try:
+        sys.stderr.write(
+            "[提示] 输入为 %s 编码，已自动转码处理——建议在编辑器中另存为 UTF-8，"
+            "后续处理不再出现本提示\n" % enc)
+    except Exception:
+        pass
 
 
 def read_text_ex(path, max_mb=50.0, retries=2):
     """read_text 的带元数据版（v2.8.0）：返回 (text, meta)。
 
-    meta 仅对 .pdf 输入非空：{"confidence": 高/中/低, "indicators": {…},
+    meta 对 .pdf 输入为 {"confidence": 高/中/低, "indicators": {…},
     "notes": [建议…]}——
     置信度由 _pdf_confidence 的四项启发指标合成，把「PDF 直读需人工复核」
     升级为「工具告诉你这次抽取有多可信」。其余格式 meta={}。"""
+    global _last_encoding
     text = read_text(path, max_mb=max_mb, retries=retries)
     meta = {}
     if path.lower().endswith(".pdf"):
         meta = _pdf_confidence(
             text, had_tounicode=getattr(_extract_pdf, "last_tounicode", False))
+    elif _last_encoding:
+        meta = {"encoding": _last_encoding + "（已自动转码）"}
+    _last_encoding = None
     return text, meta
 
 
@@ -1347,14 +1462,41 @@ def batch_resume_prepare(root, resume, kind="", row_len=None):
 
 def batch_state_store(state, root, fn, fp, status, row, kind=""):
     """把单文件结果写进本 kind 分区并整文件原子落盘——每文件一次，
-    中断最多丢当前文件。返回落盘是否成功（失败仅提示，不抛异常）。"""
-    own = state["kinds"].setdefault(kind, {"files": {}})
-    own.setdefault("files", {})[fn] = {
+    中断最多丢当前文件。返回落盘是否成功（失败仅提示，不抛异常）。
+
+    并发隔离（v4.0.0，PR stability 评测点名「批量并发场景无隔离」）：
+    写入前在文件锁（.pr_batch_state.json.lock，flock 独占）内重读最新状态并
+    合并本条记录——两个批处理进程跑同一目录不再互相覆盖对方的进度
+    （先前是各自内存快照整文件回写，后写者抹掉先写者）。Windows 无
+    fcntl 时退化为无锁（单用户场景可接受，行为同 v3.x）。"""
+    try:
+        import fcntl
+    except ImportError:
+        fcntl = None
+    record = {
         "status": status,
         "fp": batch_state_fingerprint(fp),
         "row": list(row),
         "ts": int(time.time()),
         "tool": "paper-rewriter %s" % __version__}
+    lock_path = batch_state_path(root) + ".lock"
+    try:
+        if fcntl is not None:
+            lf = open(lock_path, "w")
+            try:
+                fcntl.flock(lf, fcntl.LOCK_EX)
+                fresh = batch_state_load(root)
+                fresh.setdefault("kinds", {}).setdefault(
+                    kind, {"files": {}}).setdefault("files", {})[fn] = record
+                ok = batch_state_save(root, fresh)
+            finally:
+                fcntl.flock(lf, fcntl.LOCK_UN)
+                lf.close()
+            return ok
+    except OSError:
+        pass  # 锁失败退化：无锁直写（同 v3.x 行为）
+    own = state["kinds"].setdefault(kind, {"files": {}})
+    own.setdefault("files", {})[fn] = record
     return batch_state_save(root, state)
 
 

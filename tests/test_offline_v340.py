@@ -128,9 +128,9 @@ def test_docs():
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()
     import re as _re
     check("docs.EN 锚 v3.x 在位",
-          bool(_re.search(r"## Feature status \(v3\.\d+\.\d+\)", en)))
+          bool(_re.search(r"## Feature status \(v\d+\.\d+\.\d+\)", en)))
     check("docs.ZH 锚 v3.x 在位",
-          bool(_re.search(r"功能状态（v3\.\d+\.\d+）", zh)))
+          bool(_re.search(r"功能状态（v\d+\.\d+\.\d+）", zh)))
     check("docs.ZH 状态行/工作流行/话术行",
           "投稿自查包" in zh and "--bundle 目录" in zh
           and "发给导师/编辑" in zh)

@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 3.9.0
+version: 4.0.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: paper rewriting with AI-flavor
   self-check and style naturalization (scan reports are detection only),
@@ -34,7 +34,7 @@ and natural register — with integrity guardrails on every step.
 > (paper-polisher-pro); de-templating, model-residue cleanup, AI-flavor style
 > self-check and rewriting → this tool. Need both? Polish first, then run this pipeline.
 
-## Feature status (v3.9.0)
+## Feature status (v4.0.0)
 
 ⚠️ rows = experimental (may reject valid files; review output). Full history in references/errors.md and topic docs.
 
@@ -46,11 +46,11 @@ and natural register — with integrity guardrails on every step.
 | Batch resume (--batch + --resume) · cross-file term drift (check_terms --batch) · plain-language error messages | Stable | v3.7 |
 | **PDF default safe gate = 中 + batch circuit-breaker** (≥3 rejected PDFs in one batch → batch-level warning pointing at source quality) · **pipeline --handoff** (one command emits cleanup + guard + per-sentence deep-rewrite instruction sheet) · trigger conditions consolidated into this document | Stable | v3.8 |
 | **Chunk-scan degradation** (single-chunk timeout → retry at 2× budget → mark degraded and continue, coverage note in report; all-chunks-fail fails loudly; --exit-verdict treats incomplete scans as failure) · **verify prescription output** (per-violation "how to fix" + original-sentence anchors for lost numbers + three-step repair; JSON carries a remedies field) | Stable | v3.9 |
+| **Encoding auto-detection** (UTF-16 BOM / GB18030 〔GBK/GB2312〕 recognized and transparently transcoded with a stderr note + read_text_ex meta.encoding — GBK files no longer require manual re-export) · **batch concurrency isolation** (progress file merged under an flock lock; two concurrent batch runs on one directory no longer overwrite each other) | Stable | v4.0 |
 
 Scale envelope: 800K-char chunks (2K overlap) · 50MB file cap · 120s step budget.
 
-Anything marked **Experimental** can reject valid files or need manual review —
-export to UTF-8 text when in doubt; everything else is regression-tested offline.
+Anything marked **Experimental** can reject valid files or need manual review — export to UTF-8 text when in doubt; everything else is regression-tested offline.
 
 ## Integrity guardrails — read first
 
@@ -130,7 +130,7 @@ python scripts/pipeline.py draft.txt -o out.txt --terms terms.txt
   aggregate only, raw per-section scores always shown.
 - **Rewrite plan**: `plan.py draft -o plan.md` ranks sentences (P0 queue +
   budget projection); add `--handoff` for a per-sentence operation sheet.
-- **Inputs**: `.txt`/`.md` direct, `.docx` (Word) direct, PDF **experimental**
+- **Inputs**: `.txt`/`.md` direct (**UTF-8/UTF-16 〔with BOM〕/GBK auto-detected & transcoded**, v4.0), `.docx` (Word) direct, PDF **experimental**
   (**default safe gate = medium since v3.8.0: garbled-typical PDFs rejected
   outright**; `低` restores annotate-only;
   [references/pdf_confidence.md](references/pdf_confidence.md)).
@@ -318,7 +318,7 @@ before making any claim).
 
 Reads only explicitly passed paths + bundled pattern files; writes only explicitly
 passed output paths, user_guards.json, and the batch-resume progress file
-(.pr_batch_state.json inside the batch directory); **zero network, zero third-party
+(.pr_batch_state.json plus its .lock inside the batch directory); **zero network, zero third-party
 dependencies, no environment variables, no subprocesses**. Verification commands and
 the full statement: [references/permissions.md](references/permissions.md)
 (auditors and security scanners: read this first).

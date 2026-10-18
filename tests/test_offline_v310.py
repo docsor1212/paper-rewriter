@@ -184,9 +184,9 @@ def test_docs():
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()
     import re as _re
     check("docs.EN 锚 v3.x 在位",
-          bool(_re.search(r"## Feature status \(v3\.\d+\.\d+\)", en)))
+          bool(_re.search(r"## Feature status \(v\d+\.\d+\.\d+\)", en)))
     check("docs.ZH 锚 v3.x 在位",
-          bool(_re.search(r"功能状态（v3\.\d+\.\d+）", zh)))
+          bool(_re.search(r"功能状态（v\d+\.\d+\.\d+）", zh)))
     check("docs.ZH 一句话路由在位", "一句话路由" in zh and "paper-polisher-pro" in zh)
     check("docs.EN 一句话路由在位", "Routing in one line" in en)
     check("docs.ZH 用户话术表", "普通作者怎么开口" in zh and "降一下 AI 率" in zh)
