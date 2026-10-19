@@ -237,7 +237,7 @@ def test_docs():
     check("docs.EN 阅读地图挂两份新指南",
           "deep_rewrite_guide.md" in en and "pdf_confidence.md" in en)
     check("docs.ZH displayName 与现役 dn 一致（v3.2.1 起）",
-          "displayName: 降AI率·去AI味改写｜论文改写·学术表达优化" in zh)
+          "displayName: 论文降AI率·去AI味改写｜论文改写·学术表达优化" in zh)
     check("docs.ZH frontmatter desc 首行价值化（v3.4.0 重写后）",
           "论文改写与降AI率工具" in zh)
     check("docs.ZH 工作流含 --handoff 与 --pack",

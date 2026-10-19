@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 4.0.0
+version: 4.1.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: paper rewriting with AI-flavor
   self-check and style naturalization (scan reports are detection only),
@@ -29,12 +29,14 @@ allowed-tools:
 Bilingual (CN/EN) style naturalization for academic & medical writing: find stiff,
 templated or machine-flavored patterns, clean mechanical debris, revise for clarity
 and natural register — with integrity guardrails on every step.
+**Reading map (30-second routing; equivalent of [references/INDEX.md](references/INDEX.md))**: first time → quick start · troubleshooting → pitfalls + errors · ci/agent → automation · limits → honest_boundaries · scenarios → best_practices · deep-rewrite → [deep_rewrite_guide](references/deep_rewrite_guide.md) · pdf confidence → [pdf_confidence](references/pdf_confidence.md) · permissions → [permissions](references/permissions.md) · programmatic → [api](references/api.md).
+**Two layers in one line**: mechanical cleanup (transform/pipeline, deterministic) vs quality revision (agent per style guide) — run pipeline first, read the report, then decide what to deep-revise.
 
 > **Routing in one line**: grammar/fluency/journal-format polish → use a polisher
 > (paper-polisher-pro); de-templating, model-residue cleanup, AI-flavor style
 > self-check and rewriting → this tool. Need both? Polish first, then run this pipeline.
 
-## Feature status (v4.0.0)
+## Feature status (v4.1.0)
 
 ⚠️ rows = experimental (may reject valid files; review output). Full history in references/errors.md and topic docs.
 
@@ -92,17 +94,6 @@ SKILL_ZH.md): "remove the AI flavor from this paper" / "this reads too templated
 "check my rewrite broke no numbers" / "give me a style profile" / "stop flagging
 this legitimate term" — each maps to the pipeline, `plan.py`, `transform.py`,
 `verify.py`+`compare.py`, `stylecheck.py` and `learn_guards.py` respectively.
-
-**Reading map (30-second routing; equivalent of [references/INDEX.md](references/INDEX.md))**:
-first time → Quick start + workflow · troubleshooting →
-[references/pitfalls.md](references/pitfalls.md) + [references/errors.md](references/errors.md) ·
-CI/agent → Automation section · capability limits →
-[honest_boundaries](references/honest_boundaries.md) · scenario how-tos →
-[best_practices](references/best_practices.md) · deep-rewrite process →
-[deep_rewrite_guide](references/deep_rewrite_guide.md) · PDF confidence →
-[pdf_confidence](references/pdf_confidence.md) · permissions audit →
-[permissions](references/permissions.md) · programmatic use → [api](references/api.md).
-
 No agent is required — every capability below runs directly in a terminal.
 Every script has built-in `--help` (full flag reference) and `--version`;
 quick flag semantics:
@@ -130,10 +121,7 @@ python scripts/pipeline.py draft.txt -o out.txt --terms terms.txt
   aggregate only, raw per-section scores always shown.
 - **Rewrite plan**: `plan.py draft -o plan.md` ranks sentences (P0 queue +
   budget projection); add `--handoff` for a per-sentence operation sheet.
-- **Inputs**: `.txt`/`.md` direct (**UTF-8/UTF-16 〔with BOM〕/GBK auto-detected & transcoded**, v4.0), `.docx` (Word) direct, PDF **experimental**
-  (**default safe gate = medium since v3.8.0: garbled-typical PDFs rejected
-  outright**; `低` restores annotate-only;
-  [references/pdf_confidence.md](references/pdf_confidence.md)).
+- **Inputs**: `.txt`/`.md` direct (**UTF-8/UTF-16〔with BOM〕/GBK auto-transcoded**, v4.0), `.docx` direct, PDF **experimental** (**default safe gate = medium since v3.8**; `低` restores annotate-only; [references/pdf_confidence.md](references/pdf_confidence.md)).
 - **Term list**: `python scripts/extract_terms.py draft.txt -o terms.txt` (confirm
   by hand); any run accepts `--suggestions path.md` for a revision worksheet.
 - **Non-academic text**: add `--profile general` to down-weight formal boilerplate.

@@ -114,6 +114,8 @@ def build_handoff(rows, sections, source=""):
     lines += ["", "全部改完后运行（任一 FAIL 都不得交付）：",
               "  python scripts/verify.py <原文件> <改后文件>",
               "  python scripts/stylecheck.py <改后文件> --compare <原文件>",
+              "提示：以上交接块也可由一句命令随管线直接产出——",
+              "  python scripts/pipeline.py <原文件> -o <改后文件> --handoff <本文件>",
               "```"]
     return "\n".join(lines)
 
