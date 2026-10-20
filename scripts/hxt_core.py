@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "4.1.0"
+__version__ = "4.2.0"
 
 import json
 import os
@@ -485,9 +485,10 @@ def scan_chunked(text, lang=None, profile="academic", source_ext="",
             "⚠ 降级：%d 块超时未评分（重试未恢复），本报告实际覆盖约 %.0f%% 正文——"
             "缺失块内特征可能漏检，勿当完整报告使用" % (len(degraded_chunks), cov))
     score, level, _ = _score(pts, stats, total_units, merged, lang or "zh")
+    eff_lang = lang or detect_language(text)  # v4.2.0 评测 P1：>800k auto 模式不再硬编码 zh
     return {
-        "lang_detected": lang or "zh",
-        "lang": lang or "zh",
+        "lang_detected": eff_lang,
+        "lang": eff_lang,
         "profile": profile,
         "score": score,
         "level": level,

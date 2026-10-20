@@ -85,7 +85,8 @@ def main():
                       "--pdf-min-confidence 低 恢复「只标注不拦」旧行为")
     ap.add_argument("--exit-verdict", action="store_true",
                     help="自动化集成（CI/agent 门禁）：按判定设退出码——0=干净，"
-                         "1=完整性 FAIL，3=风格特征中及以上，4=模型残留。缺省恒 0")
+                         "1=完整性 FAIL，3=风格特征中及以上，4=模型残留；"
+                         "批量/单文件降级（覆盖不全）fail-closed=2。缺省恒 0")
     ap.add_argument("--ci", action="store_true", dest="exit_verdict",
                  help="CI 门禁模式：--exit-verdict 的短别名（机器退出码 0/1/3/4）")
     ap.add_argument("--deep", action="store_true",
@@ -134,11 +135,25 @@ def main():
             n, _rm = tf.drop_flagged_sentences(n)
             n, _nq = tf.normalize_quotes(n)
             v = vf.verify(o, n)
-            before = hxt_core.scan(o, time_budget=time_budget)
-            after = hxt_core.scan(n, time_budget=time_budget)
+            deg = 0
+            if max(len(o), len(n)) > 1_000_000:
+                # v4.2.0 接降级（遗留缺口）：批量内超大文件不再整体失败——
+                # 单块超时 2× 重试后标记降级继续；行内带标记，门禁拦停
+                before = hxt_core.scan_chunked(o, time_budget=time_budget, degrade=True)
+                after = hxt_core.scan_chunked(n, time_budget=time_budget, degrade=True)
+                deg = len(before.get("degraded_chunks") or []) + \
+                      len(after.get("degraded_chunks") or [])
+                if deg:
+                    print("[降级] %s：%d 块超时未评分（重试未恢复），该行仅覆盖部分正文"
+                          % (os.path.basename(fp), deg), file=sys.stderr)
+            else:
+                before = hxt_core.scan(o, time_budget=time_budget)
+                after = hxt_core.scan(n, time_budget=time_budget)
             conf_suffix = (" [置信度:%s]" % pdf_conf) if pdf_conf else ""
-            return (os.path.basename(fp), "%d[%s]" % (before["score"], before["level"]),
-                    "%d[%s]%s" % (after["score"], after["level"], conf_suffix),
+            deg_mark = " ⚠[降级:%d 块]" % deg if deg else ""
+            return (os.path.basename(fp),
+                    "%d[%s]" % (before["score"], before["level"]),
+                    "%d[%s]%s%s" % (after["score"], after["level"], conf_suffix, deg_mark),
                     "PASS" if v["ok"] else "FAIL(%d)" % len(v["violations"]),
                     "%+d%%" % v["stats"]["length_delta_pct"])
 
@@ -239,6 +254,10 @@ def main():
             worst = 0
             for row in rows_out:
                 integrity, after = row[3], row[2]
+                if "⚠[降级" in str(after):
+                    # 降级 fail-closed（v4.2.0）：残缺扫描门禁不放行
+                    worst = max(worst, 2)
+                    continue
                 if str(integrity).startswith("FAIL"):
                     worst = max(worst, 1)
                     continue
@@ -551,7 +570,8 @@ def main():
                 profile=args.profile,
                 source_ext=".txt")
             _md = _plan.build_handoff(_top, _secs,
-                                      source=args.rewrite or args.file)
+                                      source=args.rewrite or args.file,
+                                      lang=_full.get("lang"))
             with open(args.handoff, "w", encoding="utf-8") as hf:
                 hf.write(_md + "\n")
             _base = "改稿" if args.rewrite else "清理稿"

@@ -94,16 +94,21 @@ def advice_str(cid):
     return str(v)
 
 
-def build_handoff(rows, sections, source=""):
+def build_handoff(rows, sections, source="", lang=None):
     """v3.0.0 深改交接块：把 P0 队列变成执行改写 agent 可直接照做的逐句指令单。
 
     评审反馈（completeness/summary）指出深改环节依赖外部 agent 而工具未把
-    交接做透——本函数把「哪句、改什么、守什么、改完怎么验」一次给全。"""
+    交接做透——本函数把「哪句、改什么、守什么、改完怎么验」一次给全。
+    lang（v4.2.0，评审 P2-10）：英文稿指令单首选锚 style_guide_en.md，
+    不再让 agent 从中文锚里猜；None=由 build_queue 的全文语言自动判。"""
+    guide = "references/style_guide_en.md" if lang == "en" else "references/style_guide_zh.md"
+    guide_note = ("" if lang == "en"
+                  else "\n（英文稿请改用 references/style_guide_en.md）")
     lines = ["## 深改交接块（复制给执行改写的 agent）", "",
              "```text",
              "守卫铁律：数字/量纲/DOI/PMID/术语/专有名词/引文内容一律原样保留；",
              "每完成 3-5 句运行一次 verify，出现任何 GUARD/ERROR 立即回滚该句。",
-             "处理原则详见 references/style_guide_zh.md（英文稿用 style_guide_en.md），",
+             "处理原则详见 %s，%s" % (guide, guide_note),
              "流程细节见 references/deep_rewrite_guide.md。"]
     for i, r in enumerate(rows, 1):
         sec = SECTION_LABELS.get(section_at(sections, r["off"]), "正文")
@@ -280,7 +285,8 @@ def main():
         }
 
         if args.handoff:
-            result["handoff"] = build_handoff(top, sections, source=args.file)
+            result["handoff"] = build_handoff(top, sections, source=args.file,
+                                              lang=full.get("lang"))
 
         if args.json:
             out = json.dumps(result, ensure_ascii=False, indent=2)
@@ -345,7 +351,8 @@ def main():
                      "· 觉得有用欢迎 Star / 收藏")
         lines.append("")
         if args.handoff:
-            lines.append(build_handoff(top, sections, source=args.file))
+            lines.append(build_handoff(top, sections, source=args.file,
+                                       lang=full.get("lang")))
             lines.append("")
         out_text = "\n".join(lines)
         if args.output:

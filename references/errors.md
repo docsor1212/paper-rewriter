@@ -34,9 +34,10 @@
 | 4 | 命中模型残留（critical） | 先跑 transform.py 清理 |
 | 2 | 用法/文件错误（不受 --exit-verdict 影响） | 修调用 |
 
-> `--batch + --exit-verdict` 聚合口径（v3.7.0 备案）：detect 逐行取最坏档输出
-> 0/3/4，扫描不出的文件 fail-closed 直接 2；pipeline 聚合最坏行——integrity
-> FAIL 优先 1、错误行 2、其余按分数档 0/3/4。
+> `--batch + --exit-verdict` 聚合口径（v3.7.0 备案；v4.2.0 增补降级）：detect 逐行取
+> 最坏档输出 0/3/4，扫描不出或**带 ⚠[降级] 标记的行** fail-closed 直接 2；
+> pipeline 聚合最坏行——**降级行优先 2**（扫描残缺时 FAIL 判定本身不可信，
+> 取更严重档）、integrity FAIL 1、错误行 2、其余按分数档 0/3/4。
 
 > detect/compare 的 `--exit-verdict` 只出 0/3/4（完整性仍只写报告——exit 1 契约专属 verify/pipeline）；
 > **pipeline 是唯一 1/3/4 全档判定命令**，CI 门禁推荐 `pipeline.py 原稿 --rewrite 改稿 --exit-verdict`。

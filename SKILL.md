@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 4.1.0
+version: 4.2.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: paper rewriting with AI-flavor
   self-check and style naturalization (scan reports are detection only),
@@ -36,7 +36,7 @@ and natural register — with integrity guardrails on every step.
 > (paper-polisher-pro); de-templating, model-residue cleanup, AI-flavor style
 > self-check and rewriting → this tool. Need both? Polish first, then run this pipeline.
 
-## Feature status (v4.1.0)
+## Feature status (v4.2.0)
 
 ⚠️ rows = experimental (may reject valid files; review output). Full history in references/errors.md and topic docs.
 
@@ -49,6 +49,7 @@ and natural register — with integrity guardrails on every step.
 | **PDF default safe gate = 中 + batch circuit-breaker** (≥3 rejected PDFs in one batch → batch-level warning pointing at source quality) · **pipeline --handoff** (one command emits cleanup + guard + per-sentence deep-rewrite instruction sheet) · trigger conditions consolidated into this document | Stable | v3.8 |
 | **Chunk-scan degradation** (single-chunk timeout → retry at 2× budget → mark degraded and continue, coverage note in report; all-chunks-fail fails loudly; --exit-verdict treats incomplete scans as failure) · **verify prescription output** (per-violation "how to fix" + original-sentence anchors for lost numbers + three-step repair; JSON carries a remedies field) | Stable | v3.9 |
 | **Encoding auto-detection** (UTF-16 BOM / GB18030 〔GBK/GB2312〕 recognized and transparently transcoded with a stderr note + read_text_ex meta.encoding — GBK files no longer require manual re-export) · **batch concurrency isolation** (progress file merged under an flock lock; two concurrent batch runs on one directory no longer overwrite each other) | Stable | v4.0 |
+| **pipeline --batch degradation** (oversized files inside a batch degrade per-chunk instead of failing whole; rows carry a ⚠[degraded] marker and the gate stops on them) · **language-aware handoff** (EN drafts anchor style_guide_en.md directly, CN drafts style_guide_zh.md) | Stable | v4.2 |
 
 Scale envelope: 800K-char chunks (2K overlap) · 50MB file cap · 120s step budget.
 
