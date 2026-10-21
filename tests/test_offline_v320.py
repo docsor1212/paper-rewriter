@@ -158,7 +158,7 @@ def test_docs():
           bool(_re.search(r"## Feature status \(v\d+\.\d+\.\d+\)", en)))
     check("docs.ZH 锚 v3.x 在位",
           bool(_re.search(r"功能状态（v\d+\.\d+\.\d+）", zh)))
-    check("docs.ZH 状态行 check_stats", "统计一致性守卫" in zh and "check_stats" in zh)
+    check("docs.ZH 状态行 check_stats", "统计一致性" in zh and "check_stats" in zh)
     check("docs.ZH 能力行+话术行（合并表更名统计一致性）",
           "统计一致性" in zh and "查查数字有没有前后打架" in zh)
     check("docs.ZH 协议 bullet", "数字前后打架" in zh)

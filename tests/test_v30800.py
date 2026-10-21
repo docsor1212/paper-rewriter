@@ -123,7 +123,9 @@ def test_docs():
     api = open(os.path.join(ROOT, "references", "api.md"), encoding="utf-8").read()
     import re as _re
     check("docs.ZH 功能状态行", bool(_re.search(r"功能状态（v\d+\.\d+\.\d+）", zh))
-          and "缺省门=中" in zh and "批量熔断" in zh and "pipeline --handoff" in zh)
+          and "缺省门=中" in zh and "pipeline --handoff" in zh)
+    fs = open(os.path.join(ROOT, "references", "feature_status.md"), encoding="utf-8").read()
+    check("docs.熔断行（已下沉 feature_status）", "批量熔断" in fs)
     fs = open(os.path.join(ROOT, "references", "feature_status.md"), encoding="utf-8").read()
     check("docs.EN 功能状态行", bool(_re.search(r"Feature status \(v\d+\.\d+\.\d+\)", en))
           and "feature_status.md" in en)

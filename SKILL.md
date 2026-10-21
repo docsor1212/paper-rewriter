@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 4.3.0
+version: 4.3.1
 description: >
   Academic writing style toolkit, bilingual CN/EN: paper rewriting with AI-flavor
   self-check and style naturalization (scan reports are detection only),
@@ -36,10 +36,12 @@ and natural register — with integrity guardrails on every step.
 > (paper-polisher-pro); de-templating, model-residue cleanup, AI-flavor style
 > self-check and rewriting → this tool. Need both? Polish first, then run this pipeline.
 
-## Feature status (v4.3.0)
+## Feature status (v4.3.1)
 
 ⚠️ rows = experimental (may reject valid files; review output). **The full per-generation capability list has moved to [references/feature_status.md](references/feature_status.md)**; per-item details live in references/errors.md and topic docs. Stable highlights (all stable, v1.0–4.2): core five · section-aware · rewrite plan · learned guards · machine exit codes · chunk degradation · batch resume/concurrency isolation · cross-file term drift · Statistical consistency guard · term variant groups · encoding auto-detection · Submission self-check bundle (--bundle) · pipeline --handoff · verify prescription output.
 
+| Capability | Status | Since |
+|---|---|---|
 | ⚠️ **PDF direct-read + confidence self-report** (embedded-font/ToUnicode attempted, capped at "中"; calibration in references/pdf_confidence.md; **default gate = 中 since v3.8.0** — garbled-typical extractions rejected by default, `--pdf-min-confidence 低` restores annotate-only) | ⚠️ Experimental | v1.6–3.8 |
 
 

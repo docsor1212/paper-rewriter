@@ -2,7 +2,7 @@
 > **最短路径**：先看 ⚠️ 实验性行（唯一可能拒收合法文件的部分），再按代际扫稳定能力。
 > **回 [INDEX](INDEX.md)**
 
-# 功能状态全表（Feature Status，自 v4.3.0 自 SKILL 主文档下沉至此）
+# 功能状态全表（Feature Status，自 v4.3.1 起 SKILL 主文档只留 ⚠️ 行与速览，本文件为全表正本）
 
 > 主文档只保留 ⚠️ 实验性警示行与本表的指针；本文件是逐代际完整清单。
 
@@ -33,7 +33,7 @@
 | Core five · section-aware · rewrite plan (plan --handoff) · learned guards · machine exit codes · step timeout / batch retry · centralized errors · --deep · fullwidth normalization | Stable | v1.0–2.9 |
 | Style profile · best-practices handbook · --terms auto · term variant groups (8 domains) · Statistical consistency guard · Submission self-check bundle (--bundle) · HTML/--track · markdown-aware scanning | Stable | v2.6–3.6 |
 | Batch resume (--batch + --resume) · cross-file term drift (check_terms --batch) · plain-language error messages | Stable | v3.7 |
-| **PDF default safe gate = 中 + batch circuit-breaker** (≥3 rejected PDFs in one batch → batch-level warning pointing at source quality) · **pipeline --handoff** (one command emits cleanup + guard + per-sentence deep-rewrite instruction sheet) · trigger conditions consolidated into this document | Stable | v3.8 |
+| **PDF default safe gate = 中 + batch circuit-breaker** (≥3 rejected PDFs in one batch → batch-level warning pointing at source quality) · **pipeline --handoff** (one command emits cleanup + guard + per-sentence deep-rewrite instruction sheet) · trigger conditions consolidated into the main document | Stable | v3.8 |
 | **Feature-status list sunk into this file** (main doc keeps the ⚠️ row + stable highlights) | Stable | v4.3 |
 | **Chunk-scan degradation** (single-chunk timeout → retry at 2× budget → mark degraded and continue, coverage note in report; all-chunks-fail fails loudly; --exit-verdict treats incomplete scans as failure) · **verify prescription output** (per-violation "how to fix" + original-sentence anchors for lost numbers + three-step repair; JSON carries a remedies field) | Stable | v3.9 |
 | **Encoding auto-detection** (UTF-16 BOM / GB18030 〔GBK/GB2312〕 recognized and transparently transcoded with a stderr note + read_text_ex meta.encoding — GBK files no longer require manual re-export) · **batch concurrency isolation** (progress file merged under an flock lock; two concurrent batch runs on one directory no longer overwrite each other) | Stable | v4.0 |
