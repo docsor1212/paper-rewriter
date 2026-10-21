@@ -87,10 +87,13 @@ def test_handoff_lang():
 def test_docs():
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()
     en = open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8").read()
-    check("docs.ZH v4.2.0 行", "功能状态（v4.2.0）" in zh
-          and "pipeline --batch 降级接线" in zh and "深改交接块语言感知" in zh)
-    check("docs.EN v4.2.0 行", "Feature status (v4.2.0)" in en
-          and "batch degradation" in en and "language-aware handoff" in en)
+    fs = open(os.path.join(ROOT, "references", "feature_status.md"), encoding="utf-8").read()
+    check("docs.v4.2.0 行（已下沉 feature_status）",
+          "pipeline --batch 降级接线" in fs and "深改交接块语言感知" in fs
+          and "batch degradation" in fs and "language-aware handoff" in fs)
+    check("docs.SKILL 功能状态锚+指针", "功能状态（v" in zh
+          and "feature_status.md" in zh and "Feature status (v" in en
+          and "feature_status.md" in en)
 
 
 def main():

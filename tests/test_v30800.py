@@ -124,8 +124,11 @@ def test_docs():
     import re as _re
     check("docs.ZH 功能状态行", bool(_re.search(r"功能状态（v\d+\.\d+\.\d+）", zh))
           and "缺省门=中" in zh and "批量熔断" in zh and "pipeline --handoff" in zh)
+    fs = open(os.path.join(ROOT, "references", "feature_status.md"), encoding="utf-8").read()
     check("docs.EN 功能状态行", bool(_re.search(r"Feature status \(v\d+\.\d+\.\d+\)", en))
-          and "default gate = 中" in en and "batch circuit-breaker" in en)
+          and "feature_status.md" in en)
+    check("docs.缺省门/熔断行（已下沉 feature_status）", "default gate = 中" in fs
+          and "batch circuit-breaker" in fs)
     check("docs.触发收拢", "场景直达" in zh and "翻译腔清理（=欧化句式" in zh
           and "translationese cleanup" in en)
     check("docs.faq Q15 缺省门", "v3.8.0 起缺省安全门=中" in faq and "熔断" in faq)

@@ -19,5 +19,6 @@
 | 程序化调用（Python API） | [api.md](api.md) | 见 api.md 函数表 |
 | 合规/披露义务（AIGC 标识办法） | [compliance.md](compliance.md) | ——（披露主体是作者） |
 | 端到端输入输出样例 | [examples.md](examples.md) | 照抄样例命令 |
+| 版本能力清单（哪些稳定/哪些实验性） | [feature_status.md](feature_status.md) | ——（先看 ⚠️ 行） |
 
 > 各文件开头均有「何时读我/最短路径/回 INDEX」三行块；主 SKILL 的「阅读地图」与本表等价。

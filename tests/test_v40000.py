@@ -137,9 +137,10 @@ def test_docs():
     errs = open(os.path.join(ROOT, "references", "errors.md"), encoding="utf-8").read()
     api = open(os.path.join(ROOT, "references", "api.md"), encoding="utf-8").read()
     perm = open(os.path.join(ROOT, "references", "permissions.md"), encoding="utf-8").read()
-    check("docs.ZH 编码/并发行", "编码自适应" in zh and "批量并发隔离" in zh)
-    check("docs.EN 编码/并发行", "Encoding auto-detection" in en
-          and "batch concurrency isolation" in en)
+    fs = open(os.path.join(ROOT, "references", "feature_status.md"), encoding="utf-8").read()
+    check("docs.编码/并发行（已下沉 feature_status）", "编码自适应" in fs
+          and "批量并发隔离" in fs and "Encoding auto-detection" in fs
+          and "batch concurrency isolation" in fs)
     check("docs.faq Q13b", "Q13b：Windows 记事本存的 GBK" in faq and "透明转码" in faq)
     check("docs.errors 转码行", "已自动转码" in errs and "可识别文本编码" in errs)
     check("docs.api", "_transcode_sane" in api or "编码自适应" in api)

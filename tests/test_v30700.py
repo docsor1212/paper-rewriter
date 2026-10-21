@@ -208,10 +208,13 @@ def test_docs_wiring():
     idx = open(os.path.join(ROOT, "references", "INDEX.md"), encoding="utf-8").read()
     # 版本锚用正则（v3.8.0 机制化：版本前缀随 bump 漂移，行内容才是稳定契约）
     import re as _re
-    check("docs.SKILL_ZH 功能状态行", bool(_re.search(r"功能状态（v\d+\.\d+\.\d+）", zh))
-          and "批量断点续传" in zh and "跨文件术语漂移" in zh)
-    check("docs.SKILL_EN 功能状态行", bool(_re.search(r"Feature status \(v\d+\.\d+\.\d+\)", en))
-          and "Batch resume" in en and "cross-file term drift" in en)
+    fs = open(os.path.join(ROOT, "references", "feature_status.md"), encoding="utf-8").read()
+    check("docs.功能状态锚（SKILL）", bool(_re.search(r"功能状态（v\d+\.\d+\.\d+）", zh))
+          and bool(_re.search(r"Feature status \(v\d+\.\d+\.\d+\)", en))
+          and "feature_status.md" in zh and "feature_status.md" in en)
+    check("docs.续传/漂移行（已下沉 feature_status）", "批量断点续传" in fs
+          and "跨文件术语漂移" in fs and "Batch resume" in fs
+          and "cross-file term drift" in fs)
     check("docs.permissions 写点核对", ".pr_batch_state.json" in perm
           and "--resume" in perm and "原子替换" in perm)
     check("docs.faq 新 Q 覆盖", "Q11：术语前后不统一" in faq and "Q12：批量跑了一半中断" in faq
