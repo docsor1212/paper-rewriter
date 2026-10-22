@@ -19,6 +19,7 @@
 | **编码自适应**（UTF-16/GBK 自动转码+标注+meta.encoding）·**批量并发隔离**（flock 锁内合并，双进程互不覆盖） | 稳定 | v4.0 |
 | **pipeline --batch 降级接线**（批量内超大文件单块超时→降级继续，行内 ⚠[降级] 标记+门禁拦停——stability 系列收尾）·**深改交接块语言感知**（英文稿指令单首选锚 style_guide_en.md，中文稿 style_guide_zh.md） | 稳定 | v4.2 |
 | **功能状态全表下沉本文件**（主文档只留 ⚠️ 行+稳定速览——progressive 密度收口） | 稳定 | v4.3 |
+| **docx 回写闭环**（pipeline/transform/compare `-o` 与 check_terms `--unify` 输出路径以 .docx 结尾即回写 Word——最小 OOXML 纯段落，与 docx 直读构成闭环；表格/图片/样式不重建，复杂格式人工合并）·**术语统一稿**（`check_terms --unify`：每组统一为出现最多的变体，逐处替换计数全透出，映射冲突两级响亮拒绝，变体按长度降序单遍替换防嵌套；已一致不生成文件） | 稳定 | v4.4 |
 
 
 ---
@@ -39,6 +40,7 @@
 | **Encoding auto-detection** (UTF-16 BOM / GB18030 〔GBK/GB2312〕 recognized and transparently transcoded with a stderr note + read_text_ex meta.encoding — GBK files no longer require manual re-export) · **batch concurrency isolation** (progress file merged under an flock lock; two concurrent batch runs on one directory no longer overwrite each other) | Stable | v4.0 |
 | **pipeline --batch degradation** (oversized files inside a batch degrade per-chunk instead of failing whole; rows carry a ⚠[degraded] marker and the gate stops on them) · **language-aware handoff** (EN drafts anchor style_guide_en.md directly, CN drafts style_guide_zh.md) | Stable | v4.2 |
 | **Feature-status list sunk into this file** (main doc keeps the ⚠️ row + stable highlights) | Stable | v4.3 |
+| **docx write-back** (`-o` on pipeline/transform/compare and `--unify` on check_terms write Word files when the path ends in .docx — minimal OOXML plain paragraphs, closing the loop with .docx direct-read; tables/images/styles are not rebuilt, merge complex layouts manually) · **term unification sheet** (`check_terms --unify`: each group unified to its dominant variant, per-variant replacement counts surfaced, mapping conflicts rejected loudly at two levels, longest-variant single-pass replacement against nesting; nothing written when already consistent) | Stable | v4.4 |
 
 Scale envelope: 800K-char chunks (2K overlap) · 50MB file cap · 120s step budget.
 

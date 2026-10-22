@@ -240,6 +240,9 @@ def main():
         for row in rows_out:
             writer.writerow(row)
         if args.output:
+            if args.output.lower().endswith(".docx"):
+                print("[提示] --batch 的 -o 是汇总 CSV（逐文件评分表），"
+                      "不支持 docx 回写——改用 .csv 后缀", file=sys.stderr)
             try:
                 with open(args.output, "w", encoding="utf-8", newline="") as cf:
                     cw = _csv.writer(cf)
@@ -345,8 +348,7 @@ def main():
         mode = "机械清理" + ("+深改档" if deep_ops else "")
         if args.output:
             try:
-                with open(args.output, "w", encoding="utf-8") as f:
-                    f.write(new)
+                hxt_core.write_output(new, args.output, src_path=args.file)
             except OSError as e:
                 print("错误: 无法写入 %s（%s）" % (args.output, e), file=sys.stderr)
                 sys.exit(2)

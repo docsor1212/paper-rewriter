@@ -96,7 +96,8 @@ max_cjk_shift=0.12) -> {"ok": bool, "violations": [...], "warnings": [...], "sta
 | `hxt_core._load_user_guards()` | 读 `scripts/user_guards.json`（损坏降级为空并 stderr 提示） |
 | `plan.py <file> --json / -o plan.md --top N` | 句级改写优先级计划：P0 队列+章节归属+线性预算投影 |
 | `plan.py <file> --handoff`（v3.0.0） | 深改交接块：逐句「原句+操作指令」指令单（含守卫铁律+验收命令）；markdown 追加输出，`--json` 下为 `handoff` 键 |
-| `check_terms.py <file> --pack <域> / --list-packs`（v3.0.0） | 术语守卫域包：八学科域 28 对按域选跑；结果带 `pack` 域标签；`hxt_core` 侧 `check_terms.validate_packs()` 嵌套安全校验（变体互斥断言） |
+| `check_terms.py <file> --pack <域> / --list-packs`（v3.0.0） | 术语守卫域包：八学科域 27 组按域选跑；结果带 `pack` 域标签；`hxt_core` 侧 `check_terms.validate_packs()` 嵌套安全校验（变体互斥断言） |
+| `check_terms.py <file> --unify 统一稿`（v4.4.0） | 术语统一稿：每组统一为出现最多的变体（与报告「建议统一为」同源）；`check_terms.build_unify_plan(results)` 冲突两级防御（同变体两组不同目标 / 值域∩键域非空，均 CliError）、`unify_text(text, mapping)` 变体按长度降序单遍替换（防跨组嵌套+替换产物不再命中）；输出路径 .docx 后缀即回写 Word；退出码 0=统一稿已生成或已一致（已一致不生成文件，--json 恒 JSON 带 already_consistent）；仅单文件模式，--batch/--report 互斥；输出=输入同路径拒绝（docx 原地覆写防不可逆销毁） |
 | `check_stats.py <file> --tolerance 0.3 / --json / --report`（v3.2.0） | 统计一致性守卫：percent_sum（仅划分用语句）/ group_n_conflict（前缀归一化）/ p_style_mix；退出码 0/1/2 同 check_terms |
 | `check_stats.py --batch 目录`（v3.3.0） | 跨文件批量：逐文件三类检查+跨文件 group_n 聚合（只核 n= 记法；时点前缀加宽剥离，并组候选标 timepoint_merged 不计退出码）；--json 含 files/cross_file |
 | `detect.py / pipeline.py --batch 目录 --resume`（v3.7.0） | 批量断点续传：进度每文件原子落 `<目录>/.pr_batch_state.json`；`hxt_core.batch_resume_prepare(root, resume, kind, row_len)` / `batch_state_store(state, root, fn, fp, status, row, kind)` 公共件（kind 分区制，detect/pipeline 各认各的分区；指纹=[size, mtime_ns]） |
@@ -104,6 +105,7 @@ max_cjk_shift=0.12) -> {"ok": bool, "violations": [...], "warnings": [...], "sta
 | `hxt_core.scan_chunked(..., degrade=True)`（v3.9.0） | 分块降级：单块超时→2× 重试→标记 degraded_chunks=[{start,end,chars,retried}] 继续；全块失败抛 ValueError；结果 stats.notes 带覆盖率注记。≤max_chars 单块文本直接 scan，degrade 不生效（CLI 不可达，仅 API 直调注意） |
 | `hxt_core.read_text` 编码自适应（v4.0.0） | UTF-16 BOM / GB18030 自动转码+stderr 标注；`read_text_ex` meta 带 encoding 字段；`_transcode_sane` 卫生检查（控制字符率）|
 | `hxt_core.batch_state_store` 并发锁（v4.0.0） | flock（.pr_batch_state.json.lock）内重读-合并-落盘；双进程同目录进度互不覆盖；Windows 无 fcntl 退化为无锁 |
+| `hxt_core.write_docx(text, path)` / `write_output(text, path)`（v4.4.0） | docx 回写：最小 OOXML 三部件（Content_Types/.rels/document.xml），每行一段落、空行保留、XML 文本节点转义+非法控制字符剥除，与 `_extract_docx` 构成 roundtrip（多空行按读端压缩口径）；`write_output` 按 .docx 后缀分发（pipeline/transform/compare 的 -o 共用，传 src_path 拒绝输出=输入原地覆写）。诚实边界：纯段落回写，表格/图片/样式不重建 |
 | `verify.build_remedies(orig, r)`（v3.9.0） | 处方清单：每类违规→{check, remedy, context[原句锚点], warning}；verify JSON 报告带 remedies 字段 |
 | `plan.build_queue(text, lang, profile, source_ext, top)`（v3.8.0） | 逐句风险排序核心（plan 主流程抽取版）：返回 (top_rows, sections, full)，供 pipeline --handoff 复用；超 MAX_PLAN_CHARS 抛 ValueError |
 | `pipeline --handoff 文件`（v3.8.0） | 随管线产出深改交接块：build_queue(orig) + build_handoff 写盘；JSON 模式提示走 stderr 不污染 stdout |

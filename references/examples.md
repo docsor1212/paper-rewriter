@@ -415,3 +415,21 @@ python scripts/check_terms.py --batch 全部章节/
 # exit 1=有漂移或文件内不一致；--report 出逐文件明细；--json 出机器口径
 # 场景：多章节论文各章分头改写后，「各章内部一致、合起来不一致」的术语病
 ```
+
+### v4.4.0 新能力速览：docx 回写闭环 + 术语统一稿
+
+```bash
+# ① Word 工作流闭环：docx 直读 → 机械清理 → 回写 .docx（纯段落）
+python scripts/pipeline.py draft.docx -o 改稿.docx
+# 输出路径以 .docx 结尾即回写 Word（transform/compare -o 同样生效）
+# 诚实边界：只回写段落文本——表格/图片/样式不重建，复杂格式人工合并
+
+# ② 术语统一稿：检查报告 → 一键统一（建议产物，复核后采用）
+python scripts/check_terms.py 稿件.txt --unify 统一稿.txt
+# 统一稿已写入 统一稿.txt（2 组术语 / 共 5 处替换）：
+#   心力衰竭 → 心衰（4 处）
+#   病人 → 患者（1 处）
+# 提示：统一稿是建议产物——逐处复核清单后再采用；
+#       随后建议跑 verify.py 确认数字与引用完整性。
+# 输出路径以 .docx 结尾同样回写 Word；已一致时不生成文件、exit 0
+```

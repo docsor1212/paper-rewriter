@@ -16,7 +16,7 @@
 | 0 | 全部 | 完成（verify: 完整性 PASS） | 正常继续；其余脚本的判定读输出报告 |
 | 1 | **仅 verify.py** | 完整性守卫 FAIL——改稿动了数字/引用/术语 | **修改改稿**，不是改守卫、不是换参数 |
 | 2 | 全部 | 用法或文件错误 | 看 stderr 提示：路径错/文件空/二进制/编码/超限，每条提示自带处置建议 |
-| 1 | check_terms.py（独立口径） | 发现术语不一致（报变体对与次数） | 按「建议统一为」人工统一；`--report` 出 markdown 明细 |
+| 1 | check_terms.py（独立口径） | 发现术语不一致（报变体对与次数） | 按「建议统一为」人工统一；`--report` 出 markdown 明细；或 `--unify 统一稿` 一键生成（复核替换清单后采用，v4.4.0） |
 | 1 | check_terms.py --batch 目录（v3.7.0） | 跨文件变体漂移或文件内不一致（files→变体映射） | 按建议变体跨文件统一；`--report` 含逐文件明细 |
 | 1 | check_stats.py（同 check_terms 口径） | 发现统计一致性问题（求和/分组 n/风格混用；--batch 含跨文件聚合） | 核对原始数据后改稿；`--report` 出 markdown 明细 |
 | 2 | detect/pipeline（PDF 输入） | PDF 置信度低于门闸被拒（v3.8.0 起缺省门=中） | 按建议导出 UTF-8 文本/OCR 后重试；`--pdf-min-confidence 低` 恢复仅标注旧行为 |

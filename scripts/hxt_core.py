@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "4.3.1"
+__version__ = "4.4.0"
 
 import json
 import os
@@ -883,6 +883,81 @@ def _extract_docx(path):
             "直接继续会得到乱码。处置：用 Word/WPS 打开另存为常规 .docx，"
             "或导出 UTF-8 纯文本")
     return text
+
+
+# ── docx 回写（v4.4.0，纯标准库）：最小 OOXML 三部件，文本行→段落 ──
+# 诚实边界：只做纯段落回写，不重建表格/图片/编号/样式——复杂格式稿件请把
+# 文本产物人工合并回原文档，或直接使用 .txt 输出。与 _extract_docx（v1.3.0）
+# 合起来构成 Word 工作流闭环：docx 直读 → 清理/统一 → -o 改稿.docx 回 Word。
+_DOCX_CT = (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+    '<Default Extension="xml" ContentType="application/xml"/>'
+    '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+    '</Types>')
+_DOCX_RELS = (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
+    '</Relationships>')
+_DOCX_DOC_HEAD = (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
+    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+    '<w:body>')
+_DOCX_DOC_TAIL = ('<w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr>'
+                  '</w:body></w:document>')
+
+
+_XML_ILLEGAL = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def _docx_paragraph(line):
+    from xml.sax.saxutils import escape
+    # XML 1.0 只认 \t \n \r 三控制字符；\x1a 等 DOS 残留畅通到此处会产出
+    # Word 拒开的损坏文件（escape 只管 & < >，不管字符合法性）——剥除
+    line = _XML_ILLEGAL.sub("", line)
+    if not line:
+        return "<w:p/>"
+    return ('<w:p><w:r><w:t xml:space="preserve">%s</w:t></w:r></w:p>'
+            % escape(line))
+
+
+def write_docx(text, path, src_path=None):
+    """把纯文本写回 .docx（v4.4.0，最小 OOXML）：每行一个段落，空行保留为
+    空段落；XML 文本节点转义并剥非法控制字符，与 _extract_docx 构成
+    roundtrip（多空行按读端压缩口径）。src_path=输入文件路径：输出与输入
+    同一文件时拒绝（docx 原地覆写=不可逆销毁原排版，文本层没有这个问题）。"""
+    if not text or not text.strip():
+        fail("输出内容为空——不生成空 .docx",
+             hint="确认输入文件有正文；或改用 .txt 输出")
+    if src_path and os.path.abspath(path) == os.path.abspath(src_path):
+        fail("输出路径与输入文件相同（%s）——回写会不可逆覆盖原稿"
+             % path,
+             hint="换一个输出文件名；保留原稿才能按边界说明人工合并复杂格式")
+    body = (_DOCX_DOC_HEAD
+            + "".join(_docx_paragraph(ln) for ln in text.splitlines())
+            + _DOCX_DOC_TAIL)
+    if len(body) > 18 * 1024 * 1024:
+        print("[提示] .docx 正文解压后约 %dMB，超过读取端 20MB 守卫的余量——"
+              "该产物可能无法用本工具回读；大稿件建议改用 .txt 输出"
+              % (len(body) // (1024 * 1024)), file=sys.stderr)
+    import zipfile
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("[Content_Types].xml", _DOCX_CT)
+        z.writestr("_rels/.rels", _DOCX_RELS)
+        z.writestr("word/document.xml", body)
+    return path
+
+
+def write_output(text, path, src_path=None):
+    """改稿落盘分发（v4.4.0）：路径以 .docx 结尾→write_docx；否则 UTF-8 文本。
+    pipeline/transform/compare 的 -o 共用——Word 工作流闭环只需换输出后缀。"""
+    if path.lower().endswith(".docx"):
+        return write_docx(text, path, src_path=src_path)
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        f.write(text)
+    return path
 
 
 # 修订建议工作单：把诊断升级为可执行的结构化建议（工具不代写，诚信位置不变）

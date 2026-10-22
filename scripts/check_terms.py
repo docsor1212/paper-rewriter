@@ -144,6 +144,57 @@ def build_report(results, source=""):
     return "\n".join(lines)
 
 
+# ── 术语统一稿（v4.4.0 --unify）：检查只报不改，统一稿生成同样不静默——
+# 逐处替换计数全部透出，建议产物需人工复核后再采用 ──
+def build_unify_plan(results):
+    """检查结果 → 替换映射 {变体: 统一形}（统一形=每组出现最多的变体，
+    与报告「建议统一为」同源）。两级冲突防御，均响亮报错而非静默任选：
+    ①同一变体作为源出现在两组且目标不同；②某组的统一形又是别组的待替换
+    变体（值域∩键域非空——统一到 A 却又要把 A 统一走，目标自相矛盾）。"""
+    mapping = {}
+    for r in results:
+        target = r["suggestion"]
+        for v in r["variants"]:
+            if v == target:
+                continue
+            prev = mapping.get(v)
+            if prev is not None and prev != target:
+                hxt_core.fail(
+                    "变体「%s」同时出现在两组且统一目标不同（%s / %s）"
+                    % (v, prev, target),
+                    hint="用 --pack 分域检查，或修正自定义术语对后重跑")
+            mapping[v] = target
+    loop = set(mapping.values()) & set(mapping.keys())
+    if loop:
+        hxt_core.fail(
+            "统一目标自相矛盾：%s 既是要统一到的目标、又是别组的待替换变体"
+            % "、".join(sorted(loop)),
+            hint="用 --pack 分域检查，或修正自定义术语对后重跑")
+    return mapping
+
+
+def unify_text(text, mapping):
+    """按映射生成统一稿：变体按长度降序合成一个 alternation 单遍替换。
+    单遍保证替换产生的文本不会被后续 key 再命中；长度降序防跨组嵌套
+    （内置组有嵌套校验，用户自定义对没有）。返回 (统一稿, 逐 key 计数)。"""
+    if not mapping:
+        return text, []
+    keys = sorted(mapping, key=len, reverse=True)
+    rx = re.compile("|".join(re.escape(k) for k in keys))
+    detail = {k: 0 for k in keys}
+
+    def _sub(m):
+        k = m.group(0)
+        detail[k] += 1
+        return mapping[k]
+
+    unified = rx.sub(_sub, text)
+    rows = [{"from": k, "to": mapping[k], "count": detail[k]}
+            for k in sorted((k for k in keys if detail[k]),
+                            key=lambda k: -detail[k])]
+    return unified, rows
+
+
 def main():
     import hxt_core
     ap = argparse.ArgumentParser(description="术语一致性检查器")
@@ -159,6 +210,10 @@ def main():
                     help="列出全部域包及对数后退出")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--report", help="生成 markdown 一致性报告")
+    ap.add_argument("--unify", help="生成术语统一稿到此路径（v4.4.0）：每组统一为"
+                                    "出现最多的变体，逐处替换计数全部透出；输出"
+                                    ".docx 后缀即回写 Word。统一稿是建议产物，"
+                                    "复核替换清单后再采用；仅单文件模式")
     args = ap.parse_args()
 
     if args.list_packs:
@@ -170,6 +225,13 @@ def main():
         ap.error("缺少待检文档（或用 --batch 目录做跨文件检查）")
     if args.file and args.batch:
         ap.error("--batch 与单文件模式互斥（只传其一）")
+    if args.unify and args.batch:
+        ap.error("--unify 暂只支持单文件模式（--batch 请逐文件处理）")
+    if args.unify and not args.file:
+        ap.error("--unify 需要待检文档")
+    if args.unify and args.report:
+        ap.error("--unify 与 --report 互斥（统一稿运行自带替换清单；"
+                 "要 markdown 报告请分开两次跑）")
     if args.pack and args.pack not in _TERM_PACKS:
         ap.error("未知域包 %r；--list-packs 查看（%s）"
                  % (args.pack, "/".join(sorted(_TERM_PACKS))))
@@ -313,6 +375,42 @@ def main():
         sys.exit(2)
 
     results = find_group_inconsistencies(text, groups)
+
+    # ── 统一稿模式（v4.4.0）：生成 → 透出逐 key 计数 → 建议 verify 复核 ──
+    if args.unify:
+        mapping = build_unify_plan(results)
+        if not mapping:
+            if args.json:
+                # --json 恒 JSON 契约（batch 模式同款口径）：已一致也出机器口径
+                print(json.dumps({"unify_output": None,
+                                  "already_consistent": True,
+                                  "groups": 0, "replacements": 0,
+                                  "detail": [], "inconsistencies": []},
+                                 ensure_ascii=False, indent=2))
+                sys.exit(0)
+            print("未发现术语不一致——已一致，无需生成统一稿。")
+            sys.exit(0)
+        unified, detail = unify_text(text, mapping)
+        try:
+            hxt_core.write_output(unified, args.unify, src_path=args.file)
+        except OSError as e:
+            print("错误: 无法写入统一稿 %s（%s）" % (args.unify, e),
+                  file=sys.stderr)
+            sys.exit(2)
+        total = sum(d["count"] for d in detail)
+        if args.json:
+            print(json.dumps({"unify_output": args.unify,
+                              "groups": len(detail), "replacements": total,
+                              "detail": detail, "inconsistencies": results},
+                             ensure_ascii=False, indent=2))
+            sys.exit(0)
+        print("统一稿已写入 %s（%d 组术语 / 共 %d 处替换）"
+              % (args.unify, len(detail), total))
+        for d in detail:
+            print("  %s → %s（%d 处）" % (d["from"], d["to"], d["count"]))
+        print("提示：统一稿是建议产物——逐处复核清单后再采用；"
+              "随后建议跑 verify.py 确认数字与引用完整性。")
+        sys.exit(0)
 
     if args.json:
         print(json.dumps({"inconsistencies": results, "total": len(results)},

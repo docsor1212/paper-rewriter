@@ -259,8 +259,7 @@ def main():
 
     if args.output:
         try:
-            with open(args.output, "w", encoding="utf-8") as f:
-                f.write(out)
+            hxt_core.write_output(out, args.output, src_path=args.file)
         except OSError as e:
             print("错误: 无法写入 %s（%s）" % (args.output, e), file=sys.stderr)
             sys.exit(2)

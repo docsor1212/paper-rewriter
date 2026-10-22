@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 4.3.1
+version: 4.4.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: paper rewriting with AI-flavor
   self-check and style naturalization (scan reports are detection only),
@@ -36,9 +36,9 @@ and natural register — with integrity guardrails on every step.
 > (paper-polisher-pro); de-templating, model-residue cleanup, AI-flavor style
 > self-check and rewriting → this tool. Need both? Polish first, then run this pipeline.
 
-## Feature status (v4.3.1)
+## Feature status (v4.4.0)
 
-⚠️ rows = experimental (may reject valid files; review output). **The full per-generation capability list has moved to [references/feature_status.md](references/feature_status.md)**; per-item details live in references/errors.md and topic docs. Stable highlights (all stable, v1.0–4.2): core five · section-aware · rewrite plan · learned guards · machine exit codes · chunk degradation · batch resume/concurrency isolation · cross-file term drift · Statistical consistency guard · term variant groups · encoding auto-detection · Submission self-check bundle (--bundle) · pipeline --handoff · verify prescription output.
+⚠️ rows = experimental (may reject valid files; review output). **The full per-generation capability list has moved to [references/feature_status.md](references/feature_status.md)**; per-item details live in references/errors.md and topic docs. Stable highlights (all stable, v1.0–4.4): core five · section-aware · rewrite plan · learned guards · machine exit codes · chunk degradation · batch resume/concurrency isolation · cross-file term drift · Statistical consistency guard · term variant groups · encoding auto-detection · Submission self-check bundle (--bundle) · pipeline --handoff · verify prescription output · **docx write-back** · **term unification sheet**.
 
 | Capability | Status | Since |
 |---|---|---|
@@ -73,7 +73,7 @@ and natural register — with integrity guardrails on every step.
 | Quality deep rewrite | de-templating / rhythm / concreteness / stance (seven steps) | never invents data; invented numbers flagged (W_NUM_ADDED, human removes) | **you (the agent)** per style guide; handoff via `plan --handoff` |
 | Integrity guard | numbers/DOIs/PMIDs/years/terms must survive; tampering = exit 1 (FAIL output prescribes fixes with anchors) | no truth judgment — original data is the authority | `verify.py` |
 | Before/after | score delta + integrity verdict + profile diff | no substitute for human reading | `compare.py` / `stylecheck --compare` |
-| Term consistency | 8-domain 27 groups (HF/心力衰竭/心衰 one row) | no usage correctness — synonym unification only | `check_terms.py --pack` |
+| Term consistency | 8-domain 27 groups (HF/心力衰竭/心衰 one row); `--unify` emits a unified draft with per-variant replacement counts (review before adopting) | no usage correctness — synonym unification only | `check_terms.py --pack` / `--unify` |
 | Numeric consistency | percent-list sums (partition-cued) / cross-file group-n / p-vs-P style | not a statistics review — original data is the authority | `check_stats.py` (`--batch`) |
 
 
@@ -97,6 +97,8 @@ quick flag semantics:
 | `--structure` | section-aware scoring (IMRaD) |
 | `--step-timeout SEC` | per-step wall-clock budget (default 120) |
 | `--terms FILE` | term list for the integrity guard (build via extract_terms.py) |
+| `--unify SHEET` | check_terms: emit a term-unified draft (v4.4.0; advisory — review the replacement list) |
+| `-o revised.docx` | `-o` on pipeline/transform/compare writes Word when the path ends in `.docx` (v4.4.0, plain paragraphs; merge manually for complex layouts) |
 
 One command (self-check → cleanup → revision brief → integrity guard):
 
@@ -106,7 +108,11 @@ python scripts/pipeline.py draft.txt -o out.txt --terms terms.txt
 
 - **Visualization / batch**: `--html report.html` on detect/pipeline/compare for a
   self-contained report (compare adds sentence-level diff); `--batch dir` scans a
-  whole directory (pipeline writes a CSV).
+  whole directory (pipeline writes a CSV; the batch `-o` summary stays CSV — no
+  docx write-back for the table); `-o` on pipeline/transform/compare ending in
+  `.docx` is written back as Word (v4.4.0, plain paragraphs — closes the loop
+  with `.docx` direct-read; tables/images/styles are not rebuilt, merge complex
+  layouts manually).
 - **Section-aware**: `detect --structure` scores abstract/intro/methods/results
   separately; methods/results phrasing is genre convention — normalized in the
   aggregate only, raw per-section scores always shown.
@@ -172,7 +178,10 @@ When invoked, decide the path first, then run it:
   when both apply, polish first, then run this pipeline — neither substitutes
   for the other.
 - **Term inconsistency** (abbreviation vs full form, mixed synonyms) →
-  `check_terms.py file --pack <domain>`; `--list-packs` shows all eight
+  `check_terms.py file --pack <domain>`; to emit a unified draft directly add
+  `--unify output.txt` (each group unified to its dominant variant, per-variant
+  replacement counts surfaced — advisory output, review before adopting, then
+  run verify; v4.4.0); `--list-packs` shows all eight
   domain packs (v3.0.0).
 - **Numbers that don't agree** (percent list not summing to 100, same group
   with two different n, p/P style mix) → `check_stats.py file` (v3.2.0;

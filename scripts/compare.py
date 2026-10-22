@@ -70,8 +70,7 @@ def main():
         new, nq = tf.normalize_quotes(new)
         if args.output:
             try:
-                with open(args.output, "w", encoding="utf-8") as f:
-                    f.write(new)
+                hxt_core.write_output(new, args.output, src_path=args.orig)
             except OSError as e:
                 print("错误: 无法写入 %s（%s）" % (args.output, e), file=sys.stderr)
                 sys.exit(2)
