@@ -98,6 +98,8 @@ max_cjk_shift=0.12) -> {"ok": bool, "violations": [...], "warnings": [...], "sta
 | `plan.py <file> --handoff`（v3.0.0） | 深改交接块：逐句「原句+操作指令」指令单（含守卫铁律+验收命令）；markdown 追加输出，`--json` 下为 `handoff` 键 |
 | `check_terms.py <file> --pack <域> / --list-packs`（v3.0.0） | 术语守卫域包：八学科域 27 组按域选跑；结果带 `pack` 域标签；`hxt_core` 侧 `check_terms.validate_packs()` 嵌套安全校验（变体互斥断言） |
 | `check_terms.py <file> --unify 统一稿`（v4.4.0） | 术语统一稿：每组统一为出现最多的变体（与报告「建议统一为」同源）；`check_terms.build_unify_plan(results)` 冲突两级防御（同变体两组不同目标 / 值域∩键域非空，均 CliError）、`unify_text(text, mapping)` 变体按长度降序单遍替换（防跨组嵌套+替换产物不再命中）；输出路径 .docx 后缀即回写 Word；退出码 0=统一稿已生成或已一致（已一致不生成文件，--json 恒 JSON 带 already_consistent）；仅单文件模式，--batch/--report 互斥；输出=输入同路径拒绝（docx 原地覆写防不可逆销毁） |
+| `detect.py <file> --section abstract|...|conclusion`（v4.5.0） | 章节专项：`hxt_core.detect_sections` 切节后对该节独立 scan；节不存在 exit 2 列出可识别节；--json 带 section 元数据（key/chars/span/note）；与 --structure/--batch 互斥；--exit-verdict 按本节分数出码
+| `hxt_core.scan` 密度阈值信号（v4.5.0） | en_dash（em-dash ≥5/千词且全文 ≥400 词才启用，一次触发 weight×min(3,density//5)）与 en_paraopen（框架化副词开头段落 ≥40%，统计层自保证 ≥5 段）；密度统计（em_dash_density/para_open_ratio）照旧进 stats 信息层；低于阈值=正常修辞区间不扣分
 | `check_stats.py <file> --tolerance 0.3 / --json / --report`（v3.2.0） | 统计一致性守卫：percent_sum（仅划分用语句）/ group_n_conflict（前缀归一化）/ p_style_mix；退出码 0/1/2 同 check_terms |
 | `check_stats.py --batch 目录`（v3.3.0） | 跨文件批量：逐文件三类检查+跨文件 group_n 聚合（只核 n= 记法；时点前缀加宽剥离，并组候选标 timepoint_merged 不计退出码）；--json 含 files/cross_file |
 | `detect.py / pipeline.py --batch 目录 --resume`（v3.7.0） | 批量断点续传：进度每文件原子落 `<目录>/.pr_batch_state.json`；`hxt_core.batch_resume_prepare(root, resume, kind, row_len)` / `batch_state_store(state, root, fn, fp, status, row, kind)` 公共件（kind 分区制，detect/pipeline 各认各的分区；指纹=[size, mtime_ns]） |

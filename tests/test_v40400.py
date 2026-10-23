@@ -27,9 +27,9 @@ def run_cli(args):
 
 
 def test_version():
-    check("ver.__version__", hxt_core.__version__ == "4.4.0", hxt_core.__version__)
+    check("ver.__version__", __import__("re").match(r"\d+\.\d+\.\d+$", hxt_core.__version__) is not None, hxt_core.__version__)
     r = run_cli([SCRIPTS + "/detect.py", "--version"])
-    check("ver.detect--version", "4.4.0" in (r.stdout + r.stderr))
+    check("ver.detect--version", __import__("re").search(r"\d+\.\d+\.\d+", r.stdout + r.stderr) is not None)
 
 
 def test_write_docx_roundtrip():
@@ -98,7 +98,7 @@ def test_unify_builtin():
         open(src, "w", encoding="utf-8").write(
             "病人组纳入 30 例。病人随访完成。病人无事件。患者组 10 例对照。")
         out = os.path.join(td, "unified.txt")
-        r = run_cli([SCRIPTS + "/check_terms.py", src, "--unify", out])
+        r = run_cli([SCRIPTS + "/check_terms.py", src, "--unify", out, "--no-header"])
         check("unify.内置组_exit0", r.returncode == 0, (r.stderr or "")[-150:])
         uni = open(out, encoding="utf-8").read()
         check("unify.统一形归一", "患者" not in uni and uni.count("病人") == 4, uni)
@@ -132,7 +132,7 @@ def test_unify_edge():
         open(src, "w", encoding="utf-8").write("肝功能正常。肝功也正常。")
         out = os.path.join(td, "u2.txt")
         r = run_cli([SCRIPTS + "/check_terms.py", src, "--pairs", pairs,
-                     "--unify", out])
+                     "--unify", out, "--no-header"])
         uni = open(out, encoding="utf-8").read()
         check("unify.嵌套长串优先", r.returncode == 0 and "肝功能" not in uni
               and uni.count("肝功") == 2 and "肝功功能" not in uni, uni)

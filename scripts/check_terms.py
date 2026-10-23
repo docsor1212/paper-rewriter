@@ -146,6 +146,40 @@ def build_report(results, source=""):
 
 # ── 术语统一稿（v4.4.0 --unify）：检查只报不改，统一稿生成同样不静默——
 # 逐处替换计数全部透出，建议产物需人工复核后再采用 ──
+_HEADER_MARK_TXT = "════ 术语统一稿"
+_HEADER_MARK_MD = "<!-- 术语统一稿"
+
+
+def strip_header_block(text):
+    """剥除统一稿头部清单块（v4.5.0 自指安全）：对带头块的统一稿再跑检查/
+    --unify 时，头块自己的「A → B」清单行会被当成正文变体（干净文档被工具
+    自产物判脏、头块叠加）。txt 块从标记行到结束线、md 块从 <!-- 到 --> 整段剥除。"""
+    for mark, is_md in ((_HEADER_MARK_MD, True), (_HEADER_MARK_TXT, False)):
+        i = text.find(mark)
+        if i < 0:
+            continue
+        if is_md:
+            j = text.find("-->", i)
+            if j < 0:
+                # 注释未闭合（手改破损）：保守剥到块标记行尾为止
+                k = text.find("\n", i)
+                return (text[:i] + (text[k + 1:] if k >= 0 else "")).lstrip("\n")
+            return (text[:i] + text[j + 3:]).lstrip("\n")
+        lines = text.split("\n")
+        out, skip = [], False
+        for ln in lines:
+            if mark in ln:
+                skip = True
+                continue
+            if skip and ln.startswith("════"):
+                skip = False
+                continue
+            if not skip:
+                out.append(ln)
+        return "\n".join(out).lstrip("\n")
+    return text
+
+
 def build_unify_plan(results):
     """检查结果 → 替换映射 {变体: 统一形}（统一形=每组出现最多的变体，
     与报告「建议统一为」同源）。两级冲突防御，均响亮报错而非静默任选：
@@ -214,6 +248,9 @@ def main():
                                     "出现最多的变体，逐处替换计数全部透出；输出"
                                     ".docx 后缀即回写 Word。统一稿是建议产物，"
                                     "复核替换清单后再采用；仅单文件模式")
+    ap.add_argument("--no-header", action="store_true",
+                    help="统一稿不注入头部替换清单块（v4.5.0；缺省在 .txt/.md 稿"
+                         "头部注入复核清单注释，.docx 始终不注入）")
     args = ap.parse_args()
 
     if args.list_packs:
@@ -272,14 +309,16 @@ def main():
                 sys.exit(2)
             print("错误: 目录内没有 .txt/.md/.docx 文件（%s）" % root, file=sys.stderr)
             sys.exit(2)
-        per_file = {fn: find_group_inconsistencies(tx, groups)
+        per_file = {fn: find_group_inconsistencies(strip_header_block(tx), groups)
                     for fn, tx in texts.items()}
+        # 跨文件漂移同样基于剥头块后的正文（统一稿的头块清单行不参与漂移统计）
+        drift_src = {fn: strip_header_block(tx) for fn, tx in texts.items()}
         # 跨文件漂移：各文件「主导变体」（出现最多的）构成集合，≥2 个不同 → 漂移。
         # 单文件各自一致、合起来不一致是多章节论文最隐蔽的术语病，单文件模式看不见。
         drift = []
         for g in groups:
             dominant = {}
-            for fn, tx in texts.items():
+            for fn, tx in drift_src.items():
                 counts = {v: len(re.findall(re.escape(v), tx)) for v in g["variants"]}
                 present = {v: c for v, c in counts.items() if c > 0}
                 if present:
@@ -373,6 +412,8 @@ def main():
     except (OSError, ValueError) as e:
         print("错误: %s" % e, file=sys.stderr)
         sys.exit(2)
+    # 统一稿再处理自指安全（v4.5.0）：输入带历史头块时先剥除再统计
+    text = strip_header_block(text)
 
     results = find_group_inconsistencies(text, groups)
 
@@ -391,6 +432,31 @@ def main():
             print("未发现术语不一致——已一致，无需生成统一稿。")
             sys.exit(0)
         unified, detail = unify_text(text, mapping)
+        # 头部清单注入（v4.5.0，usability 处方：复核零切换——打开统一稿第一屏
+        # 就是替换清单）：.txt/.md 注入（md 用 HTML 注释渲染不可见）；.docx 是
+        # 交付件不注入（清单看运行输出）。--no-header 关闭。.md 检测到 YAML
+        # front matter 时注入其后（front matter 必须居首，pandoc/Jekyll 口径）。
+        if detail and not args.no_header and not args.unify.lower().endswith(".docx"):
+            head, body = "", unified
+            if args.unify.lower().endswith(".md") and unified.startswith("---"):
+                k = unified.find("\n---", 3)
+                if k >= 0:
+                    k = unified.find("\n", k + 1)
+                    head, body = unified[:k + 1], unified[k + 1:]
+            if args.unify.lower().endswith(".md"):
+                block = ("<!-- 术语统一稿（复核后删除本注释块，再跑 verify.py）\n"
+                         + "\n".join("  %s → %s（%d 处）" % (x["from"], x["to"], x["count"])
+                                     for x in detail)
+                         + "\n  共 %d 组 / %d 处替换 -->\n\n"
+                             % (len(detail), sum(x["count"] for x in detail)))
+            else:
+                block = ("════ 术语统一稿 · 复核后删除本块再跑 verify ════\n"
+                         + "\n".join("  %s → %s（%d 处）" % (x["from"], x["to"], x["count"])
+                                     for x in detail)
+                         + "\n  共 %d 组 / %d 处替换\n"
+                             "══════════════════════════════\n\n"
+                             % (len(detail), sum(x["count"] for x in detail)))
+            unified = head + block + body
         try:
             hxt_core.write_output(unified, args.unify, src_path=args.file)
         except OSError as e:

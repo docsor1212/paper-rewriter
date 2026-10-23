@@ -20,6 +20,7 @@
 | **pipeline --batch 降级接线**（批量内超大文件单块超时→降级继续，行内 ⚠[降级] 标记+门禁拦停——stability 系列收尾）·**深改交接块语言感知**（英文稿指令单首选锚 style_guide_en.md，中文稿 style_guide_zh.md） | 稳定 | v4.2 |
 | **功能状态全表下沉本文件**（主文档只留 ⚠️ 行+稳定速览——progressive 密度收口） | 稳定 | v4.3 |
 | **docx 回写闭环**（pipeline/transform/compare `-o` 与 check_terms `--unify` 输出路径以 .docx 结尾即回写 Word——最小 OOXML 纯段落，与 docx 直读构成闭环；表格/图片/样式不重建，复杂格式人工合并）·**术语统一稿**（`check_terms --unify`：每组统一为出现最多的变体，逐处替换计数全透出，映射冲突两级响亮拒绝，变体按长度降序单遍替换防嵌套；已一致不生成文件） | 稳定 | v4.4 |
+| **EN 2026 特征扩容**（结构性对冲/三连同构正则组 +16 词；em-dash 密度过载〔≥5/千词且 ≥400 词〕与段落开头副词均匀化〔≥40%〕两个密度阈值信号接入评分——阈值以下属正常修辞不计分；profound/transformative 医学语境守卫白名单）·**章节专项 `detect --section`**（只切摘要/结论等单节独立诊断——审稿人第一眼重点节；与 --structure 全文总览互补）·**统一稿头部清单**（--unify 在 .txt/.md 稿头注入替换清单注释，复核零切换；--no-header 关闭） | 稳定 | v4.5 |
 
 
 ---
@@ -41,6 +42,7 @@
 | **pipeline --batch degradation** (oversized files inside a batch degrade per-chunk instead of failing whole; rows carry a ⚠[degraded] marker and the gate stops on them) · **language-aware handoff** (EN drafts anchor style_guide_en.md directly, CN drafts style_guide_zh.md) | Stable | v4.2 |
 | **Feature-status list sunk into this file** (main doc keeps the ⚠️ row + stable highlights) | Stable | v4.3 |
 | **docx write-back** (`-o` on pipeline/transform/compare and `--unify` on check_terms write Word files when the path ends in .docx — minimal OOXML plain paragraphs, closing the loop with .docx direct-read; tables/images/styles are not rebuilt, merge complex layouts manually) · **term unification sheet** (`check_terms --unify`: each group unified to its dominant variant, per-variant replacement counts surfaced, mapping conflicts rejected loudly at two levels, longest-variant single-pass replacement against nesting; nothing written when already consistent) | Stable | v4.4 |
+| **EN 2026 signal expansion** (structured-hedging & rule-of-three regex groups +16 vocabulary items; two density-threshold signals wired into scoring — em-dash overload [≥5/1k words and ≥400 words] and uniform paragraph openers [≥40%], below-threshold rhetoric stays unscored; profound/transformative medical-context guard whitelists) · **per-section focus `detect --section`** (diagnose the abstract/conclusion in isolation — the pages reviewers read first; complements full-document --structure) · **unified-draft header sheet** (--unify injects the replacement list as a header comment in .txt/.md drafts, zero-switch review; --no-header to disable) | Stable | v4.5 |
 
 Scale envelope: 800K-char chunks (2K overlap) · 50MB file cap · 120s step budget.
 

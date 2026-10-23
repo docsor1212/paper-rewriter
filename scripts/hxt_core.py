@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "4.4.0"
+__version__ = "4.5.0"
 
 import json
 import os
@@ -977,6 +977,10 @@ _ADVICE = {
     "en_chal": ("挑战/展望公式段", "删公式，写具体判断（EN 指南第 7 步）"),
     "en_filler": ("填充短语", "transform.py 可自动处理大部分"),
     "en_opening": ("套路开场", "删仪式感开场句，直接进入论点；万能框架换成具体陈述（EN 指南第 1/2 步）"),
+    "en_hedge": ("结构性对冲", "删「It is important to note that」类框架，让主张自己站住；动词短语换直述动词（EN 指南第 2/5 步）"),
+    "en_symmetry": ("三连同构", "三连并列拆成两点或换长度不一的散句；镜像收尾改为具体结论（EN 指南第 3 步）"),
+    "en_dash": ("em-dash 过载", "大部分破折号改逗号/括号/分号；全文留一两处最有力的（transform -a 可降噪）"),
+    "en_paraopen": ("段落开头均匀化", "框架化副词开头的段落过多——部分段落直接以内容起句，让节奏错落（EN 指南第 4 步）"),
     "markdown": ("Markdown 残留", "transform.py 可自动处理"),
 }
 
@@ -1301,6 +1305,35 @@ def scan(text, lang=None, profile="academic", source_ext="",
     units = count_units(text, lang)
     _tick("统计特征")
     stats = _structural_stats(text, sentences, lang)
+
+    # --- 密度阈值信号（v4.5.0，2026 高发特征接入评分；形态层自研归纳，溯源见词表 _meta）---
+    # 与逐命中类不同：密度型只在超过校准阈值时按「一次触发」计分——
+    # 阈值以下属于正常修辞区间（em-dash 单两处/副词开头段落偶见都正常），
+    # 不因存在而扣分，只因过载而扣分。样本带实测密度值，可复核。
+    if lang == "en":
+        # 密度信号校准（v4.5.0）：两类信号门槛不同——
+        # em-dash 是绝对密度：全文 ≥400 词才启用（短文一两个破折号就爆表），
+        # 且实际个数 ≥3 才计分（400 词 2 个破折号是正常会议摘要写法）；
+        # 阈值 5.0/千词=「泛滥」区间（正常学术 <1，2026 高发 5-15）。
+        if stats.get("words_en", 0) >= 400:
+            em_d = stats.get("em_dash_density")
+            if em_d is not None and em_d >= 5.0 and stats.get("em_dash_count", 0) >= 3:
+                _mult = min(3, int(em_d // 5.0))
+                add_cat("en_dash", "em-dash 密度过载", 0.8, _mult,
+                        ["%d 处、密度 %.1f/千词（阈值 5.0 且 ≥3 处）——"
+                         "改用逗号/括号/分号拆分" % (stats["em_dash_count"], em_d)])
+            _tick("密度信号")
+        # 段落开头占比是相对信号：统计层已保证 ≥5 段，占比本身跨规模稳定，
+        # 不套词数门槛；且命中段 ≥3 才计分（5 段 2 段的 0.4 太弱，However 类
+        # 正当段首不算框架化副词——opener 表已收窄）
+        po = stats.get("para_open_ratio")
+        if po is not None and po >= 0.4 and stats.get("para_open_hits", 0) >= 3:
+            add_cat("en_paraopen", "段落开头副词均匀化", 0.9, 1,
+                    ["%.0f%% 段落以框架化副词开头（%d/%d，阈值 40%% 且 ≥3 段）——"
+                     "部分段落直接以内容起句" % (po * 100,
+                                                stats.get("para_open_hits", 0),
+                                                max(1, len([p for p in re.split(r"\n\s*\n", text) if p.strip()])))])
+
     pts = pts_acc[0]
 
     score, level, critical = _score(pts, stats, units, cats, lang)
@@ -1374,6 +1407,19 @@ def _structural_stats(text, sentences, lang):
         words = max(1, len(re.findall(r"[A-Za-z]+", text)))
         n_em = len(re.findall(r"(?<!\d)—(?!\d)", text))
         stats["em_dash_density"] = round(n_em / words * 1000, 2)
+        stats["em_dash_count"] = n_em
+        stats["words_en"] = words
+        # v4.5.0 段落开头均匀化（2026 高发特征：框架化副词开头的段落占比）：
+        # 只统计英文语境、≥5 段才有效；信息层统计，计分阈值在 scan 密度段
+        paras = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+        if len(paras) >= 5:
+            _opener = re.compile(
+                r"^(Moreover|Furthermore|Additionally|Consequently|Therefore|Thus"
+                r"|Overall|In addition|Notably|Importantly|Specifically|Ultimately"
+                r"|Meanwhile|Subsequently)[,;:]")
+            n_open = sum(1 for p in paras if _opener.match(p))
+            stats["para_open_ratio"] = round(n_open / len(paras), 3)
+            stats["para_open_hits"] = n_open
     return stats
 
 

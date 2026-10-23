@@ -55,6 +55,11 @@ def main():
                          "结构后扫描正文，结构统计单列不计分）")
     ap.add_argument("--structure", action="store_true",
                     help="章节感知：识别论文结构（摘要/引言/方法/结果/讨论），分章节评分（方法/结果自动降权）")
+    ap.add_argument("--section", choices=["abstract", "introduction", "methods",
+                                          "results", "discussion", "conclusion"],
+                    help="章节专项（v4.5.0）：只切出指定章节独立诊断——审稿人第一眼重点节"
+                         "（摘要/结论）的模板腔最浓缩；全文总分用不带本参数的 detect（与"
+                         " --structure/--batch 互斥）")
     ap.add_argument("--exit-verdict", action="store_true",
                     help="自动化集成（CI/agent 管线）：按判定设退出码——0=低/无残留，"
                          "3=风格特征中及以上（需深改），4=命中模型残留（critical）。"
@@ -67,6 +72,17 @@ def main():
     if getattr(args, "resume", False) and not args.batch:
         print("[提示] --resume 仅在 --batch 下生效（本次按普通单文件/ stdin 处理）",
               file=sys.stderr)
+    if getattr(args, "section", None):
+        if args.batch:
+            print("错误: --section 与 --batch 互斥（章节专项面向单稿重点节）", file=sys.stderr)
+            sys.exit(2)
+        if args.structure:
+            print("错误: --section 与 --structure 互斥（单节深挖 vs 全文结构总览，二选一）",
+                  file=sys.stderr)
+            sys.exit(2)
+        if not args.file:
+            print("错误: --section 需要文件输入（stdin 无章节定位意义）", file=sys.stderr)
+            sys.exit(2)
     if args.batch:
         root = args.batch
         if not os.path.isdir(root):
@@ -251,6 +267,64 @@ def main():
     if not text.strip():
         print("错误: 输入为空", file=sys.stderr)
         sys.exit(2)
+
+    # ── 章节专项模式（v4.5.0）：切节独立诊断，不动全文口径 ──
+    if getattr(args, "section", None):
+        _ext = os.path.splitext(args.file or "")[1].lower()
+        _stext = text
+        if _ext == ".md":
+            import re as _re
+            _stext = _re.sub(r"^#{1,6}(?:\s+|(?=[\u4e00-\u9fff]))", "", text, flags=_re.M)
+            _stext = _re.sub(r"\*\*([^*\n]+)\*\*", r"\1", _stext)
+        secs = hxt_core.detect_sections(_stext)
+        found = [(k, s, e) for k, s, e in secs if k == args.section]
+        if not found:
+            avail = sorted({k for k, _s, _e in secs} - {"preamble", "body"})
+            print("错误: 未识别到「%s」章节（识别到：%s）" % (
+                args.section, "/".join(avail) or "无任何标准章节"), file=sys.stderr)
+            print("处置：确认章节标题行写法（如「摘要」「2. Methods」）；"
+                  "或跑 detect --structure 看结构识别结果", file=sys.stderr)
+            sys.exit(2)
+        key, s0, e0 = found[0]
+        seg = _stext[s0:e0]
+        try:
+            r = hxt_core.scan(seg, lang=None if args.lang == "auto" else args.lang,
+                              profile=args.profile, source_ext=_ext)
+        except ValueError as e:
+            print("错误: %s" % e, file=sys.stderr)
+            sys.exit(2)
+        r["section"] = {"key": key, "chars": len(seg), "span": [s0, e0],
+                        "note": "章节专项：仅本节独立诊断（审稿人第一眼重点节）；"
+                                "全文总分跑不带 --section 的 detect"}
+        if args.json:
+            print(json.dumps(r, ensure_ascii=False, indent=2))
+            if args.exit_verdict:
+                sys.exit(hxt_core.verdict_exit_code(r["score"], r["critical_hit"]))
+            sys.exit(0)
+        print("=" * 62)
+        print("章节专项诊断：%s（%d 字符 · 字符 %d-%d）" % (key, len(seg), s0, e0))
+        print("=" * 62)
+        print("分数: %d [%s]  （本节独立评分；全文诊断跑不带 --section 的 detect）"
+              % (r["score"], r["level"]))
+        if r["critical_hit"]:
+            print("⚠ 命中模型残留（critical）——先 transform.py 清理")
+        cats = r.get("categories") or {}
+        if cats:
+            for cid, c in sorted(cats.items(), key=lambda kv: -(kv[1]["weight"] * kv[1]["count"])):
+                for smp in c.get("samples", [])[:2]:
+                    print("  - [%s] %s" % (c["label"], smp))
+                if not c.get("samples"):
+                    print("  - [%s] ×%d" % (c["label"], c["count"]))
+        else:
+            print("  本节未命中任何模板腔特征。")
+        sugg = r.get("suggestions") or []
+        if sugg:
+            print("词表建议: " + "；".join("%s→%s" % (s["from"], s["to"]) for s in sugg[:5]))
+        print("处置提示: 重点改本节——摘要是审稿人读的第一段，AI 腔在此最显眼；"
+              "逐条改后用本命令复核。")
+        if args.exit_verdict:
+            sys.exit(hxt_core.verdict_exit_code(r["score"], r["critical_hit"]))
+        sys.exit(0)
 
     if args.structure:
         _ext = os.path.splitext(args.file or "")[1].lower()

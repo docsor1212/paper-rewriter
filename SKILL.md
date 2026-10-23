@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 4.4.0
+version: 4.5.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: paper rewriting with AI-flavor
   self-check and style naturalization (scan reports are detection only),
@@ -36,9 +36,9 @@ and natural register — with integrity guardrails on every step.
 > (paper-polisher-pro); de-templating, model-residue cleanup, AI-flavor style
 > self-check and rewriting → this tool. Need both? Polish first, then run this pipeline.
 
-## Feature status (v4.4.0)
+## Feature status (v4.5.0)
 
-⚠️ rows = experimental (may reject valid files; review output). **The full per-generation capability list has moved to [references/feature_status.md](references/feature_status.md)**; per-item details live in references/errors.md and topic docs. Stable highlights (all stable, v1.0–4.4): core five · section-aware · rewrite plan · learned guards · machine exit codes · chunk degradation · batch resume/concurrency isolation · cross-file term drift · Statistical consistency guard · term variant groups · encoding auto-detection · Submission self-check bundle (--bundle) · pipeline --handoff · verify prescription output · **docx write-back** · **term unification sheet**.
+⚠️ rows = experimental (may reject valid files; review output). **The full per-generation capability list has moved to [references/feature_status.md](references/feature_status.md)**; per-item details live in references/errors.md and topic docs. Stable highlights (all stable, v1.0–4.5): core five · section-aware · rewrite plan · learned guards · machine exit codes · chunk degradation · batch resume/concurrency isolation · cross-file term drift · Statistical consistency guard · term variant groups · encoding auto-detection · Submission self-check bundle (--bundle) · pipeline --handoff · verify prescription output · **docx write-back** · **term unification sheet** · **EN 2026 signals (hedging / rule-of-three / em-dash density / paragraph openers)** · **per-section focus (`--section`)**.
 
 | Capability | Status | Since |
 |---|---|---|
@@ -98,6 +98,7 @@ quick flag semantics:
 | `--step-timeout SEC` | per-step wall-clock budget (default 120) |
 | `--terms FILE` | term list for the integrity guard (build via extract_terms.py) |
 | `--unify SHEET` | check_terms: emit a term-unified draft (v4.4.0; advisory — review the replacement list) |
+| `--section abstract` | detect: diagnose one section in isolation (v4.5.0; the abstract is what reviewers read first) |
 | `-o revised.docx` | `-o` on pipeline/transform/compare writes Word when the path ends in `.docx` (v4.4.0, plain paragraphs; merge manually for complex layouts) |
 
 One command (self-check → cleanup → revision brief → integrity guard):

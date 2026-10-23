@@ -433,3 +433,27 @@ python scripts/check_terms.py 稿件.txt --unify 统一稿.txt
 #       随后建议跑 verify.py 确认数字与引用完整性。
 # 输出路径以 .docx 结尾同样回写 Word；已一致时不生成文件、exit 0
 ```
+
+### v4.5.0 新能力速览：EN 2026 特征 + 章节专项 + 统一稿头清单
+
+```bash
+# ① 章节专项：审稿人第一眼重点节独立诊断（全文总分跑不带 --section 的 detect）
+python scripts/detect.py thesis.txt --section abstract
+python scripts/detect.py thesis.txt --section conclusion
+# 分数: 32 [中]  （本节独立评分；全文诊断跑不带 --section 的 detect）
+#   - [结构性对冲/框架化短语] It is important to note that ...
+
+# ② EN 2026 特征（自动生效，无需参数）：em-dash 密度过载 / 段落开头副词
+#    均匀化 / 结构性对冲（It is important to note that…）/ 三连同构
+#    （engaging, rewarding, and lasting）/ profound 等词带医学语境守卫
+
+# ③ 统一稿头清单：打开统一稿第一屏就是替换清单（复核零切换）
+python scripts/check_terms.py 稿件.txt --unify 统一稿.txt
+# 稿件头部自动注入：
+# ════ 术语统一稿 · 复核后删除本块 ════
+#   病人 → 患者（1 处）
+#   共 1 组 / 1 处替换
+# 头块自带「复核后删除本块再跑 verify」——删块后再跑 verify（否则头块
+# 数字/行会被守卫按新增内容告警）
+# .md 稿用 HTML 注释（渲染不可见）；.docx 不注入；--no-header 关闭
+```
