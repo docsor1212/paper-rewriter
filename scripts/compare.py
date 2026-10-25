@@ -6,7 +6,8 @@
     python scripts/compare.py 原稿.txt -o 改稿.txt         # 先机械清洗再对比并落盘
     python scripts/compare.py 原稿.txt 改稿.txt --terms t.txt
 退出码: 0 完成（含完整性 FAIL 也算完成，看报告）| 2 用法/文件错误
-        --exit-verdict: 0 干净 | 3 风格特征中及以上（完整性仍只写报告）
+        --exit-verdict: 0 干净 | 3 风格特征中及以上（完整性仍只写报告；
+                        大文件分块降级时 exit 2=部分覆盖，v4.6.0）
 """
 
 import argparse
@@ -47,7 +48,8 @@ def main():
     ap.add_argument("--html", help="生成单文件 HTML 对照报告（含逐句 diff）到此路径")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--exit-verdict", action="store_true",
-                    help="自动化集成（CI/agent 管线）：按改稿判定设退出码——0=低档，"
+                    help="自动化集成（CI/agent 管线；大文件分块降级时 exit 2=部分覆盖不判干净，"
+         "v4.6.0）：按改稿判定设退出码——0=低档，"
                          "3=风格特征中及以上。完整性守卫仍只写报告（exit 1 契约专属 "
                          "verify.py；要 1/3/4 全档判定用 pipeline --exit-verdict）。"
                          "缺省恒 0")
@@ -78,12 +80,21 @@ def main():
 
     ext_orig = os.path.splitext(args.orig or "")[1].lower()
     ext_new = os.path.splitext(args.new or "")[1].lower() if args.new else ext_orig
+    # v4.6.0 大文件分块：>1M 与 pipeline 同款接 scan_chunked（degrade=True）——
+    # 50MB 单遍 scan 会超 120s 预算（v4.5 词表增量的已知边界）；降级块在报告标注
+    if max(len(orig), len(new)) > 1_000_000:
+        def scan_fn(txt, **kw):
+            return hxt_core.scan_chunked(txt, degrade=True, **kw)
+    else:
+        scan_fn = hxt_core.scan
     try:
-        ro = hxt_core.scan(orig, profile=args.profile, source_ext=ext_orig)
-        rn = hxt_core.scan(new, profile=args.profile, source_ext=ext_new)
+        ro = scan_fn(orig, profile=args.profile, source_ext=ext_orig)
+        rn = scan_fn(new, profile=args.profile, source_ext=ext_new)
     except ValueError as e:
         print("错误: %s" % e, file=sys.stderr)
         sys.exit(2)
+    _deg_o = ro.get("degraded_chunks") or []
+    _deg_n = rn.get("degraded_chunks") or []
     vr = vf.verify(orig, new,
                    vf.load_terms(args.terms) if args.terms else None)
 
@@ -104,8 +115,13 @@ def main():
             "after": {k: rn[k] for k in ("score", "level", "lang", "units", "sentences")},
             "categories_removed": _delta(ro["categories"], rn["categories"]),
             "verify": vr,
+            **({"degraded": {"original": _deg_o, "rewrite": _deg_n}} if (_deg_o or _deg_n) else {}),
         }, ensure_ascii=False, indent=2))
         if args.exit_verdict:
+            # 降级 fail-closed（v4.6.0，与 detect/pipeline 同口径）：
+            # 部分覆盖的对比不给出「干净」判定
+            if _deg_o or _deg_n:
+                sys.exit(2)
             sys.exit(hxt_core.verdict_exit_code(rn["score"], rn["critical_hit"]))
         sys.exit(0)
 
@@ -126,6 +142,12 @@ def main():
                 print("  %-28s 已清除 %d 处" % (label, d))
             else:
                 print("  %-28s 新增 %d 处" % (label, -d))
+    if _deg_o or _deg_n:
+        print()
+        print("⚠[降级] 大文件分块扫描中 %d 个块超时被标记降级（原稿 %d / 改稿 %d）——"
+              "对比基于部分覆盖，请人工抽查未覆盖段落"
+              % (len(_deg_o) + len(_deg_n), len(_deg_o), len(_deg_n)))
+        print()
     print()
     print("完整性守卫: %s" % ("PASS ✓" if vr["ok"] else "FAIL ✗"))
     for v in vr["violations"]:
@@ -139,6 +161,8 @@ def main():
     else:
         print("结论: 痕迹已明显下降；深改请仍按指南复核语义自然度（机器分≠官方检测器分）。")
     if args.exit_verdict:
+        if _deg_o or _deg_n:
+            sys.exit(2)
         sys.exit(hxt_core.verdict_exit_code(rn["score"], rn["critical_hit"]))
     sys.exit(0)
 

@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "4.5.0"
+__version__ = "4.6.0"
 
 import json
 import os
@@ -474,7 +474,10 @@ def scan_chunked(text, lang=None, profile="academic", source_ext="",
     critical = any(k.startswith(("model_artifact", "chatbot", "cutoff")) and c["count"]
                    for k, c in merged.items())
     all_sents = split_sentences(text)
-    stats = _structural_stats(text, all_sents, lang or "zh")
+    eff_lang = lang or detect_language(text)  # v4.2.0 评测 P1：>800k auto 模式不再硬编码 zh
+    # v4.6.0 审计 P1：评分入参此前仍硬编码 zh（连接词统计/_LANG_K 归一化双失真，
+    # EN 大文件跨 1M 阈值 score 虚增 39 分实测）——stats/_score 与返回字段统一吃 eff_lang
+    stats = _structural_stats(text, all_sents, eff_lang)
     stats["notes"].append(
         "超大文本已自动分块（%d 块，块间 2000 字符重叠缝合）——跨块边界信号已缝合，"
         "恰骑重叠窗两端的极端信号仍可能少量偏差" % len(spans))
@@ -484,8 +487,7 @@ def scan_chunked(text, lang=None, profile="academic", source_ext="",
         stats["notes"].append(
             "⚠ 降级：%d 块超时未评分（重试未恢复），本报告实际覆盖约 %.0f%% 正文——"
             "缺失块内特征可能漏检，勿当完整报告使用" % (len(degraded_chunks), cov))
-    score, level, _ = _score(pts, stats, total_units, merged, lang or "zh")
-    eff_lang = lang or detect_language(text)  # v4.2.0 评测 P1：>800k auto 模式不再硬编码 zh
+    score, level, _ = _score(pts, stats, total_units, merged, eff_lang)
     return {
         "lang_detected": eff_lang,
         "lang": eff_lang,
@@ -981,6 +983,8 @@ _ADVICE = {
     "en_symmetry": ("三连同构", "三连并列拆成两点或换长度不一的散句；镜像收尾改为具体结论（EN 指南第 3 步）"),
     "en_dash": ("em-dash 过载", "大部分破折号改逗号/括号/分号；全文留一两处最有力的（transform -a 可降噪）"),
     "en_paraopen": ("段落开头均匀化", "框架化副词开头的段落过多——部分段落直接以内容起句，让节奏错落（EN 指南第 4 步）"),
+    "zh_dash": ("「——」滥用", "句间连接改句号/分号；解释性插入全文留一两处最有力的即可"),
+    "zh_paraopen": ("段落开头公式化", "「随着…的发展」类开场段落过多——部分段落直接以内容起句；段落衔接靠逻辑不靠套语（指南第 1/4 步）"),
     "markdown": ("Markdown 残留", "transform.py 可自动处理"),
 }
 
@@ -1332,7 +1336,28 @@ def scan(text, lang=None, profile="academic", source_ext="",
                     ["%.0f%% 段落以框架化副词开头（%d/%d，阈值 40%% 且 ≥3 段）——"
                      "部分段落直接以内容起句" % (po * 100,
                                                 stats.get("para_open_hits", 0),
-                                                max(1, len([p for p in re.split(r"\n\s*\n", text) if p.strip()])))])
+                                                max(1, len([p for p in re.split(r"\n\s*\n|\n", text) if p.strip()])))])
+    if lang in ("zh", "mix"):
+        # 中文密度阈值（v4.6.0，镜像 EN 校准哲学：阈值以下属正常修辞）——
+        # 「——」：≥400 汉字才启用、≥4/千字且 ≥3 处才计分（正常学术 <1/千字）；
+        # 段落开头公式词：占比 ≥40% 且 ≥3 段才计分
+        if stats.get("zh_chars", 0) >= 400:
+            zd = stats.get("zh_dash_density")
+            if zd is not None and zd >= 4.0 and stats.get("zh_dash_count", 0) >= 3:
+                _mult = min(3, int(zd // 4.0))
+                add_cat("zh_dash", "「——」连接滥用", 0.8, _mult,
+                        ["%d 处、密度 %.1f/千字（阈值 4.0 且 ≥3 处）——"
+                         "句间改用句号或分号；解释插入保留一处即可"
+                         % (stats["zh_dash_count"], zd)])
+            _tick("密度信号")
+        zpo = stats.get("zh_para_open_ratio")
+        if zpo is not None and zpo >= 0.4 and stats.get("zh_para_open_hits", 0) >= 3:
+            add_cat("zh_paraopen", "段落开头公式化", 0.9, 1,
+                    ["%.0f%% 段落以「随着…/近年来/为了…/针对…」类公式词开头"
+                     "（%d/%d，阈值 40%% 且 ≥3 段）——部分段落直接以内容起句"
+                     % (zpo * 100,
+                        stats.get("zh_para_open_hits", 0),
+                        max(1, len([p for p in re.split(r"\n\s*\n|\n", text) if p.strip()])))])
 
     pts = pts_acc[0]
 
@@ -1411,7 +1436,9 @@ def _structural_stats(text, sentences, lang):
         stats["words_en"] = words
         # v4.5.0 段落开头均匀化（2026 高发特征：框架化副词开头的段落占比）：
         # 只统计英文语境、≥5 段才有效；信息层统计，计分阈值在 scan 密度段
-        paras = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+        # v4.6.0 审计 P1：切段口径含单换行——docx/PDF 复制稿段落间只有单 \n，
+        # 原口径（仅空行）对这类输入整文 1 段、段落信号全盲
+        paras = [p.strip() for p in re.split(r"\n\s*\n|\n", text) if p.strip()]
         if len(paras) >= 5:
             _opener = re.compile(
                 r"^(Moreover|Furthermore|Additionally|Consequently|Therefore|Thus"
@@ -1420,6 +1447,25 @@ def _structural_stats(text, sentences, lang):
             n_open = sum(1 for p in paras if _opener.match(p))
             stats["para_open_ratio"] = round(n_open / len(paras), 3)
             stats["para_open_hits"] = n_open
+    if lang in ("zh", "mix"):
+        # v4.6.0 中文密度镜像（与 EN 侧同一校准哲学：阈值以下不扣分）：
+        # ①「——」滥用密度——正常中文破折号做解释插入频率很低（<1/千字），
+        #   AI 高发拿它连接两个独立句；数值区间（2018—2020）不统计
+        # ②段落开头公式词占比（随着…的发展/近年来/在…背景下/为了/针对…）：
+        #   段落级模板化开场的中文形态；≥5 段才有效
+        zh_chars = max(1, len(re.findall(r"[\u4e00-\u9fff]", text)))
+        n_zd = len(re.findall(r"(?<!\d)——(?!\d)", text))
+        stats["zh_dash_density"] = round(n_zd / zh_chars * 1000, 2)
+        stats["zh_dash_count"] = n_zd
+        stats["zh_chars"] = zh_chars
+        zh_paras = [p.strip() for p in re.split(r"\n\s*\n|\n", text) if p.strip()]
+        if len(zh_paras) >= 5:
+            _zh_opener = re.compile(
+                r"^(随着.{2,20}的|近年来[，,]|在.{1,16}(背景|形势|语境)之?下[，,]"
+                r"|为了|针对|考虑到|基于(以上|上述|此)|与此同时[，,])")
+            n_open = sum(1 for p in zh_paras if _zh_opener.match(p))
+            stats["zh_para_open_ratio"] = round(n_open / len(zh_paras), 3)
+            stats["zh_para_open_hits"] = n_open
     return stats
 
 
