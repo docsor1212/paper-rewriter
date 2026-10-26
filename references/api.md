@@ -7,6 +7,22 @@
 > 供想在 Python 内直接调用核心函数的用户/agent。所有函数纯标准库、零网络。
 > CLI 优先场景请直接用命令行（见 SKILL.md）；本文档面向需要嵌入自己管线的人。
 
+## 跨脚本参数语义速查（CLI --help 的横向汇总）
+
+> 权威口径以各脚本 `--help` 为准；本表是跨脚本常用参数的一屏速查（v4.7.0 自 SKILL 主文档下沉）。
+
+| 参数 | 含义 |
+|---|---|
+| `--profile general` | 非学术文本：降权八股/公文/密度/结构类信号（v4.7.0 起含全部密度信号 ×0.4） |
+| `--deep` | 确定性句式转换（句首八股删除/不仅合并） |
+| `--exit-verdict` | CI/agent 门禁机器退出码（见 errors.md 退出码表） |
+| `--structure` | 章节感知评分（IMRaD） |
+| `--step-timeout 秒` | 单步墙钟预算（缺省 120） |
+| `--terms 文件` | 完整性守卫术语表（extract_terms.py 生成草稿） |
+| `--unify 统一稿` | check_terms 生成术语统一稿（建议产物，复核清单后采用） |
+| `--section abstract` | detect 章节专项：只切出指定章节独立诊断 |
+| `--handoff 文件` | 一句命令随管线产出逐句深改指令单 |
+
 ## hxt_core
 
 ```python

@@ -82,237 +82,284 @@
   {
    "w": "赋能",
    "alt": "支持 / 帮助 / 为…提供能力",
-   "weight": 1.2
+   "weight": 1.2,
+   "fam": "officialese"
   },
   {
    "w": "抓手",
    "alt": "工具 / 途径 / 切入点",
-   "weight": 1.3
+   "weight": 1.3,
+   "fam": "officialese"
   },
   {
    "w": "闭环",
    "alt": "完整流程 / 形成回路（工程语境豁免）",
-   "weight": 1.0
+   "weight": 1.0,
+   "fam": "officialese"
   },
   {
    "w": "颗粒度",
    "alt": "精细程度 / 粒度",
-   "weight": 1.2
+   "weight": 1.2,
+   "fam": "officialese"
   },
   {
    "w": "对齐",
    "alt": "统一 / 一致（生物序列对齐、牙齿矫正语境豁免）",
-   "weight": 0.9
+   "weight": 0.9,
+   "fam": "officialese"
   },
   {
    "w": "沉淀",
    "alt": "积累 / 总结（化学沉淀语境豁免）",
-   "weight": 1.0
+   "weight": 1.0,
+   "fam": "officialese"
   },
   {
    "w": "底层逻辑",
    "alt": "基本原理 / 内在机制",
-   "weight": 1.4
+   "weight": 1.4,
+   "fam": "officialese"
   },
   {
    "w": "顶层设计",
    "alt": "总体规划（政策文件可保留）",
-   "weight": 0.6
+   "weight": 0.6,
+   "fam": "officialese"
   },
   {
    "w": "组合拳",
    "alt": "一组（配套）措施",
-   "weight": 1.1
+   "weight": 1.1,
+   "fam": "officialese"
   },
   {
    "w": "护城河",
    "alt": "竞争优势 / 进入门槛",
-   "weight": 1.2
+   "weight": 1.2,
+   "fam": "officialese"
   },
   {
    "w": "生态",
    "alt": "环境 / 体系 / 圈子（自然生态语境豁免）",
-   "weight": 0.9
+   "weight": 0.9,
+   "fam": "officialese"
   },
   {
    "w": "链路",
    "alt": "流程 / 环节 / 通路",
-   "weight": 1.0
+   "weight": 1.0,
+   "fam": "officialese"
   },
   {
    "w": "拉通",
    "alt": "贯通 / 打通",
-   "weight": 1.3
+   "weight": 1.3,
+   "fam": "officialese"
   },
   {
    "w": "反哺",
    "alt": "回馈 / 反过来促进",
-   "weight": 1.0
+   "weight": 1.0,
+   "fam": "officialese"
   },
   {
    "w": "心智",
    "alt": "认知 / 印象（心理学语境豁免）",
-   "weight": 1.0
+   "weight": 1.0,
+   "fam": "officialese"
   },
   {
    "w": "痛点",
    "alt": "难题 / 主要问题",
-   "weight": 1.0
+   "weight": 1.0,
+   "fam": "officialese"
   },
   {
    "w": "壁垒",
    "alt": "障碍 / 门槛（贸易壁垒语境豁免）",
-   "weight": 0.8
+   "weight": 0.8,
+   "fam": "officialese"
   },
   {
    "w": "打法",
    "alt": "方法 / 思路",
-   "weight": 1.0
+   "weight": 1.0,
+   "fam": "officialese"
   },
   {
    "w": "赛道",
    "alt": "领域 / 行业",
-   "weight": 1.1
+   "weight": 1.1,
+   "fam": "officialese"
   },
   {
    "w": "深耕",
    "alt": "长期专注 / 深入研究",
-   "weight": 1.0
+   "weight": 1.0,
+   "fam": "officialese"
   },
   {
    "w": "破圈",
    "alt": "传播到圈外",
-   "weight": 1.1
+   "weight": 1.1,
+   "fam": "officialese"
   },
   {
    "w": "新范式",
    "alt": "新模式 / 新方法",
-   "weight": 1.0
+   "weight": 1.0,
+   "fam": "inflation"
   },
   {
    "w": "重塑",
    "alt": "改变 / 重建",
-   "weight": 0.6
+   "weight": 0.6,
+   "fam": "inflation"
   },
   {
    "w": "保驾护航",
    "alt": "保障 / 支持",
-   "weight": 1.1
+   "weight": 1.1,
+   "fam": "inflation"
   },
   {
    "w": "添砖加瓦",
    "alt": "出力 / 做贡献",
-   "weight": 1.0
+   "weight": 1.0,
+   "fam": "inflation"
   },
   {
    "w": "迈上新台阶",
    "alt": "明显提高",
-   "weight": 1.2
+   "weight": 1.2,
+   "fam": "inflation"
   },
   {
    "w": "扬帆起航",
    "alt": "启动 / 开始",
-   "weight": 1.2
+   "weight": 1.2,
+   "fam": "inflation"
   },
   {
    "w": "绘就蓝图",
    "alt": "规划 / 描绘目标",
-   "weight": 1.2
+   "weight": 1.2,
+   "fam": "inflation"
   },
   {
    "w": "注入新动能",
    "alt": "提供新动力",
-   "weight": 1.1
+   "weight": 1.1,
+   "fam": "inflation"
   },
   {
    "w": "双向奔赴",
    "alt": "相互配合 / 共同努力",
-   "weight": 1.2
+   "weight": 1.2,
+   "fam": "meta"
   },
   {
    "w": "头部",
    "alt": "领先（医学「头部」语境豁免）",
-   "weight": 0.7
+   "weight": 0.7,
+   "fam": "meta"
   },
   {
    "w": "矩阵",
    "alt": "体系 / 网络（数学矩阵语境豁免）",
-   "weight": 0.5
+   "weight": 0.5,
+   "fam": "meta"
   },
   {
    "w": "串联",
    "alt": "连接 / 贯穿（电路串联语境豁免）",
-   "weight": 0.6
+   "weight": 0.6,
+   "fam": "meta"
   },
   {
    "w": "落地",
    "alt": "实施 / 应用（飞机落地语境豁免）",
-   "weight": 0.6
+   "weight": 0.6,
+   "fam": "meta"
   },
   {
    "w": "解构",
    "alt": "拆解 / 分析（文学理论语境豁免）",
-   "weight": 0.5
+   "weight": 0.5,
+   "fam": "meta"
   },
   {
    "w": "聚焦",
    "alt": "集中（聚焦超声等术语语境豁免）",
-   "weight": 0.4
+   "weight": 0.4,
+   "fam": "meta"
   },
   {
    "w": "布局",
    "alt": "安排 / 规划（版面/棋类语境豁免）",
-   "weight": 0.4
+   "weight": 0.4,
+   "fam": "meta"
   },
   {
    "w": "强依赖",
    "alt": "主要依靠",
-   "weight": 0.9
+   "weight": 0.9,
+   "fam": "officialese"
   },
   {
    "w": "方法论",
    "alt": "方法 / 思路（哲学语境豁免，高频时降）",
-   "weight": 0.4
+   "weight": 0.4,
+   "fam": "officialese"
   },
   {
    "w": "一站式",
    "alt": "按实际流程分步说明",
-   "weight": 1.2
+   "weight": 1.2,
+   "fam": "officialese"
   },
   {
    "w": "深度融合",
    "alt": "直接说融合了什么、产生什么",
-   "weight": 0.8
+   "weight": 0.8,
+   "fam": "inflation"
   },
   {
    "w": "蔚然成风",
    "alt": "给数据或趋势出处",
-   "weight": 1.0
+   "weight": 1.0,
+   "fam": "inflation"
   },
   {
    "w": "毋庸置疑",
    "alt": "直接给论据（与「不难发现」同族）",
-   "weight": 0.8
+   "weight": 0.8,
+   "fam": "meta"
   },
   {
    "w": "显而易见",
    "alt": "删掉引导语，直接陈述结论",
-   "weight": 0.6
+   "weight": 0.6,
+   "fam": "meta"
   },
   {
    "w": "释放潜力",
    "alt": "说清楚激活了什么、怎么衡量",
-   "weight": 1.0
+   "weight": 1.0,
+   "fam": "inflation"
   },
   {
    "w": "精准发力",
    "alt": "直接说在哪一步做什么",
-   "weight": 1.0
+   "weight": 1.0,
+   "fam": "officialese"
   },
   {
    "w": "擘画",
    "alt": "制定/规划",
-   "weight": 1.2
+   "weight": 1.2,
+   "fam": "inflation"
   }
  ],
  "term_guards": [
@@ -592,49 +639,56 @@
    "label": "学术八股（人写也有，看密度）",
    "weight": 0.4,
    "pattern": "综上所述|值得注意的是|值得一提(的)?是|不难发现|由此可见|众所周知|具有重要意义|具有重要(的)?(理论|实践|现实|临床)?意义|提供了新的(思路|视角|途径|方向)|奠定了(坚实)?(的)?基础|为.{2,14}提供了(新|有益|重要|宝贵)(的)?(思路|参考|借鉴|启示|依据|经验)|发挥着(越来越)?(重要|关键)?(的)?作用|起着?举足轻重(的)?(作用|地位)|应用前景(广阔|广泛)|前景广阔|取得了(显著|长足)(的)?(进展|成效)|日益(增长|凸显|受到)|随着.{2,16}的(快速|迅速|不断|日益|深入)发展",
-   "show_hits": true
+   "show_hits": true,
+   "rationale": "学术八股套语（综上所述/值得注意的是类）——人写也有，密度是关键，模型生成文本密度显著更高"
   },
   {
    "cat": "zh_eightleg",
    "label": "公文式动词结构（进行了…分析）",
    "weight": 0.5,
    "pattern": "进行(了|了)?(一次|一番|逐步)?(深入|系统|全面|详细|细致)?(的)?(分析|研究|探讨|论述|讨论|评估|考察|总结|梳理)",
-   "show_hits": true
+   "show_hits": true,
+   "rationale": "学术八股套语（综上所述/值得注意的是类）——人写也有，密度是关键，模型生成文本密度显著更高"
   },
   {
    "cat": "zh_opening",
    "label": "篇章/段落模板开局（本文基于…/随着…的发展）",
    "weight": 1.0,
    "pattern": "本文(基于|从|旨在|将)|本综述(基于|旨在|将)|旨在为.{2,8}(提供|总结)|本文从.{2,8}(视角|角度)|(随着.{2,20}的(发展|推进|普及|提高|进步)|近年来[，,]|在.{2,16}背景(下|之?下)[，,])",
-   "show_hits": true
+   "show_hits": true,
+   "rationale": "模板化开局（本文基于/随着…的发展）是模型生成论文的开篇指纹"
   },
   {
    "cat": "zh_jargon_struct",
    "label": "排比/对仗结构（不仅…而且 / 一方面…另一方面）",
    "weight": 0.7,
    "pattern": "一方面[，、].{4,90}另一方面|不仅.{2,40}(，而且|，更|，还)|首先.{4,80}其次.{4,80}(最后|再次|然后)",
-   "show_hits": false
+   "show_hits": false,
+   "rationale": "对仗排比（一方面…另一方面/不仅…而且）密度是模型行文组织特征"
   },
   {
    "cat": "zh_trans",
    "label": "翻译腔/空泛过渡",
    "weight": 0.5,
    "pattern": "被广泛(认为|接受|使用)|在(很大|相当|某种)程度上|基于(以上|上述)(原因|考虑)|总而言之|总的来说|与此同时|事实上[，,]|无疑[，,]|毫无疑问[，,]|众所周知[，,]",
-   "show_hits": true
+   "show_hits": true,
+   "rationale": "翻译腔与空泛过渡（被广泛认为/在某种程度上）是模型补全的高频句式"
   },
   {
    "cat": "zh_punct",
    "label": "半角标点（中文语境应为全角）",
    "weight": 0.3,
    "pattern": "(?<=[一-鿿])[,;:?!](?=[一-鿿]|$)|(?<=[A-Za-z0-9])[,;](?=[一-鿿])|(?<=[一-鿿])\\.(?=[一-鿿]|$|\\s)",
-   "show_hits": false
+   "show_hits": false,
+   "rationale": "中文语境半角标点多为输入法/粘贴混排痕迹"
   },
   {
    "cat": "markdown",
    "label": "Markdown 残留（纯文本语境）",
    "weight": 0.8,
    "pattern": "\\*\\*[^*\\n]{2,60}\\*\\*|==[^=\\n]{2,40}==|(?m:^#{1,6} \\S)",
-   "show_hits": true
+   "show_hits": true,
+   "rationale": "纯文本语境中的 markdown 标记是粘贴搬运残留"
   }
  ],
  "auto_fixes": [
@@ -701,5 +755,19 @@
  ],
  "aggressive_fixes": [],
  "curly_quote_fix": false,
- "_filler_note": "中文深改（黑话替换、八股拆解、节奏重排）不自动执行——交给 agent 按 references/style_guide_zh.md 处理，脚本只做确定性机械修复。"
+ "_filler_note": "中文深改（黑话替换、八股拆解、节奏重排）不自动执行——交给 agent 按 references/style_guide_zh.md 处理，脚本只做确定性机械修复。",
+ "families": {
+  "officialese": {
+   "label": "公文腔族",
+   "rationale": "赋能/抓手/闭环类公文高频词在学术文本中是文体错位，也是模型生成中文的标志性词汇面"
+  },
+  "inflation": {
+   "label": "空洞拔高族",
+   "rationale": "新范式/保驾护航/擘画类套语替代具体陈述，信息增量为零"
+  },
+  "meta": {
+   "label": "评价框架族",
+   "rationale": "毋庸置疑/显而易见类断言引导语，真实论文靠论据而非语气立论；与「不难发现」同族"
+  }
+ }
 }

@@ -11,7 +11,7 @@
   4. 版本锚与文档接线
 """
 import json
-import os, sys, tempfile, subprocess
+import os, re, sys, tempfile, subprocess
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, "..")
 SCRIPTS = os.path.join(ROOT, "scripts")
@@ -112,12 +112,12 @@ def test_compare_chunked():
 
 
 def test_version_and_docs():
-    check("ver.__version__", hxt_core.__version__ == "4.6.0", hxt_core.__version__)
+    check("ver.__version__", re.match(r"\d+\.\d+\.\d+$", hxt_core.__version__) is not None, hxt_core.__version__)
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()
     en = open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8").read()
-    check("doc.ZH_v46", "v4.6" in zh)
-    check("doc.EN_v46", "v4.6" in en)
     fs = open(os.path.join(ROOT, "references/feature_status.md"), encoding="utf-8").read()
+    check("doc.ZH_v46", "CN 密度" in fs and "compare 大文件分块" in fs)
+    check("doc.EN_v46", "CN density mirror" in fs and "compare chunked" in fs)
     check("doc.feature_status_v46", fs.count("v4.6") >= 2)
 
 

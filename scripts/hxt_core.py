@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "4.6.0"
+__version__ = "4.7.0"
 
 import json
 import os
@@ -383,6 +383,9 @@ def _merge_cat_counts(r, merged, weighted, sign=1):
                                     "auto_fixable": c["auto_fixable"]})
         m["count"] = max(0, m["count"] + sign * c["count"])
         m["weight"] = c["weight"]  # 同类同权
+        # v4.7.0 审计 P1：可解释层 rationale 随合并搬运（>1MB 分块主路径不再丢依据）
+        if c.get("rationale") and "rationale" not in m:
+            m["rationale"] = c["rationale"]
         if sign > 0:
             for smp in c["samples"]:
                 if smp not in m["samples"]:
@@ -1314,6 +1317,7 @@ def scan(text, lang=None, profile="academic", source_ext="",
     # 与逐命中类不同：密度型只在超过校准阈值时按「一次触发」计分——
     # 阈值以下属于正常修辞区间（em-dash 单两处/副词开头段落偶见都正常），
     # 不因存在而扣分，只因过载而扣分。样本带实测密度值，可复核。
+    _gw = 0.4 if profile == "general" else 1.0  # v4.7.0 general 降权矩阵：密度/结构信号在非学术文本是文体常态
     if lang == "en":
         # 密度信号校准（v4.5.0）：两类信号门槛不同——
         # em-dash 是绝对密度：全文 ≥400 词才启用（短文一两个破折号就爆表），
@@ -1323,7 +1327,7 @@ def scan(text, lang=None, profile="academic", source_ext="",
             em_d = stats.get("em_dash_density")
             if em_d is not None and em_d >= 5.0 and stats.get("em_dash_count", 0) >= 3:
                 _mult = min(3, int(em_d // 5.0))
-                add_cat("en_dash", "em-dash 密度过载", 0.8, _mult,
+                add_cat("en_dash", "em-dash 密度过载", round(0.8 * _gw, 4), _mult,
                         ["%d 处、密度 %.1f/千词（阈值 5.0 且 ≥3 处）——"
                          "改用逗号/括号/分号拆分" % (stats["em_dash_count"], em_d)])
             _tick("密度信号")
@@ -1332,7 +1336,7 @@ def scan(text, lang=None, profile="academic", source_ext="",
         # 正当段首不算框架化副词——opener 表已收窄）
         po = stats.get("para_open_ratio")
         if po is not None and po >= 0.4 and stats.get("para_open_hits", 0) >= 3:
-            add_cat("en_paraopen", "段落开头副词均匀化", 0.9, 1,
+            add_cat("en_paraopen", "段落开头副词均匀化", round(0.9 * _gw, 4), 1,
                     ["%.0f%% 段落以框架化副词开头（%d/%d，阈值 40%% 且 ≥3 段）——"
                      "部分段落直接以内容起句" % (po * 100,
                                                 stats.get("para_open_hits", 0),
@@ -1345,14 +1349,14 @@ def scan(text, lang=None, profile="academic", source_ext="",
             zd = stats.get("zh_dash_density")
             if zd is not None and zd >= 4.0 and stats.get("zh_dash_count", 0) >= 3:
                 _mult = min(3, int(zd // 4.0))
-                add_cat("zh_dash", "「——」连接滥用", 0.8, _mult,
+                add_cat("zh_dash", "「——」连接滥用", round(0.8 * _gw, 4), _mult,
                         ["%d 处、密度 %.1f/千字（阈值 4.0 且 ≥3 处）——"
                          "句间改用句号或分号；解释插入保留一处即可"
                          % (stats["zh_dash_count"], zd)])
             _tick("密度信号")
         zpo = stats.get("zh_para_open_ratio")
         if zpo is not None and zpo >= 0.4 and stats.get("zh_para_open_hits", 0) >= 3:
-            add_cat("zh_paraopen", "段落开头公式化", 0.9, 1,
+            add_cat("zh_paraopen", "段落开头公式化", round(0.9 * _gw, 4), 1,
                     ["%.0f%% 段落以「随着…/近年来/为了…/针对…」类公式词开头"
                      "（%d/%d，阈值 40%% 且 ≥3 段）——部分段落直接以内容起句"
                      % (zpo * 100,
@@ -1362,6 +1366,50 @@ def scan(text, lang=None, profile="academic", source_ext="",
     pts = pts_acc[0]
 
     score, level, critical = _score(pts, stats, units, cats, lang)
+
+    # ── 特征可解释层（v4.7.0）：每命中类附「为什么这是信号」的依据 ──
+    # 依据口径=公开写作风格共识+本项目多轮真实语料实测（373 文件统计通道/
+    # 医学知识库实测/2026-10 二轮实测），词表按语义族给据，正则组逐组给据。
+    for pats, pref in ((zh_pats, "zh_"), (en_pats, "en_")):
+        if not pats:
+            continue
+        fams = pats.get("families") or {}
+        for item in pats.get("regex_signals", []):
+            c = cats.get(item.get("cat"))
+            if c and item.get("rationale") and "rationale" not in c:
+                c["rationale"] = item["rationale"]
+        fam_hit = {}
+        for w, st in vocab_stats.items():
+            if not st[0]:
+                continue
+            for e in pats.get("vocabulary", []):
+                if e["w"] == w and e.get("fam") in fams:
+                    fam_hit[e["fam"]] = fam_hit.get(e["fam"], 0) + st[0]
+                    break
+        if fam_hit:
+            top_fam = max(fam_hit, key=fam_hit.get)
+            target = cats.get(pref + "jargon" if pref == "zh_" else "en_vocab")
+            if target:
+                target["rationale"] = (
+                    "%s（主导族，命中 %d 处）：%s" % (
+                        fams[top_fam]["label"], fam_hit[top_fam],
+                        fams[top_fam]["rationale"]))
+    _BUILTIN_RATIONALE = {
+        "en_dash": "破折号在正式学术文体正常频率 <1/千词，高频连用是模型生成文本的典型形态特征",
+        "en_paraopen": "框架化副词开头的段落占比过高反映段落组织的模板化",
+        "zh_dash": "中文破折号正常用法为解释性插入（<1/千字），句间高密度连用是模型生成中文的典型形态特征",
+        "zh_paraopen": "「随着…/为了…/针对…」类公式开场段落占比过高反映段落组织的模板化",
+        # 残留三类（硬信号）：模型输出特有、无正当学术用途——命中即自明级依据
+        "model_artifact_zh": "模型输出特有的引用残渣/标记（无正当用途），命中即硬信号",
+        "model_artifact_en": "Model-output citation residue with no legitimate use — hard signal on hit",
+        "chatbot_zh": "聊天客套/免责声明是会话机器人输出特征，正式学术文本不出现",
+        "chatbot_en": "Chatbot filler/disclaimers never appear in formal academic prose — hard signal",
+        "cutoff_zh": "知识截止声明是模型对话的直接残留",
+        "cutoff_en": "Knowledge-cutoff statements are direct chatbot residue",
+    }
+    for cid, why in _BUILTIN_RATIONALE.items():
+        if cid in cats:
+            cats[cid]["rationale"] = why
 
     suggestions = []
     if zh_pats:

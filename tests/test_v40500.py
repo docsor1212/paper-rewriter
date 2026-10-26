@@ -179,10 +179,10 @@ def test_version_and_docs():
     check("ver.__version__", __import__("re").match(r"\d+\.\d+\.\d+$", hxt_core.__version__) is not None, hxt_core.__version__)
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()
     en = open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8").read()
-    check("doc.ZH_v45", "v4.5" in zh)
-    check("doc.EN_v45", "v4.5" in en)
+    # doc 锚=feature_status 永久正本（主文档随代际滚动，v4.7 起机制化迁移）
     fs = open(os.path.join(ROOT, "references/feature_status.md"), encoding="utf-8").read()
-    check("doc.feature_status_v45", fs.count("v4.5") >= 2)
+    check("doc.ZH_v45", "v4.5" in fs and "EN 2026" in fs)
+    check("doc.EN_v45", "signal expansion" in fs)
 
 
 def test_audit_round2():

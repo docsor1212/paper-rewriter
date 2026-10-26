@@ -311,10 +311,11 @@ def main():
         cats = r.get("categories") or {}
         if cats:
             for cid, c in sorted(cats.items(), key=lambda kv: -(kv[1]["weight"] * kv[1]["count"])):
+                print("  - [%s] ×%d" % (c["label"], c["count"]))
+                if c.get("rationale"):
+                    print("      依据: %s" % c["rationale"])
                 for smp in c.get("samples", [])[:2]:
-                    print("  - [%s] %s" % (c["label"], smp))
-                if not c.get("samples"):
-                    print("  - [%s] ×%d" % (c["label"], c["count"]))
+                    print("      %s" % smp)
         else:
             print("  本节未命中任何模板腔特征。")
         sugg = r.get("suggestions") or []
@@ -486,6 +487,8 @@ def main():
             c = r["categories"][cid]
             mark = " [可自动修]" if cid in hxt_core.AUTO_FIXABLE else ""
             print("  · %-28s %3d 处%s" % (c["label"], c["count"], mark))
+            if c.get("rationale"):
+                print("      依据: %s" % c["rationale"])
             for s in c["samples"][:4]:
                 print("      - %s" % s)
     else:

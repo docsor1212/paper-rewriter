@@ -475,3 +475,19 @@ python scripts/compare.py 原稿_全本.txt 改稿_全本.txt
 # 请人工抽查未覆盖段落
 # --exit-verdict 下有降级块时 exit 2（部分覆盖不判干净）
 ```
+
+### v4.7.0 新能力速览：特征可解释层 + general 降权矩阵
+
+```bash
+# ① 每个命中类带「依据」——为什么报我，一眼可查
+python scripts/detect.py draft.txt
+#   · AI vocabulary                   5 处
+#       依据: 空洞拔高名词族（主导族，命中 3 处）：tapestry/testament/realm 类
+#             抽象大词缺乏信息增量，模型用它替代具体陈述
+#       - testament → 直接给可核对的证据
+# --json 的 categories 每类自动带 rationale 字段（程序化消费同口径）
+
+# ② 非学术文本的机制级出路：--profile general 下密度/结构信号整体降权
+python scripts/detect.py 公众号文章.txt --profile general
+# 八股/公文/密度/段落结构类信号 ×0.4（v4.7.0 起覆盖全部密度信号）
+```
