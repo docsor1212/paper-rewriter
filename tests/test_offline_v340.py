@@ -116,7 +116,7 @@ def test_description():
               "official-eval"):
         check("desc.禁词「%s」零命中" % w, w not in desc.lower())
     check("desc.displayName 钉住铁律⑤值",
-          "displayName: 论文降AI率·去AI味改写｜论文改写·学术表达优化" in zh)
+          "displayName: 毕业论文降AI率·去AI味改写｜论文改写·学术表达优化" in zh)
     check("version.>=3.4.0",
           tuple(int(x) for x in hxt_core.__version__.split(".")) >= (3, 4, 0),
           hxt_core.__version__)

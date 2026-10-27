@@ -215,7 +215,7 @@ def test_review_fixes():
         check("fix.时点并组=候选不计退出码",
               r3.returncode == 0 and "时点候选" in r3.stdout, r3.stdout[-200:])
         check("docs.ZH frontmatter displayName 与现役 dn 一致",
-              "displayName: 论文降AI率·去AI味改写｜论文改写·学术表达优化" in zh)
+              "displayName: 毕业论文降AI率·去AI味改写｜论文改写·学术表达优化" in zh)
 
 
 def main():

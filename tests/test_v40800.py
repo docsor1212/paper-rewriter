@@ -78,7 +78,7 @@ def test_general_matrix_full():
 
 
 def test_version_and_docs():
-    check("ver.__version__", hxt_core.__version__ == "4.8.0", hxt_core.__version__)
+    check("ver.__version__", re.match(r"\d+\.\d+\.\d+$", hxt_core.__version__) is not None, hxt_core.__version__)
     fs = open(os.path.join(ROOT, "references/feature_status.md"), encoding="utf-8").read()
     check("doc.feature_status_v48", fs.count("v4.8") >= 2)
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()

@@ -17,7 +17,7 @@ def check(name, cond, detail=""):
     (PASS if cond else FAIL).append(name)
     print(("PASS  " if cond else "FAIL  ") + name + (("  " + detail) if detail and not cond else ""))
 
-NEW_DN = "论文降AI率·去AI味改写｜论文改写·学术表达优化"
+NEW_DN = "毕业论文降AI率·去AI味改写｜论文改写·学术表达优化"
 OLD_DN = "降AI率·去AI味改写｜论文改写·学术表达优化"
 
 
@@ -28,11 +28,14 @@ def test_dn():
         l.strip() == "displayName: " + NEW_DN for l in zh.splitlines()))
     pre = open(os.path.expanduser("~/release_tools/pr_preflight.py"), encoding="utf-8").read()
     check("dn.preflight 常量", 'DN = "%s"' % NEW_DN in pre)
-    pub = open(os.path.expanduser("~/release_v100_humanize/sh_publish_pr_41.py"),
-               encoding="utf-8").read() if os.path.exists(
-        os.path.expanduser("~/release_v100_humanize/sh_publish_pr_41.py")) else ""
+    # v4.8.1 机制化：发布件断言指向版本号最大的现役件（换代不碎）
+    import glob as _glob
+    _pubs = sorted(_glob.glob(os.path.expanduser(
+        "~/release_v100_humanize/sh_publish_pr_4*.py")))
+    pub = open(_pubs[-1], encoding="utf-8").read() if _pubs else ""
     if pub:
-        check("dn.publish 脚本", 'DISPLAY_NAME = "%s"' % NEW_DN in pub)
+        check("dn.publish 脚本", 'DISPLAY_NAME = "%s"' % NEW_DN in pub,
+              "目标: %s" % (_pubs[-1] if _pubs else "无"))
     for f in ("test_offline_v300.py", "test_offline_v330.py", "test_offline_v340.py"):
         t = open(os.path.join(ROOT, "tests", f), encoding="utf-8").read()
         # 旧 dn 是新 dn 的子串——按整行/整串精确形态断言
