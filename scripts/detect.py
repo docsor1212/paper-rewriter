@@ -12,6 +12,7 @@
 """
 
 import argparse
+import datetime
 import json
 import sys
 import os
@@ -28,6 +29,10 @@ def _deg_exit(r):
     if r.get("degraded_chunks"):
         return 2
     return None
+
+def _now_str():
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+
 
 def main():
     ap = argparse.ArgumentParser(description="写作风格特征自查（本地启发式）")
@@ -200,9 +205,55 @@ def main():
                     mark += "（重试成功）"
                 print("  %-36s%s" % (f, mark))
         if getattr(args, "suggestions", None):
-            print("[提示] detect --batch 暂不生成 --suggestions（可对重点单稿单跑）", file=sys.stderr)
+            # v4.8.0 批量建议工作单：对 ≥中 档文件逐个详扫取 top 命中，
+            # 合并为一份「改哪里」markdown（批量场景的深改任务清单）
+            guide = "references/style_guide_zh.md（英文稿改用 style_guide_en.md）"
+            lines = ["# 批量修订建议工作单：%s" % root, "",
+                     "> 自动生成（%s） · %d 个文件 · ≥中 档 %d 个进入清单"
+                     % (_now_str(), len(rows_out),
+                        sum(1 for _f, s, _l, _c, _g in rows_out
+                            if isinstance(s, int) and s >= hxt_core.LEVEL_MID_THRESHOLD)), ""]
+            n_detailed = 0
+            for f, s, l, c, g in sorted(rows_out, key=lambda x: -(x[1] if isinstance(x[1], int) else -1)):
+                if not (isinstance(s, int) and s >= hxt_core.LEVEL_MID_THRESHOLD):
+                    continue
+                fp2 = os.path.join(root, f)
+                try:
+                    txt2 = hxt_core.read_text(fp2)
+                    ext2 = os.path.splitext(f)[1].lower()
+                    if ext2 in (".md", ".markdown") and not getattr(args, "raw_markdown", False):
+                        txt2, _ms = hxt_core.strip_markdown(txt2)
+                    rr = hxt_core.scan(txt2, lang=None if g in ("zh", "en") else None,
+                                       profile=args.profile, source_ext=ext2)
+                except (OSError, ValueError) as e:
+                    lines.append("## %s（%s [%s]）" % (f, s, l))
+                    lines.append("详扫失败：%s" % str(e)[:100])
+                    lines.append("")
+                    continue
+                n_detailed += 1
+                lines.append("## %s（%d [%s]%s）" % (f, s, l, " ⚠残留" if c else ""))
+                cats2 = rr.get("categories") or {}
+                for cid2, cc2 in sorted(cats2.items(),
+                                        key=lambda kv: -(kv[1]["weight"] * kv[1]["count"]))[:4]:
+                    lines.append("- **%s** ×%d" % (cc2["label"], cc2["count"]))
+                    if cc2.get("rationale"):
+                        lines.append("  依据: %s" % cc2["rationale"])
+                    for smp2 in cc2.get("samples", [])[:2]:
+                        lines.append("  - %s" % smp2)
+                lines.append("")
+            lines.append("---")
+            lines.append("处置：按文件顺序逐个深改（先高分区）；机械残留先 transform.py；"
+                         "改完用 detect 单稿复核。完整指南见 %s。" % guide)
+            try:
+                with open(args.suggestions, "w", encoding="utf-8") as bf:
+                    bf.write("\n".join(lines) + "\n")
+                print("批量建议工作单已写入 %s（详扫 %d 个 ≥中 档文件）"
+                      % (args.suggestions, n_detailed), file=sys.stderr)
+            except OSError as e:
+                print("错误: 无法写入批量工作单（%s）" % e, file=sys.stderr)
         if getattr(args, "review", None):
-            print("[提示] detect --batch 暂不生成 --review（可对重点单稿单跑）", file=sys.stderr)
+            print("[提示] detect --batch 暂不生成 --review（工作单 --suggestions 已覆盖"
+                  "批量「改哪里」场景；审稿报告请对重点单稿单跑）", file=sys.stderr)
         if args.html:
             import reporter
             trs = "".join("<tr><td>%s</td><td>%s</td></tr>" % (
@@ -210,9 +261,22 @@ def main():
                 ("%d [%s]%s" % (s, reporter.esc(l), " ⚠残留" if c else "")) if s >= 0
                 else "<span class='bad'>%s</span>" % reporter.esc(l))
                 for f, s, l, c, g in rows_out)
+            # v4.8.0 统计卡：档位分布/critical/降级数一眼可读（stability 处方：
+            # 降级注记不再只藏在 stderr）
+            ok_rows = [r0 for r0 in rows_out if isinstance(r0[1], int) and r0[1] >= 0]
+            n_mid = sum(1 for r0 in ok_rows if r0[1] >= hxt_core.LEVEL_MID_THRESHOLD)
+            n_high = sum(1 for r0 in ok_rows if r0[1] >= hxt_core.LEVEL_HIGH_THRESHOLD)
+            n_crit = sum(1 for r0 in ok_rows if r0[3])  # r0[2]=level 字符串（带置信度/降级后缀），critical 在 r0[3]
+            n_err = len(rows_out) - len(ok_rows)
+            stats_html = (
+                "<div class='card'><h2>统计</h2><p>"
+                "扫描 %d · ≥中 %d · ≥高 %d · ⚠残留 %d · 失败/降级 %d"
+                "</p><p class='meta'>≥中 文件见工作单（--suggestions）；本表按分数降序无排序，"
+                "文件名序即扫描序</p></div>" % (len(ok_rows), n_mid, n_high, n_crit, n_err))
             body = ("<div class='card'><h1>批量扫描汇总</h1><p class='meta'>%d 个文件 · %s · "
                     "%s 模式</p></div>" % (len(rows_out), reporter.esc(root),
                                            "academic" if args.profile == "academic" else "general"))
+            body += stats_html
             body += ("<div class='card'><table><tr><th>文件</th><th>结果</th></tr>%s</table></div>"
                      % trs) + reporter._FOOT.format(ts=reporter._now())
             try:

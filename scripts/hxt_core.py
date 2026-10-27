@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "4.7.0"
+__version__ = "4.8.0"
 
 import json
 import os
@@ -1299,8 +1299,12 @@ def scan(text, lang=None, profile="academic", source_ext="",
             n = len(item["_re"].findall(text))
             if n:
                 w0 = float(item.get("weight", 0.6))
-                # general 模式：学术八股/公文过渡在人写博客、公文里是常态，降权 60%
-                if profile == "general" and item.get("cat") in ("zh_eightleg", "zh_trans"):
+                # general 模式：学术八股/公文过渡/模板结构在人写博客、公文里是
+                # 文体常态，降权 60%（v4.8.0 矩阵扩全——密度信号外全部结构组，
+                # v4.7 宣称的代码级补全；en_hedge/en_symmetry 等英文模板组同权）
+                if profile == "general" and item.get("cat") in (
+                        "zh_eightleg", "zh_trans", "zh_opening", "zh_jargon_struct",
+                        "en_para", "en_symmetry", "en_opening", "en_hedge"):
                     w0 *= 0.4
                 add_cat(item["cat"], item["label"], w0,
                         n, [item["label"]] if not item.get("show_hits") else

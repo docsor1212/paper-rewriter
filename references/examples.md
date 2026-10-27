@@ -491,3 +491,22 @@ python scripts/detect.py draft.txt
 python scripts/detect.py 公众号文章.txt --profile general
 # 八股/公文/密度/段落结构类信号 ×0.4（v4.7.0 起覆盖全部密度信号）
 ```
+
+### v4.8.0 新能力速览：批量工作单 + HTML 统计卡 + general 矩阵扩全
+
+```bash
+# ① 批量「改哪里」清单：≥中 档文件逐个详扫，top 命中带依据
+python scripts/detect.py --batch 全部章节/ --suggestions 要改清单.md
+# # 批量修订建议工作单：全部章节/
+# # > 3 个文件 · ≥中 档 1 个进入清单
+# ## a.txt（64 [高]）
+# - **学术八股** ×4
+#   依据: 学术八股套语——人写也有，密度是关键……
+#   - 综上所述
+
+# ② 批量 HTML 汇总带统计卡（降级/失败不再只藏在 stderr）
+python scripts/detect.py --batch 目录/ --html 汇总.html
+# 统计：扫描 3 · ≥中 1 · ≥高 1 · ⚠残留 0 · 失败/降级 0
+
+# ③ --profile general 矩阵扩全：八组结构信号全部 ×0.4（v4.7 宣称的代码补全）
+```
