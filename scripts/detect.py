@@ -351,9 +351,12 @@ def main():
             sys.exit(2)
         key, s0, e0 = found[0]
         seg = _stext[s0:e0]
+        # v4.9.0 审计 P1：行号换算到原文——样本 L{行号} 对齐用户文档而非节内
+        _seg_base = _stext.count("\n", 0, s0) + 1
         try:
             r = hxt_core.scan(seg, lang=None if args.lang == "auto" else args.lang,
-                              profile=args.profile, source_ext=_ext)
+                              profile=args.profile, source_ext=_ext,
+                              base_line=_seg_base)
         except ValueError as e:
             print("错误: %s" % e, file=sys.stderr)
             sys.exit(2)

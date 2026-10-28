@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "4.8.1"
+__version__ = "4.9.0"
 
 import json
 import os
@@ -232,16 +232,20 @@ def strip_markdown(text):
     stats = {"code_blocks": len(_MD_CODE_FENCE_RX.findall(text)),
              "table_rows": len(_MD_TABLE_ROW_RX.findall(text)),
              "headings": len(_MD_HEAD_RX.findall(text))}
-    t = _MD_CODE_FENCE_RX.sub("", text)
+    # v4.9.0 审计 P1：行数保持剥离——代码围栏/表格行按换行 1:1 置换为空行
+    # （原实现整删+压缩空行+strip，.md 输入的命中行号相对原文系统性错位）
+    def _keep_lines(m):
+        return "\n" * m.group(0).count("\n")
+    t = _MD_CODE_FENCE_RX.sub(_keep_lines, text)
     stats["table_rows"] = len(_MD_TABLE_ROW_RX.findall(t))
-    t = _MD_TABLE_ROW_RX.sub("", t)
+    t = _MD_TABLE_ROW_RX.sub(_keep_lines, t)
     stats["headings"] = len(_MD_HEAD_RX.findall(t))
     t = _MD_HEAD_RX.sub("", t)
     t = _MD_UL_RX.sub("", t)
     t = _MD_OL_RX.sub("", t)
     t = _MD_BOLD_RX.sub(r"\1", t)
     t = t.replace("|", "，")
-    return re.sub(r"\n{3,}", "\n\n", t).strip(), stats
+    return t, stats
 
 
 def scan_md(text, lang=None, profile="academic", source_ext=""):
@@ -431,9 +435,13 @@ def scan_chunked(text, lang=None, profile="academic", source_ext="",
         """单块扫描 + 降级（v3.9.0）：超时→2×预算重试一次→仍超时按 degrade
         处置（is_overlap 的重叠窗超时按无降级扫描处理——重叠窗只影响扣减，
         跳过它只是保守多计，不影响「继续跑完」）。返回结果 dict 或 None(降级)。"""
+        # v4.9.0 行号换算：块样本的 L{行号} 直接对齐用户原文——
+        # 基准 = 全文里块起点（或重叠窗起点）之前的换行数 + 1
+        base = text.count("\n", 0, ov if (is_overlap is False and ov is not None) else s) + 1
         try:
             return scan(segment, lang=lang, profile=profile,
-                        source_ext=source_ext, time_budget=time_budget)
+                        source_ext=source_ext, time_budget=time_budget,
+                        base_line=base)
         except ValueError:
             if not degrade:
                 raise
@@ -1174,7 +1182,7 @@ SCAN_TIME_BUDGET = 120.0  # 秒
 
 
 def scan(text, lang=None, profile="academic", source_ext="",
-         time_budget=SCAN_TIME_BUDGET):
+         time_budget=SCAN_TIME_BUDGET, base_line=1):
     """全量扫描。返回结构化 dict：
     {
       lang, score, level, critical_hit, units, sentences,
@@ -1182,12 +1190,25 @@ def scan(text, lang=None, profile="academic", source_ext="",
       guards_applied, stats, suggestions, hints?
     }
     time_budget: 墙钟预算秒（v2.4.0）；超时抛 ValueError 带处置建议。
+    base_line: 行号基准（v4.9.0 分块换算入口——scan_chunked 各块传其在全文
+    中的起始行号，命中样本的 L{行号} 直接对齐用户原文；单稿调用恒 1）。
     """
     if lang not in ("zh", "en", "mix", None):
         raise ValueError("lang 参数只接受 zh/en/mix/None（省略则按文本自动判断）")
     if profile not in ("academic", "general"):
         raise ValueError("profile 必须是 academic（默认，论文口径）或 general（非学术文本）")
     t0 = time.monotonic()
+
+    # 命中定位（v4.9.0）：换行位置预计算 + bisect 行号——样本带 L{行号}，
+    # 大文本 O(命中数×log n) 而非逐命中 O(n) 全扫
+    import bisect as _bisect
+    _nl, _pos = [], text.find("\n")
+    while _pos >= 0:
+        _nl.append(_pos)
+        _pos = text.find("\n", _pos + 1)
+
+    def _line(pos):
+        return base_line + _bisect.bisect_right(_nl, pos)
 
     def _tick(stage):
         if time_budget and (time.monotonic() - t0) > time_budget:
@@ -1229,7 +1250,7 @@ def scan(text, lang=None, profile="academic", source_ext="",
                     if g:
                         guards_applied.append({"hit": hit, "guard": g, "position": m.start()})
                         continue
-                add_cat(cat_id, label, weight, 1, [hit])
+                add_cat(cat_id, label, weight, 1, ["L%d: %s" % (_line(m.start()), hit)])
 
     zh_pats = load_patterns("zh") if lang in ("zh", "mix") else None
     en_pats = load_patterns("en") if lang in ("en", "mix") else None
@@ -1273,7 +1294,8 @@ def scan(text, lang=None, profile="academic", source_ext="",
                 st[0] += 1
                 alt = entry.get("alt", "")
                 add_cat(cat_id, label, float(entry.get("weight", 1.0)), 1,
-                        ["%s → %s" % (hit, alt)] if alt else [hit])
+                        ["L%d: %s → %s" % (_line(s), hit, alt)] if alt
+                        else ["L%d: %s" % (_line(s), hit)])
 
     scan_vocab(zh_pats, guards_zh, "zh_jargon", "中文 AI 黑话", True)
     scan_vocab(en_pats, guards_en, "en_vocab", "AI vocabulary", False)
@@ -1306,9 +1328,12 @@ def scan(text, lang=None, profile="academic", source_ext="",
                         "zh_eightleg", "zh_trans", "zh_opening", "zh_jargon_struct",
                         "en_para", "en_symmetry", "en_opening", "en_hedge"):
                     w0 *= 0.4
-                add_cat(item["cat"], item["label"], w0,
-                        n, [item["label"]] if not item.get("show_hits") else
-                        [m.group(0)[:40] for m in item["_re"].finditer(text)][:4])
+                if item.get("show_hits"):
+                    add_cat(item["cat"], item["label"], w0, n,
+                            ["L%d: %s" % (_line(m.start()), m.group(0)[:40])
+                             for m in item["_re"].finditer(text)][:4])
+                else:
+                    add_cat(item["cat"], item["label"], w0, n, [item["label"]])
     _tick("词表/正则信号")
 
     # --- 统计特征 ---
