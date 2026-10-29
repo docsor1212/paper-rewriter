@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 4.9.0
+version: 5.0.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: paper rewriting with AI-flavor
   self-check and style naturalization (scan reports are detection only),
@@ -36,9 +36,9 @@ and natural register — with integrity guardrails on every step.
 > (paper-polisher-pro); de-templating, model-residue cleanup, AI-flavor style
 > self-check and rewriting → this tool. Need both? Polish first, then run this pipeline.
 
-## Feature status (v4.9.0)
+## Feature status (v5.0.0)
 
-⚠️ rows = experimental (may reject valid files; review output). **The full per-generation capability list has moved to [references/feature_status.md](references/feature_status.md)**; per-item details live in references/errors.md and topic docs. Stable highlights (all stable, v1.0–4.9): core five · section-aware · rewrite plan · learned guards · machine exit codes · chunk degradation · batch resume/concurrency isolation · cross-file term drift · Statistical consistency guard · term variant groups · encoding auto-detection · Submission self-check bundle (--bundle) · pipeline --handoff · verify prescription output · **docx write-back** · **term unification sheet** · **EN 2026 signals (hedging / rule-of-three / em-dash density / paragraph openers)** · **per-section focus (`--section`)** · **CN density mirror (dash overuse / formulaic paragraph openers)** · **compare chunked scans for very large files** · **per-signal rationale (why flagged)** · **general-profile down-weighting matrix (all 8 structural groups)** · **batch worksheet + stats card** · **hit line numbers (L{line} on every sample)**.
+⚠️ rows = experimental (may reject valid files; review output). **The full per-generation capability list has moved to [references/feature_status.md](references/feature_status.md)**; per-item details live in references/errors.md and topic docs. Stable highlights (all stable, v1.0–5.0): core five · section-aware · rewrite plan · learned guards · machine exit codes · chunk degradation · batch resume/concurrency isolation · cross-file term drift · Statistical consistency guard · term variant groups · encoding auto-detection · Submission self-check bundle (--bundle) · pipeline --handoff · verify prescription output · **docx write-back** · **term unification sheet** · **EN 2026 signals (hedging / rule-of-three / em-dash density / paragraph openers)** · **per-section focus (`--section`)** · **CN density mirror (dash overuse / formulaic paragraph openers)** · **compare chunked scans for very large files** · **per-signal rationale (why flagged)** · **general-profile down-weighting matrix (all 8 structural groups)** · **batch worksheet + stats card** · **hit line numbers (L{line} on every sample)** · **health-report dashboard (bundle 2.0)** · **CN feature library v2**.
 
 | Capability | Status | Since |
 |---|---|---|

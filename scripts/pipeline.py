@@ -543,13 +543,23 @@ def main():
                 f.write("| 问题 | 说明 | 改前 | 改后 | 状态 |\n|---|---|---|---|---|\n")
                 for cid, label, b, a, st in led:
                     f.write("| %s | %s | %d | %d | %s |\n" % (cid, label, b, a, st))
+            # ⑧ 体检报告 dashboard（v5.0.0 旗舰：单页交互聚合——六件数据一页读）
+            try:
+                with open(os.path.join(bdir, "08_体检报告.html"), "w", encoding="utf-8") as f:
+                    f.write(_rep.render_dashboard(
+                        ro, rn, vr, prof, st_issues, t_issues, led,
+                        meta=os.path.basename(str(args.file or "stdin"))))
+                print("[体检报告] 08_体检报告.html 已并入自查包", file=sys.stderr)
+            except OSError as e:
+                print("[提示] 体检报告写盘失败（不影响其余六件）：%s" % e, file=sys.stderr)
             with open(os.path.join(bdir, "README.txt"), "w", encoding="utf-8") as f:
                 f.write(
                     "投稿自查包（paper-rewriter v%s，模式=%s）\n生成时间: %s\n原稿: %s\n\n"
                     "六件说明：01 改稿风格自查报告（本地启发式口径，非任何官方检测）；"
                     "02 机械清理修订记录（可审计；--rewrite 模式下本件为空属正常）；"
                     "03 前后风格画像对比；04 统计一致性（以原始数据为准）；"
-                    "05 术语一致性；06 完整性守卫判定（ok=true 才算过）。\n"
+                    "05 术语一致性；06 完整性守卫判定（ok=true 才算过）；"
+                    "08 体检报告（v5.0.0：单页聚合——分数卡/命中行号/依据/台账）。\n"
                     % (hxt_core.__version__, mode,
                        _dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
                        str(args.file)))

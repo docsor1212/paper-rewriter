@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "4.9.0"
+__version__ = "5.0.0"
 
 import json
 import os
@@ -463,7 +463,14 @@ def scan_chunked(text, lang=None, profile="academic", source_ext="",
         if r is not None:
             total_units += r["units"]
             _merge_cat_counts(r, merged, weighted, sign=1)
+            _g_off = ov if ov is not None else s
+            _g_base = text.count("\n", 0, _g_off) + 1
             for g in r["guards_applied"]:
+                # v5.0.0 审计遗留收口：position 从块内相对坐标换算全文绝对坐标+行号
+                g = dict(g)
+                if isinstance(g.get("position"), int):
+                    g["position"] = _g_off + g["position"]
+                    g["line"] = _g_base + text.count("\n", _g_off, g["position"])
                 all_guards.append(g)
             for su in r["suggestions"]:
                 all_sug[su["from"]] = su

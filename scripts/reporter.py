@@ -390,3 +390,53 @@ def build_review_md(text, scan_result, verify_result=None, source=""):
                  "[SkillHub](https://skillhub.cn/skills/indiv-sorsor/paper-rewriter)）"
                  "· 觉得有用欢迎 Star / 收藏")
     return "\n".join(lines)
+
+
+def render_dashboard(ro, rn, vr, prof, st_issues, t_issues, led, meta=""):
+    """v5.0.0 旗舰：投稿自查包 2.0 单页交互体检报告。
+
+    聚合六件数据：分数卡（前→后）/完整性判定/命中行号定位表（含依据折叠，
+    details 原生折叠零 JS）/术语+统计一致性面板/问题台账/处置清单。"""
+    now = _now()
+    delta = rn.get("score", 0) - ro.get("score", 0)
+    head_cards = (
+        "<div class='cards'>"
+        + _score_card("改前风格分", ro.get("score", 0), ro.get("level", ""), "")
+        + _score_card("改后风格分", rn.get("score", 0), rn.get("level", ""),
+                      "Δ%+d" % delta if delta else "持平")
+        + _integrity_card(vr)
+        + "</div>")
+    # 命中定位表（改后口径；samples 带 L 行号与依据折叠）
+    rows = []
+    cats = rn.get("categories") or {}
+    for cid, c in sorted(cats.items(), key=lambda kv: -(kv[1].get("weight", 1) * kv[1].get("count", 0))):
+        rat = ("<details><summary>依据</summary><p class='meta'>%s</p></details>"
+               % esc(c["rationale"])) if c.get("rationale") else ""
+        smps = "".join("<li>%s</li>" % esc(s) for s in c.get("samples", [])[:6])
+        rows.append("<details><summary>%s ×%d%s</summary>%s<ul>%s</ul></details>"
+                    % (esc(c.get("label", cid)), c.get("count", 0),
+                       " [可自动修]" if cid in __import__("hxt_core").AUTO_FIXABLE else "",
+                       rat, smps))
+    hit_html = ("<div class='card'><h2>命中明细（改稿口径，L=原文行号）</h2>"
+                + ("".join(rows) if rows else "<p>未命中任何特征。</p>") + "</div>")
+    # 术语/统计面板
+    t_rows = "".join("<tr><td>%s</td><td>%s</td><td>「%s」</td></tr>" % (
+        esc(x.get("pack", "")),
+        " / ".join("%s(%d)" % (v, n) for v, n in sorted(
+            x.get("variants", {}).items(), key=lambda kv: -kv[1])),
+        esc(x.get("suggestion", ""))) for x in (t_issues or []))
+    st_rows = "".join("<li>%s</li>" % esc(str(x)[:120]) for x in (st_issues or [])) or "<li>无</li>"
+    panel = ("<div class='card'><h2>术语一致性（%d 组）</h2><table>"
+             "<tr><th>域</th><th>变体（次数）</th><th>建议</th></tr>%s</table></div>"
+             % (len(t_issues or []), t_rows or "<tr><td colspan='3'>一致</td></tr>"))
+    panel += ("<div class='card'><h2>统计一致性（%d 项）</h2><ul>%s</ul></div>"
+              % (len(st_issues or []), st_rows))
+    # 台账
+    led_rows = "".join("<tr><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>" % (
+        esc(cid), esc(label), b, a, esc(st)) for cid, label, b, a, st in (led or []))
+    led_html = ("<div class='card'><h2>问题台账</h2><table><tr><th>问题</th><th>说明</th>"
+                "<th>改前</th><th>改后</th><th>状态</th></tr>%s</table></div>" % led_rows)
+    body = ("<div class='card'><h1>稿件体检报告（投稿自查包 2.0）</h1>"
+            "<p class='meta'>%s · 本地启发式，非任何官方检测分数</p></div>" % esc(meta or now))
+    body += head_cards + hit_html + panel + led_html
+    return _page("稿件体检报告", body) + _FOOT.format(ts=now)
