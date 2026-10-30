@@ -570,6 +570,78 @@
    "alt": "detailed analysis / in-depth examination",
    "weight": 1.0,
    "fam": "inflation"
+  },
+  {
+   "w": "bear out",
+   "alt": "support（直接说证据支持什么）",
+   "weight": 0.8,
+   "fam": "inflation"
+  },
+  {
+   "w": "shed light on",
+   "alt": "explain / clarify（直接说解释了什么）",
+   "weight": 0.8,
+   "fam": "inflation"
+  },
+  {
+   "w": "give rise to",
+   "alt": "cause / lead to（直接说因果）",
+   "weight": 0.8,
+   "fam": "inflation"
+  },
+  {
+   "w": "in the realm of",
+   "alt": "in（直接用 in）",
+   "weight": 1.0,
+   "fam": "inflation"
+  },
+  {
+   "w": "a wide array of",
+   "alt": "several / many（给具体数字更好）",
+   "weight": 0.8,
+   "fam": "inflation"
+  },
+  {
+   "w": "a plethora of",
+   "alt": "many / too many（给具体数字）",
+   "weight": 1.0,
+   "fam": "inflation"
+  },
+  {
+   "w": "in the landscape of",
+   "alt": "in（直接用 in）",
+   "weight": 1.0,
+   "fam": "inflation"
+  },
+  {
+   "w": "serves as a cornerstone",
+   "alt": "is central to / underpins",
+   "weight": 1.0,
+   "fam": "inflation"
+  },
+  {
+   "w": "it is worth highlighting",
+   "alt": "直接陈述该事实",
+   "weight": 0.8,
+   "fam": "inflation"
+  },
+  {
+   "w": "usher in",
+   "alt": "introduce / begin（直接说开始了什么）",
+   "weight": 1.0,
+   "fam": "inflation"
+  },
+  {
+   "w": "garner attention",
+   "alt": "attract attention / be cited",
+   "weight": 0.8,
+   "fam": "inflation"
+  },
+  {
+   "w": "at the forefront of",
+   "alt": "leading / among the first（给证据）",
+   "weight": 0.8,
+   "fam": "inflation"
   }
  ],
  "term_guards": [
@@ -863,6 +935,14 @@
    "show_hits": true,
    "pattern": "\\b[a-z]+ing, [a-z]+ing, and [a-z]+ing\\b|\\b[a-z]+ly, [a-z]+ly, and [a-z]+ly\\b|\\b[a-z]+ive, [a-z]+ive, and [a-z]+ive\\b|\\bnot (just|merely|only) [^.\\n]{3,50};? (but|it is|rather) [^.\\n]{3,50}\\b|\\bthe (ability|power|potential) to (transform|revolutionize|redefine|reshape)\\b",
    "rationale": "三连同构与镜像收尾是模型行文组织方式的公开风格讨论中广泛描述的形态学特征"
+  },
+  {
+   "cat": "en_roadmap",
+   "label": "路线图公式（structure-preview boilerplate）",
+   "weight": 0.8,
+   "show_hits": true,
+   "rationale": "「The remainder of this paper is organized as follows / Section 2 introduces… Section 3…」类结构预告三段式是模型生成论文的开篇模板；人写论文按需交代结构，不以固定套路铺陈",
+   "pattern": "[Tt]he (remainder|rest) of (this|the) (paper|article|chapter) (is|are) organized as follows|[Tt]his paper is structured as follows|[Tt]he (following|next) (section|sections) (will |)[a-z]+s?"
   }
  ],
  "auto_fixes": [

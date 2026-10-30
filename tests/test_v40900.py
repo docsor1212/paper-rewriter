@@ -121,7 +121,7 @@ def test_md_and_section_lineno():
 
 
 def test_version_and_docs():
-    check("ver.__version__", hxt_core.__version__ == "5.0.0",
+    check("ver.__version__", hxt_core.__version__ == "5.1.0",
           hxt_core.__version__)
     fs = open(os.path.join(ROOT, "references/feature_status.md"), encoding="utf-8").read()
     check("doc.feature_status_v49", fs.count("v4.9") >= 2)

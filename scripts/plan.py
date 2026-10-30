@@ -113,8 +113,10 @@ def build_handoff(rows, sections, source="", lang=None):
     for i, r in enumerate(rows, 1):
         sec = SECTION_LABELS.get(section_at(sections, r["off"]), "正文")
         ops = "；".join(dict.fromkeys(advice_str(cid) for cid in r["cats"]))
+        lineno = r.get("line")
+        loc = ("（原文 L%d 行）" % lineno) if lineno else ""
         lines.append("")
-        lines.append("%d. [%s] %s" % (i, sec, r["sent"]))
+        lines.append("%d. [%s]%s %s" % (i, sec, loc, r["sent"]))
         lines.append("   操作：%s" % ops)
     lines += ["", "全部改完后运行（任一 FAIL 都不得交付）：",
               "  python scripts/verify.py <原文件> <改后文件>",
@@ -152,6 +154,10 @@ def build_queue(text, lang=None, profile="academic", source_ext=".txt", top=15):
                                   for cid, c in r["categories"].items() if c["count"]},
                          "labels": {cid: c["label"]
                                     for cid, c in r["categories"].items() if c["count"]}})
+    # v5.1.0：句级行号锚（handoff 指令单「原文 L{行}」）——off → 行号一次换算
+    for _r in rows:
+        if isinstance(_r.get("off"), int):
+            _r["line"] = text.count("\n", 0, _r["off"]) + 1
     rows.sort(key=lambda x: (-x["pts"], x["off"]))
     return rows[:max(1, top)], sections, full
 
@@ -227,6 +233,10 @@ def main():
                              "labels": {cid: c["label"]
                                         for cid, c in r["categories"].items()
                                         if c["count"]}})
+        # v5.1.0：句级行号锚（main 路径与 build_queue 同款换算）
+        for _r in rows:
+            if isinstance(_r.get("off"), int):
+                _r["line"] = text.count("\n", 0, _r["off"]) + 1
         rows.sort(key=lambda x: (-x["pts"], x["off"]))
         top = rows[:max(1, args.top)]
 

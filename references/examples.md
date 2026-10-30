@@ -538,3 +538,18 @@ python scripts/pipeline.py 原稿.txt --rewrite 改稿.txt --bundle 自查材料
 # CN 特征库 v2（自动生效）：路线图公式（本文余下部分将组织如下：首先…）/
 # 不难看出、归根结底、究其原因族 +12 词——零参数
 ```
+
+### v5.1.0 新能力速览：指令单行号锚 + EN v2 镜像 + 计数对账
+
+```bash
+python scripts/pipeline.py 原稿.txt -o 改稿.txt --handoff 交接块.md
+# 深改交接块每句带原文行号——执行改写的 agent 零定位成本：
+# 1. [结论]（原文 L23 行） 综上所述，本文具有重要意义。
+#    操作：模板结构：删仪式感开场/拆投票式列举（指南第 1 步）
+
+# EN 特征库 v2 镜像（自动生效）：en_roadmap 结构预告组 /
+# shed light on、a plethora of、at the forefront of 等 +12 句式族
+
+# 文档计数对账：python tests/check_doc_counts.py（电池内置）
+# pitfalls 条数/术语组数/套件数/双语版本不同步 = FAIL
+```
