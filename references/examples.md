@@ -553,3 +553,7 @@ python scripts/pipeline.py 原稿.txt -o 改稿.txt --handoff 交接块.md
 # 文档计数对账：python tests/check_doc_counts.py（电池内置）
 # pitfalls 条数/术语组数/套件数/双语版本不同步 = FAIL
 ```
+
+### v5.2.0 新能力速览：体检报告行动清单 + 口径统一
+
+

@@ -555,7 +555,7 @@ def main():
             with open(os.path.join(bdir, "README.txt"), "w", encoding="utf-8") as f:
                 f.write(
                     "投稿自查包（paper-rewriter v%s，模式=%s）\n生成时间: %s\n原稿: %s\n\n"
-                    "六件说明：01 改稿风格自查报告（本地启发式口径，非任何官方检测）；"
+                    "各件说明：01 改稿风格自查报告（本地启发式口径，非任何官方检测）；"
                     "02 机械清理修订记录（可审计；--rewrite 模式下本件为空属正常）；"
                     "03 前后风格画像对比；04 统计一致性（以原始数据为准）；"
                     "05 术语一致性；06 完整性守卫判定（ok=true 才算过）；"
@@ -563,7 +563,7 @@ def main():
                     % (hxt_core.__version__, mode,
                        _dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
                        str(args.file)))
-            print("投稿自查包: %s（6 件）" % bdir, file=sys.stderr)
+            print("投稿自查包: %s（8 件）" % bdir, file=sys.stderr)
         except Exception as e:  # 自查包是辅助产物：失败降级为警告，主报告照常输出
             print("[提示] 自查包生成失败（%s），主流程结果不受影响" % str(e)[:80],
                   file=sys.stderr)

@@ -436,7 +436,29 @@ def render_dashboard(ro, rn, vr, prof, st_issues, t_issues, led, meta=""):
         esc(cid), esc(label), b, a, esc(st)) for cid, label, b, a, st in (led or []))
     led_html = ("<div class='card'><h2>问题台账</h2><table><tr><th>问题</th><th>说明</th>"
                 "<th>改前</th><th>改后</th><th>状态</th></tr>%s</table></div>" % led_rows)
+    # 行动清单（v5.2.0）：报告→行动闭环——按命中性质分三段给可执行命令
+    act_auto, act_deep, act_guard = [], [], []
+    for cid, c in sorted(cats.items(), key=lambda kv: -kv[1].get("count", 0)):
+        label = c.get("label", cid)
+        cnt = c.get("count", 0)
+        if cid in __import__("hxt_core").AUTO_FIXABLE:
+            act_auto.append("<li>%s ×%d → <code>python scripts/transform.py 原稿 -o 改稿.txt</code>（机械层自动处理）</li>"
+                            % (esc(label), cnt))
+        elif cid.startswith(("chatbot", "cutoff", "model_artifact")):
+            act_auto.append("<li>%s ×%d → 同上，transform 一步清除（硬残留零保留）</li>"
+                            % (esc(label), cnt))
+        else:
+            act_deep.append("<li>%s ×%d → 按 style_guide 深改（<code>plan.py 原稿 --handoff</code> 出逐句指令单）</li>"
+                            % (esc(label), cnt))
+    if vr and not vr.get("ok"):
+        act_guard.append("<li>完整性守卫 FAIL → 按 06_完整性判定.json 的 remedies 逐条修复改稿（不修守卫）</li>")
+    act_guard.append("<li>交付前：<code>python scripts/verify.py 原稿 改稿</code>（exit 0 才算过）</li>")
+    act_html = ("<div class='card'><h2>下一步行动（按序执行）</h2>"
+                + ("<h3>①机械清理（自动）</h3><ul>%s</ul>" % "".join(act_auto) if act_auto else "")
+                + ("<h3>②质量深改（agent/人工）</h3><ul>%s</ul>" % "".join(act_deep) if act_deep else "")
+                + ("<h3>③守卫复核</h3><ul>%s</ul>" % "".join(act_guard))
+                + "</div>")
     body = ("<div class='card'><h1>稿件体检报告（投稿自查包 2.0）</h1>"
             "<p class='meta'>%s · 本地启发式，非任何官方检测分数</p></div>" % esc(meta or now))
-    body += head_cards + hit_html + panel + led_html
+    body += head_cards + act_html + hit_html + panel + led_html
     return _page("稿件体检报告", body) + _FOOT.format(ts=now)
