@@ -87,7 +87,7 @@ def test_guards_chunked_position():
 
 
 def test_version_and_docs():
-    check("ver.5.0.0", hxt_core.__version__ == "5.1.0", hxt_core.__version__)
+    check("ver.5.0.0", hxt_core.__version__ == "5.2.0", hxt_core.__version__)
     fs = open(os.path.join(ROOT, "references/feature_status.md"), encoding="utf-8").read()
     check("doc.feature_status_v50", fs.count("5.0") >= 2)
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()
