@@ -557,3 +557,18 @@ python scripts/pipeline.py 原稿.txt -o 改稿.txt --handoff 交接块.md
 ### v5.2.0 新能力速览：体检报告行动清单 + 口径统一
 
 
+
+### v5.3.0 新能力速览：bundle 深改指令单 + 批量修订记录
+
+```bash
+# ① 自查包自包含「改哪里+怎么改」：08 行动清单 + 09 指令单（每句带原文行号）
+python scripts/pipeline.py 原稿.txt --rewrite 改稿.txt --bundle 自查材料/
+# 自查包_时间戳/09_深改指令单.md：
+# 1. [结论]（原文 L23 行） 综上所述，本文具有重要意义。
+#    操作：模板结构：删仪式感开场/拆投票式列举（指南第 1 步）
+
+# ② 批量改写可审计：--batch --track 逐文件修订记录
+python scripts/pipeline.py --batch 全部章节/ --track 修订记录/
+# [批量修订记录] 2 个文件 → 修订记录/（transform 同款口径）
+#   base_a.md base_a.json base_b.md base_b.json
+```

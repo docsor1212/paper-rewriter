@@ -151,6 +151,8 @@ def main():
                 after = hxt_core.scan(n, time_budget=time_budget)
             conf_suffix = (" [置信度:%s]" % pdf_conf) if pdf_conf else ""
             deg_mark = " ⚠[降级:%d 块]" % deg if deg else ""
+            if getattr(args, "track", None):
+                batch_track[os.path.basename(fp)] = (_af, _rm, o)
             return (os.path.basename(fp),
                     "%d[%s]" % (before["score"], before["level"]),
                     "%d[%s]%s%s" % (after["score"], after["level"], conf_suffix, deg_mark),
@@ -158,6 +160,7 @@ def main():
                     "%+d%%" % v["stats"]["length_delta_pct"])
 
         rows_out = []
+        batch_track = {}  # v5.3.0 --track：fn → (applied, removed, 原文)
         pending = []  # (fp, 行索引)——二遍重试队列（v2.5.0 stability 处方）
         gate_rej = 0  # 置信度门闸拒收计数（v3.8.0 批量熔断）
         done, state = hxt_core.batch_resume_prepare(root, args.resume, kind="pipeline", row_len=5)
@@ -221,6 +224,26 @@ def main():
                   "（扫描件/嵌入字体缺失）。建议：检查来源，或统一导出 UTF-8 文本后重跑；"
                   "确要逐个强收可加 --pdf-min-confidence 低（输出需人工复核）" % gate_rej,
                   file=sys.stderr)
+
+        if getattr(args, "track", None) and batch_track:
+            # v5.3.0 批量修订记录落盘（transform 同款 build_revision_log，逐文件审计）
+            os.makedirs(args.track, exist_ok=True)
+            n_t = 0
+            for fn_t, (_af, _rm, _o) in batch_track.items():
+                try:
+                    md_t, j_t = hxt_core.build_revision_log(_af, _rm, source=fn_t)
+                    stem = os.path.splitext(fn_t)[0]
+                    with open(os.path.join(args.track, "base_%s.md" % stem), "w",
+                              encoding="utf-8") as f:
+                        f.write(md_t + "\n")
+                    with open(os.path.join(args.track, "base_%s.json" % stem), "w",
+                              encoding="utf-8") as f:
+                        json.dump(j_t, f, ensure_ascii=False, indent=1)
+                    n_t += 1
+                except OSError as e:
+                    print("[提示] %s 修订记录写盘失败：%s" % (fn_t, e), file=sys.stderr)
+            print("[批量修订记录] %d 个文件 → %s（transform 同款口径）"
+                  % (n_t, args.track), file=sys.stderr)
         if getattr(args, "html", None):
             print("[提示] pipeline --batch 暂不生成 --html（可用 detect --batch --html）", file=sys.stderr)
         if getattr(args, "bundle", None):
@@ -552,6 +575,24 @@ def main():
                 print("[体检报告] 08_体检报告.html 已并入自查包", file=sys.stderr)
             except OSError as e:
                 print("[提示] 体检报告写盘失败（不影响其余六件）：%s" % e, file=sys.stderr)
+            # ⑨ 深改指令单（v5.3.0：08 行动清单②段直连——bundle 自包含「改哪里+怎么改」）
+            try:
+                import plan as _plan_mod
+                _src9 = orig
+                if (args.file or "").lower().endswith((".md", ".markdown")) and not getattr(args, "raw_markdown", False):
+                    _src9 = hxt_core.strip_markdown(orig)[0]
+                _top, _secs, _full = _plan_mod.build_queue(
+                    _src9, lang=None, profile=profile, source_ext=".txt")
+                _hd = _plan_mod.build_handoff(_top, _secs, source=str(args.file or "stdin"),
+                                              lang=_full.get("lang"))
+                with open(os.path.join(bdir, "09_深改指令单.md"), "w", encoding="utf-8") as f:
+                    f.write(_hd + "\n")
+                print("[深改指令单] 09_深改指令单.md 已并入自查包（%d 句）" % len(_top),
+                      file=sys.stderr)
+            except ValueError as e:
+                print("[提示] 深改指令单跳过（%s）" % str(e)[:80], file=sys.stderr)
+            except OSError as e:
+                print("[提示] 深改指令单写盘失败（不影响其余件）：%s" % e, file=sys.stderr)
             with open(os.path.join(bdir, "README.txt"), "w", encoding="utf-8") as f:
                 f.write(
                     "投稿自查包（paper-rewriter v%s，模式=%s）\n生成时间: %s\n原稿: %s\n\n"
@@ -563,7 +604,7 @@ def main():
                     % (hxt_core.__version__, mode,
                        _dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
                        str(args.file)))
-            print("投稿自查包: %s（8 件）" % bdir, file=sys.stderr)
+            print("投稿自查包: %s（9 件）" % bdir, file=sys.stderr)
         except Exception as e:  # 自查包是辅助产物：失败降级为警告，主报告照常输出
             print("[提示] 自查包生成失败（%s），主流程结果不受影响" % str(e)[:80],
                   file=sys.stderr)

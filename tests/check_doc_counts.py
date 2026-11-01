@@ -50,15 +50,15 @@ for mm in re.finditer(r"pitfalls\.md（(\d+) 条", bp):
 # ⑥ 自查包口径：文档「N 件」声明 vs bundle 实际产出数
 src_pl = read("scripts/pipeline.py")
 n_items = len(set(re.findall(r'os\.path\.join\(bdir, "(\d{2})_', src_pl)))
-if n_items != 8:
-    fails.append("bundle 编号件 %d ≠ 8（口径漂移）" % n_items)
+if n_items != 9:
+    fails.append("bundle 编号件 %d ≠ 9（口径漂移）" % n_items)
 for name, doc in (("SKILL_ZH.md", zh), ("SKILL.md", read("SKILL.md"))):
-    for mm in re.finditer(r"(六件|七件|九件)", doc):
-        fails.append("%s 仍用旧口径「%s」（现役=八件）" % (name, mm.group(1)))
+    for mm in re.finditer(r"(六件|七件|八件)", doc):
+        fails.append("%s 仍用旧口径「%s」（现役=九件）" % (name, mm.group(1)))
     for mm in re.finditer(r"[（(](\d+)\s*件[）)]", doc):
         if int(mm.group(1)) != n_items:
             fails.append("%s 自查包「%s 件」vs 实际 %d 件" % (name, mm.group(1), n_items))
-print("自查包 %d 件对账 ✓" % n_items)
+print("自查包 %d 编号件对账 ✓" % n_items)
 
 # ⑦ feature_status 提及的 tests/ 文件必须真实存在
 fs_txt = read("references/feature_status.md")
