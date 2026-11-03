@@ -50,8 +50,8 @@ for mm in re.finditer(r"pitfalls\.md（(\d+) 条", bp):
 # ⑥ 自查包口径：文档「N 件」声明 vs bundle 实际产出数
 src_pl = read("scripts/pipeline.py")
 n_items = len(set(re.findall(r'os\.path\.join\(bdir, "(\d{2})_', src_pl)))
-if n_items != 9:
-    fails.append("bundle 编号件 %d ≠ 9（口径漂移）" % n_items)
+if n_items != 10:
+    fails.append("bundle 编号件 %d ≠ 10（00-09，口径漂移）" % n_items)
 for name, doc in (("SKILL_ZH.md", zh), ("SKILL.md", read("SKILL.md"))):
     for mm in re.finditer(r"(六件|七件|八件)", doc):
         fails.append("%s 仍用旧口径「%s」（现役=九件）" % (name, mm.group(1)))
@@ -66,6 +66,20 @@ for mm in re.finditer(r"tests/(check_[a-z_]+\.py|run_tests\.py)", fs_txt):
     if not os.path.exists(os.path.join(ROOT, "tests", mm.group(1))):
         fails.append("feature_status 提及 tests/%s 但文件不存在" % mm.group(1))
 print("feature_status tests 引用 ✓")
+
+
+# ⑧ permissions.md 的 bundle 写入件数声明 vs 实际
+perm = read("references/permissions.md")
+mp = re.search(r"写 (\d+) 个编号件", perm)
+n_items_p = len(set(re.findall(r'os\.path\.join\(bdir, "(\d{2})_', src_pl)))  # 00-09 含写入清单
+if mp and int(mp.group(1)) != n_items_p:
+    fails.append("permissions 称写 %s 件 vs bundle 实际 %d 件（00-09）"
+                 % (mp.group(1), n_items_p))
+elif mp:
+    print("permissions bundle 计数 %s ✓" % mp.group(1))
+# permissions 不得残留旧「写 8 个文件」表述
+if re.search(r"写 8 个文件", perm):
+    fails.append("permissions.md 残留旧口径「写 8 个文件」")
 
 if fails:
     print("COUNT_MISMATCH:")

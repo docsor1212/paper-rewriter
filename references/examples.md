@@ -572,3 +572,13 @@ python scripts/pipeline.py --batch 全部章节/ --track 修订记录/
 # [批量修订记录] 2 个文件 → 修订记录/（transform 同款口径）
 #   base_a.md base_a.json base_b.md base_b.json
 ```
+
+### v5.4.0 新能力速览：写入清单自证
+
+```bash
+python scripts/pipeline.py 原稿.txt --rewrite 改稿.txt --bundle 自查材料/
+# 自查包_时间戳/ 新增 00_写入清单.json：本次运行全部写入路径的实测工件
+#   {"generated_by": "pipeline --bundle", "writes": [...12 项...]}
+#   00_写入清单.json（清单自身）01 风格自查报告 … 09 深改指令单 README
+# permissions.md 的「写什么」声明随包可验——权限不再只是文档承诺。
+```

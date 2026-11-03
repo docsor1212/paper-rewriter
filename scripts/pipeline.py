@@ -500,21 +500,36 @@ def main():
                     k += 1
                 bdir += "_%d" % k
             os.makedirs(bdir, exist_ok=True)
+            # ⓪ 写入清单（v5.4.0 权限自证：本次运行全部写入路径的实测工件）
+            _manifest = {"generated_by": "pipeline --bundle",
+                         "note": "本次运行全部写入路径实测清单（权限自证工件）",
+                         "writes": []}
+
+            def _reg(path, kind, flag):
+                _manifest["writes"].append({"path": path, "kind": kind, "flag": flag})
+
+            _reg(os.path.join(bdir, "00_写入清单.json"), "manifest", "--bundle")
+
             # ① 检测报告（改稿口径）
             prof = hxt_core.style_profile(new)
+            _reg(os.path.join(bdir, "01_风格自查报告.html"), "风格自查报告（改稿口径）", "--bundle")
             with open(os.path.join(bdir, "01_风格自查报告.html"), "w", encoding="utf-8") as f:
                 f.write(_rep.render_style_profile(prof, os.path.basename(str(args.file or "stdin"))))
             # ② 修订记录
             md, jobj = hxt_core.build_revision_log(applied, removed, source=args.file)
+            _reg(os.path.join(bdir, "02_修订记录.md"), "修订记录 markdown", "--bundle")
             with open(os.path.join(bdir, "02_修订记录.md"), "w", encoding="utf-8") as f:
                 f.write(md + "\n")
+            _reg(os.path.join(bdir, "02_修订记录.json"), "修订记录 JSON", "--bundle")
             with open(os.path.join(bdir, "02_修订记录.json"), "w", encoding="utf-8") as f:
                 json.dump(jobj, f, ensure_ascii=False, indent=1)
             # ③ 风格画像差值
+            _reg(os.path.join(bdir, "03_风格画像对比.md"), "风格画像对比", "--bundle")
             with open(os.path.join(bdir, "03_风格画像对比.md"), "w", encoding="utf-8") as f:
                 f.write(_render_profile_compare(orig, new))
             # ④ 统计一致性（原稿）
             _g, st_issues = _cst.run_checks(orig)
+            _reg(os.path.join(bdir, "04_统计一致性.md"), "统计一致性", "--bundle")
             with open(os.path.join(bdir, "04_统计一致性.md"), "w", encoding="utf-8") as f:
                 f.write(_cst.build_report(_g, st_issues, source=args.file) + "\n")
             # ⑤ 术语一致性（原稿）
@@ -529,9 +544,11 @@ def main():
                         x["variants"].items(), key=lambda kv: -kv[1]))
                     t_lines.append("- [%s] %s → 建议「%s」" % (
                         x.get("pack", ""), vs, x.get("suggestion", "")))
+            _reg(os.path.join(bdir, "05_术语一致性.md"), "术语一致性", "--bundle")
             with open(os.path.join(bdir, "05_术语一致性.md"), "w", encoding="utf-8") as f:
                 f.write("\n".join(t_lines) + "\n")
             # ⑥ 完整性判定
+            _reg(os.path.join(bdir, "06_完整性判定.json"), "完整性判定 JSON", "--bundle")
             with open(os.path.join(bdir, "06_完整性判定.json"), "w", encoding="utf-8") as f:
                 json.dump(vr, f, ensure_ascii=False, indent=1)
             # ⑦ 问题台账（v3.5.0 模块移植）：逐类 resolved/partial/unresolved + 预算行
@@ -558,6 +575,7 @@ def main():
                         len(t_b), len(t_after),
                         "resolved" if not t_after else
                         ("partially answered" if len(t_after) < len(t_b) else "unresolved")))
+            _reg(os.path.join(bdir, "07_问题台账.md"), "问题台账", "--bundle")
             with open(os.path.join(bdir, "07_问题台账.md"), "w", encoding="utf-8") as f:
                 f.write("# 问题台账（finding ledger）\n\n")
                 f.write("> 逐项标记 answered / partially answered / unresolved；"
@@ -568,6 +586,7 @@ def main():
                     f.write("| %s | %s | %d | %d | %s |\n" % (cid, label, b, a, st))
             # ⑧ 体检报告 dashboard（v5.0.0 旗舰：单页交互聚合——六件数据一页读）
             try:
+                _reg(os.path.join(bdir, "08_体检报告.html"), "体检报告 dashboard", "--bundle")
                 with open(os.path.join(bdir, "08_体检报告.html"), "w", encoding="utf-8") as f:
                     f.write(_rep.render_dashboard(
                         ro, rn, vr, prof, st_issues, t_issues, led,
@@ -585,6 +604,7 @@ def main():
                     _src9, lang=None, profile=profile, source_ext=".txt")
                 _hd = _plan_mod.build_handoff(_top, _secs, source=str(args.file or "stdin"),
                                               lang=_full.get("lang"))
+                _reg(os.path.join(bdir, "09_深改指令单.md"), "深改指令单", "--bundle")
                 with open(os.path.join(bdir, "09_深改指令单.md"), "w", encoding="utf-8") as f:
                     f.write(_hd + "\n")
                 print("[深改指令单] 09_深改指令单.md 已并入自查包（%d 句）" % len(_top),
@@ -593,6 +613,7 @@ def main():
                 print("[提示] 深改指令单跳过（%s）" % str(e)[:80], file=sys.stderr)
             except OSError as e:
                 print("[提示] 深改指令单写盘失败（不影响其余件）：%s" % e, file=sys.stderr)
+            _reg(os.path.join(bdir, "README.txt"), "包说明", "--bundle")
             with open(os.path.join(bdir, "README.txt"), "w", encoding="utf-8") as f:
                 f.write(
                     "投稿自查包（paper-rewriter v%s，模式=%s）\n生成时间: %s\n原稿: %s\n\n"
@@ -604,7 +625,13 @@ def main():
                     % (hxt_core.__version__, mode,
                        _dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
                        str(args.file)))
-            print("投稿自查包: %s（9 件）" % bdir, file=sys.stderr)
+            _mp = os.path.join(bdir, "00_写入清单.json")
+            try:
+                with open(_mp, "w", encoding="utf-8") as f:
+                    json.dump(_manifest, f, ensure_ascii=False, indent=1)
+            except OSError:
+                pass
+            print("投稿自查包: %s（00-09 共 10 件）" % bdir, file=sys.stderr)
         except Exception as e:  # 自查包是辅助产物：失败降级为警告，主报告照常输出
             print("[提示] 自查包生成失败（%s），主流程结果不受影响" % str(e)[:80],
                   file=sys.stderr)
