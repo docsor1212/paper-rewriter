@@ -582,3 +582,14 @@ python scripts/pipeline.py 原稿.txt --rewrite 改稿.txt --bundle 自查材料
 #   00_写入清单.json（清单自身）01 风格自查报告 … 09 深改指令单 README
 # permissions.md 的「写什么」声明随包可验——权限不再只是文档承诺。
 ```
+
+### v5.5.0 新能力速览：对照报告行号 + 打印友好
+
+```bash
+python scripts/compare.py 原稿.txt 改稿.txt --html 对照.html
+# 逐句 diff 每行带「L原文→L改稿」锚列：
+#   同 L1→L1
+#   改 L2→L2  <del>综上所述，本文具有重要意义。</del> <ins>直接给出结论…</ins>
+# 改稿命中明细带依据折叠（与 detect/体检报告同口径）。
+# 全部 HTML 报告内置 @media print——浏览器打印即交付级排版（卡片防断页）。
+```

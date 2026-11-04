@@ -908,11 +908,14 @@ class TestV15(unittest.TestCase):
 
     def test_sentence_diff_alignment(self):
         rows = reporter.sentence_diff("甲句。乙句。丙句。", "甲句。修改后的乙句。丙句。")
-        tags = [t for t, _, _ in rows]
+        tags = [r[0] for r in rows]
         self.assertIn("replace", tags)
         self.assertIn("equal", tags)
-        joined_del = "".join(o for t, o, _ in rows if t in ("replace", "delete"))
+        joined_del = "".join(r[1] for r in rows if r[0] in ("replace", "delete"))
         self.assertIn("乙句", joined_del)
+        # v5.5.0 行号版：行号字段存在且合法（单行文本两侧行号均 1）
+        self.assertTrue(all(isinstance(r[3], int) and r[3] >= 1 for r in rows if r[3]))
+        self.assertTrue(all(isinstance(r[4], int) and r[4] >= 1 for r in rows if r[4]))
 
     def test_detect_html_report(self):
         out = os.path.join(tempfile.mkdtemp(prefix="hxt_v15_"), "r.html")

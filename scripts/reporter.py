@@ -40,6 +40,13 @@ margin:2px 4px 2px 0;background:#eaeef2}
 .warn{color:#9a6700}
 .ok{color:#1a7f37;font-weight:600}
 .bad{color:#cf222e;font-weight:600}
+
+@media print {
+  .wrap { max-width: none; margin: 0; padding: 0; }
+  .card { break-inside: avoid; box-shadow: none; border: 1px solid #ccc; }
+  h1, h2 { page-break-after: avoid; }
+  .foot { font-size: 9px; }
+}
 """
 
 _FOOT = ("<div class='foot'>本地启发式风格诊断 · 非任何官方检测分数 · "
@@ -260,15 +267,37 @@ def render_style_compare(pa, pb, sa, sb):
 
 
 def sentence_diff(orig, new):
-    """句级对齐：返回 [(tag, orig_sent, new_sent)]，tag∈equal/replace/delete/insert。"""
-    def split(text):
-        return [x for x in re.split(r"(?<=[。！？!?;.])\s*|\n+", text) if x and x.strip()]
-    a, b = split(orig), split(new)
+    """句级对齐（v5.5.0 行号版）：返回 [(tag, orig_sent, new_sent, orig_line, new_line)]，
+    tag∈equal/replace/delete/insert；行号=该句在各自文本中的 1-based 行号
+    （删/增句对应侧行号为 None）。供 render_compare 的 L 锚列使用。"""
+    def split_with_lines(text):
+        out = []
+        line = 1
+        buf = ""
+        for ch in text:
+            if ch == "\n":
+                if buf.strip():
+                    out.append((buf.strip(), line))
+                buf = ""
+                line += 1
+                continue
+            buf += ch
+            if re.match(r"[。！？!?;.]", ch):
+                if buf.strip():
+                    out.append((buf.strip(), line))
+                buf = ""
+        if buf.strip():
+            out.append((buf.strip(), line))
+        return out
+    a, b = split_with_lines(orig), split_with_lines(new)
+    sm = difflib.SequenceMatcher(None, [x[0] for x in a], [x[0] for x in b], autojunk=False)
     rows = []
-    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
-        o = "".join(a[i1:i2])
-        n = "".join(b[j1:j2])
-        rows.append((tag, o, n))
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        o = "".join(x[0] for x in a[i1:i2])
+        n = "".join(x[0] for x in b[j1:j2])
+        o_ln = a[i1][1] if i1 < i2 else None
+        n_ln = b[j1][1] if j1 < j2 else None
+        rows.append((tag, o, n, o_ln, n_ln))
     return rows
 
 
@@ -279,11 +308,24 @@ def render_compare(orig, new, ro, rn, verify_result):
              + _score_card("原稿", ro["score"], ro["level"])
              + _score_card("改稿", rn["score"], rn["level"]) + "</div>")
     body += _integrity_card(verify_result)
+    # 命中依据节（v5.5.0 口径统一：改稿命中带 L 行号与依据折叠）
+    cats = rn.get("categories") or {}
+    if cats:
+        det = []
+        for cid, c in sorted(cats.items(), key=lambda kv: -(kv[1].get("weight", 1) * kv[1].get("count", 0))):
+            rat = ("<details><summary>依据</summary><p class='meta'>%s</p></details>"
+                   % esc(c["rationale"])) if c.get("rationale") else ""
+            smps = "".join("<li>%s</li>" % esc(s) for s in c.get("samples", [])[:6])
+            det.append("<details><summary>%s ×%d</summary>%s<ul>%s</ul></details>"
+                       % (esc(c.get("label", cid)), c.get("count", 0), rat, smps))
+        body += ("<div class='card'><h2>改稿命中明细（L=改稿行号）</h2>%s</div>"
+                 % "".join(det))
     rows = sentence_diff(orig, new)
     trs = []
-    for tag, o, n in rows:
+    for tag, o, n, o_ln, n_ln in rows:
+        loc = ("<span class='meta'>L%s→L%s</span>" % (o_ln or "–", n_ln or "–"))
         if tag == "equal":
-            trs.append("<tr><td class='meta'>同</td><td>%s</td></tr>" % esc(o))
+            trs.append("<tr><td class='meta'>同 %s</td><td>%s</td></tr>" % (loc, esc(o)))
         else:
             cell = ""
             if o:
@@ -294,7 +336,7 @@ def render_compare(orig, new, ro, rn, verify_result):
             trs.append("<tr><td>%s</td><td>%s</td></tr>" % (act, cell))
     body += ("<div class='card'><h2>逐句对照（%d 句，其中变更 %d）</h2><table>"
              "<tr><th>操作</th><th>内容（<span class='del'>删除</span>/<span class='ins'>新增</span>）</th></tr>%s"
-             "</table></div>" % (len(rows), sum(1 for t, _, _ in rows if t != "equal"), "".join(trs)))
+             "</table></div>" % (len(rows), sum(1 for r in rows if r[0] != "equal"), "".join(trs)))
     body += _FOOT.format(ts=_now())
     return _page("改写前后对照", body)
 
@@ -436,29 +478,7 @@ def render_dashboard(ro, rn, vr, prof, st_issues, t_issues, led, meta=""):
         esc(cid), esc(label), b, a, esc(st)) for cid, label, b, a, st in (led or []))
     led_html = ("<div class='card'><h2>问题台账</h2><table><tr><th>问题</th><th>说明</th>"
                 "<th>改前</th><th>改后</th><th>状态</th></tr>%s</table></div>" % led_rows)
-    # 行动清单（v5.2.0）：报告→行动闭环——按命中性质分三段给可执行命令
-    act_auto, act_deep, act_guard = [], [], []
-    for cid, c in sorted(cats.items(), key=lambda kv: -kv[1].get("count", 0)):
-        label = c.get("label", cid)
-        cnt = c.get("count", 0)
-        if cid in __import__("hxt_core").AUTO_FIXABLE:
-            act_auto.append("<li>%s ×%d → <code>python scripts/transform.py 原稿 -o 改稿.txt</code>（机械层自动处理）</li>"
-                            % (esc(label), cnt))
-        elif cid.startswith(("chatbot", "cutoff", "model_artifact")):
-            act_auto.append("<li>%s ×%d → 同上，transform 一步清除（硬残留零保留）</li>"
-                            % (esc(label), cnt))
-        else:
-            act_deep.append("<li>%s ×%d → 按 style_guide 深改（<code>plan.py 原稿 --handoff</code> 出逐句指令单）</li>"
-                            % (esc(label), cnt))
-    if vr and not vr.get("ok"):
-        act_guard.append("<li>完整性守卫 FAIL → 按 06_完整性判定.json 的 remedies 逐条修复改稿（不修守卫）</li>")
-    act_guard.append("<li>交付前：<code>python scripts/verify.py 原稿 改稿</code>（exit 0 才算过）</li>")
-    act_html = ("<div class='card'><h2>下一步行动（按序执行）</h2>"
-                + ("<h3>①机械清理（自动）</h3><ul>%s</ul>" % "".join(act_auto) if act_auto else "")
-                + ("<h3>②质量深改（agent/人工）</h3><ul>%s</ul>" % "".join(act_deep) if act_deep else "")
-                + ("<h3>③守卫复核</h3><ul>%s</ul>" % "".join(act_guard))
-                + "</div>")
     body = ("<div class='card'><h1>稿件体检报告（投稿自查包 2.0）</h1>"
             "<p class='meta'>%s · 本地启发式，非任何官方检测分数</p></div>" % esc(meta or now))
-    body += head_cards + act_html + hit_html + panel + led_html
+    body += head_cards + hit_html + panel + led_html
     return _page("稿件体检报告", body) + _FOOT.format(ts=now)

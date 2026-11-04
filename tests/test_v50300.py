@@ -87,7 +87,7 @@ def test_bundle_bigfile_skip():
 
 
 def test_version_and_docs():
-    check("ver.5.3.0", hxt_core.__version__ == "5.4.0", hxt_core.__version__)
+    check("ver.5.3.0", hxt_core.__version__ == "5.5.0", hxt_core.__version__)
     fs = open(os.path.join(ROOT, "references/feature_status.md"), encoding="utf-8").read()
     check("doc.feature_status_v53", fs.count("v5.3") >= 2)
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()

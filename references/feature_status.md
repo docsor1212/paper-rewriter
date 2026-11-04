@@ -30,6 +30,7 @@
 | **自查包口径统一 + 行动清单**（全文「六件套」旧口径清剿为「10 个编号件（00-09）」〔01-08，README 另附〕——计数对账新增三闸：best_practices 引用计数/自查包件数口径/feature_status 提及的 tests 文件存在性，当场抓漏两处；08_体检报告.html 新增「下一步行动」节——命中按性质分三段〔机械清理/质量深改/守卫复核〕逐条给可执行命令，报告→行动闭环） | 稳定 | v5.2 |
 | **bundle 深改指令单**（--bundle 新增 09_深改指令单.md——08 行动清单②段的直连：原稿逐句排序+每句原文行号锚，自查包自包含「改哪里+怎么改」；大文本超逐句上限时优雅跳过）·**pipeline --batch --track**（批量修订记录：逐文件 base_<名>.md/.json 落指定目录——transform 同款 build_revision_log 口径，批量改写可审计；复用单文件 --track 旗标，批量模式语义=目录） | 稳定 | v5.3 |
 | **写入清单自证**（--bundle 新增 00_写入清单.json——本次运行全部写入路径的实测工件〔12 项：清单自身在列〕，permissions.md 声明随包可验；permissions 计数对账纳入闸⑧〔写 N 个编号件 vs 实际〕+旧口径残留检查；仓库 tests 读取双语源文件 SKILL_ZH.md 的口径披露——包内该内容即 SKILL.md） | 稳定 | v5.4 |
+| **compare 对照报告行号+依据**（逐句 diff 每行带「L原文→L改稿」锚列；改稿命中明细带依据折叠——与 detect/dashboard 三报告口径终统一）·**报告打印友好**（全部 HTML 报告内置 @media print——卡片防分页断开/标题防孤行，浏览器打印即交付级排版） | 稳定 | v5.5 |
 
 
 ---
@@ -61,6 +62,7 @@
 | **Bundle wording unification + action checklist** (legacy「六件套」wording swept to「9 numbered items」〔01-08, README separate〕 — reconciliation gains three gates: best_practices reference counts / bundle item-count wording / existence of tests files mentioned in feature_status, catching two stale spots on first run; 08_体检报告.html gains a「下一步行动 / next steps」section — hits grouped by nature into three stages 〔mechanical / deep-rewrite / guard〕 each with executable commands, closing report→action) | Stable | v5.2 |
 | **Bundle deep-rewrite sheet** (--bundle now emits 09_深改指令单.md — the direct companion of the dashboard action checklist: per-sentence ranking of the original with L{line} anchors, the bundle self-contains「改哪里+怎么改」; skips gracefully above the per-sentence cap) · **pipeline --batch --track** (batch revision records: per-file base_<name>.md/.json into a chosen directory — same build_revision_log contract as transform, batch rewrites become auditable; reuses the single-file --track flag with directory semantics in batch mode) | Stable | v5.3 |
 | **Write-manifest self-evidence** (--bundle now emits 00_写入清单.json — a measured artifact of every write path taken this run 〔12 entries, manifest lists itself〕; the permissions.md claim is verifiable from the bundle; permissions counting joins reconciliation gate ⑧ 〔declared N items vs actual〕 plus legacy-wording residue check; repo-side tests read the bilingual source SKILL_ZH.md — inside the package that content is SKILL.md) | Stable | v5.4 |
+| **Compare report line anchors + rationale** (per-sentence diff rows carry「L原文→L改稿」anchors; the rewrite hit-detail section with folded rationale — three-report convention now fully unified with detect/dashboard) · **print-friendly reports** (all HTML reports ship @media print — cards avoid page breaks, headings avoid orphan lines; browser print gives delivery-grade layout) | Stable | v5.5 |
 
 Scale envelope: 800K-char chunks (2K overlap) · 50MB file cap · 120s step budget.
 
