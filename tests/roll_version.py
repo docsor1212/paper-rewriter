@@ -14,7 +14,8 @@ def main():
     p = "scripts/hxt_core.py"
     t = open(p, encoding="utf-8").read()
     t2 = re.sub(r'__version__ = "[0-9.]+"', '__version__ = "%s"' % new, t, count=1)
-    assert t2 != t, "hxt_core 版本行未变化（已是 %s？）" % new
+    if t2 == t:
+        print("hxt_core 已是 %s（跳过）" % new)
     open(p, "w", encoding="utf-8", newline="").write(t2)
     print("hxt_core ->", new)
     n = 0
