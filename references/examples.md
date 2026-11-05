@@ -593,3 +593,16 @@ python scripts/compare.py 原稿.txt 改稿.txt --html 对照.html
 # 改稿命中明细带依据折叠（与 detect/体检报告同口径）。
 # 全部 HTML 报告内置 @media print——浏览器打印即交付级排版（卡片防断页）。
 ```
+
+### v5.6.0 新能力速览：守卫库共享 + bundle 前后对照
+
+```bash
+# ① 守卫库导出/导入（多项目/多机共享，术语级去重合并）
+python scripts/learn_guards.py export 守卫库.json
+python scripts/learn_guards.py import 守卫库.json --dry-run   # 先预览
+python scripts/learn_guards.py import 守卫库.json             # 新术语追加
+
+# ② 自查包新增 10_前后对照.html（render_compare 直出：L 行号锚+依据节）
+python scripts/pipeline.py 原稿.txt --rewrite 改稿.txt --bundle 自查材料/
+# 自查包 00-10 共 11 件
+```

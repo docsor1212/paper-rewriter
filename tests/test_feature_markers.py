@@ -8,7 +8,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, "..")
 MARKERS = [
     ("v5.2 行动清单", "scripts/reporter.py", "下一步行动（按序执行）"),
-    ("v5.2 口径统一", "scripts/pipeline.py", "00-09 共 10 件"),
+    ("v5.2 口径统一", "scripts/pipeline.py", "00-10 共 11 件"),
     ("v5.3 bundle 指令单", "scripts/pipeline.py", "09_深改指令单"),
     ("v5.3 批量修订记录", "scripts/pipeline.py", "批量修订记录"),
     ("v5.4 写入清单", "scripts/pipeline.py", "00_写入清单"),

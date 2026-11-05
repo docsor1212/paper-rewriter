@@ -20,7 +20,7 @@
   的 `-o`/`--output`、`--suggestions`、`--html`、`--review`（detect.py 的审稿
   报告）、`--report`（check_terms.py / check_stats.py 的一致性报告）、`--track`（写 base.md +
   base.json 双文件）、`--bundle 目录`（v3.4.0 投稿自查包：在指定目录下创建带时间戳
-  子目录，写 00-09 共 10 个编号件（00 写入清单〔v5.4.0 权限自证：本次全部写入路径实测〕、01 自查报告 … 08 体检报告 dashboard、09 深改指令单）与 README。一个派生例外：`pipeline --terms auto` 会额外写自动术语
+  子目录，写 00-10 共 11 个编号件（00 写入清单〔v5.4.0 权限自证：本次全部写入路径实测〕、01 自查报告 … 08 体检报告 dashboard、09 深改指令单）与 README。一个派生例外：`pipeline --terms auto` 会额外写自动术语
   草稿 `<输出基名>.terms.auto.txt`（工具生成、未经人工确认，见工作流说明）。外加两个工具自有数据文件：`learn_guards.py
   add/from-text/remove` 写 `scripts/user_guards.json`（你自学的术语守卫，
   经瞬时 `.tmp` 原子替换落盘）；`--batch` 运行在**批量目录自身**写

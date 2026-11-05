@@ -50,8 +50,8 @@ for mm in re.finditer(r"pitfalls\.md（(\d+) 条", bp):
 # ⑥ 自查包口径：文档「N 件」声明 vs bundle 实际产出数
 src_pl = read("scripts/pipeline.py")
 n_items = len(set(re.findall(r'os\.path\.join\(bdir, "(\d{2})_', src_pl)))
-if n_items != 10:
-    fails.append("bundle 编号件 %d ≠ 10（00-09，口径漂移）" % n_items)
+if n_items != 11:
+    fails.append("bundle 编号件 %d ≠ 11（00-10，口径漂移）" % n_items)
 for name, doc in (("SKILL_ZH.md", zh), ("SKILL.md", read("SKILL.md"))):
     for mm in re.finditer(r"(六件|七件|八件)", doc):
         fails.append("%s 仍用旧口径「%s」（现役=九件）" % (name, mm.group(1)))

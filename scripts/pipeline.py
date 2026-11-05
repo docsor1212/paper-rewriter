@@ -613,6 +613,13 @@ def main():
                 print("[提示] 深改指令单跳过（%s）" % str(e)[:80], file=sys.stderr)
             except OSError as e:
                 print("[提示] 深改指令单写盘失败（不影响其余件）：%s" % e, file=sys.stderr)
+            # ⑩ 前后对照（v5.6.0：体检报告行动清单的复核件——render_compare 直出）
+            try:
+                with open(os.path.join(bdir, "10_前后对照.html"), "w", encoding="utf-8") as f:
+                    f.write(_rep.render_compare(orig, new, ro, rn, vr))
+                print("[前后对照] 10_前后对照.html 已并入自查包", file=sys.stderr)
+            except OSError as e:
+                print("[提示] 前后对照写盘失败（不影响其余件）：%s" % e, file=sys.stderr)
             _reg(os.path.join(bdir, "README.txt"), "包说明", "--bundle")
             with open(os.path.join(bdir, "README.txt"), "w", encoding="utf-8") as f:
                 f.write(
@@ -631,7 +638,7 @@ def main():
                     json.dump(_manifest, f, ensure_ascii=False, indent=1)
             except OSError:
                 pass
-            print("投稿自查包: %s（00-09 共 10 件）" % bdir, file=sys.stderr)
+            print("投稿自查包: %s（00-10 共 11 件）" % bdir, file=sys.stderr)
         except Exception as e:  # 自查包是辅助产物：失败降级为警告，主报告照常输出
             print("[提示] 自查包生成失败（%s），主流程结果不受影响" % str(e)[:80],
                   file=sys.stderr)

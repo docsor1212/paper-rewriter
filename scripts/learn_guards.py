@@ -111,6 +111,17 @@ def main():
     p_rm.add_argument("term")
 
     p_t = sub.add_parser("test", help="验证守卫效果：test \"样本文本\"")
+
+    p_exp = sub.add_parser("export", help="导出守卫库到 JSON 文件（多项目/多机共享）："
+                                          "export 导出文件.json")
+    p_exp.add_argument("out", help="导出目标 .json 路径")
+
+    p_imp = sub.add_parser("import", help="从 JSON 导入守卫（合并策略=术语级去重："
+                                          "同术语已存在则跳过并计数，新术语追加）:"
+                                          "import 导出文件.json")
+    p_imp.add_argument("src", help="导入源 .json 路径")
+    p_imp.add_argument("--dry-run", action="store_true",
+                       help="只统计将导入的条数，不写库")
     p_t.add_argument("text")
 
     args = ap.parse_args()
@@ -195,6 +206,48 @@ def main():
     except (OSError, ValueError) as e:
         print("错误: %s" % e, file=sys.stderr)
         sys.exit(2)
+
+
+    if args.cmd == "export":
+        data = load_store()
+        guards = data.get("term_guards", [])
+        out_obj = {"_meta": {"exported_by": "learn_guards export",
+                             "version": hxt_core.__version__,
+                             "count": len(guards)},
+                   "term_guards": guards}
+        with open(args.out, "w", encoding="utf-8") as f:
+            json.dump(out_obj, f, ensure_ascii=False, indent=1)
+        print("已导出 %d 条守卫 → %s" % (len(guards), args.out))
+        return
+
+    if args.cmd == "import":
+        with open(args.src, encoding="utf-8") as f:
+            src = json.load(f)
+        incoming = src.get("term_guards", [])
+        if not isinstance(incoming, list):
+            hxt_core.fail("导入文件结构损坏：term_guards 不是列表")
+        data = load_store()
+        have = {g.get("term") for g in data.get("term_guards", [])}
+        new_items, skipped = [], 0
+        for g in incoming:
+            term = g.get("term")
+            if not term:
+                continue
+            if term in have:
+                skipped += 1
+                continue
+            data["term_guards"].append(g)
+            have.add(term)
+            new_items.append(term)
+        if args.dry_run:
+            print("dry-run：将导入 %d 条新守卫，跳过 %d 条已存在"
+                  % (len(new_items), skipped))
+            return
+        if new_items:
+            save_store(data)
+        print("导入完成：新增 %d 条、跳过 %d 条已存在（现库共 %d 条）"
+              % (len(new_items), skipped, len(data["term_guards"])))
+        return
 
 
 if __name__ == "__main__":

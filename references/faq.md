@@ -186,3 +186,8 @@ HTML 含逐句增删对照，复核改稿最直观。stylecheck 也有 `--html`�
 `--profile general`，八股/公文类信号权重会降低；③密度信号与逐词命中不同，
 没有逐词白名单机制（给「——」做白名单等于关闭信号本身）——它的价值就在于
 对文体惯例也保持敏感，最终取舍权在作者。
+
+**Q26：换电脑/多项目并行，误报守卫要重新教一遍吗？**
+不用。`learn_guards.py export 守卫库.json` 导出全部用户守卫，新环境
+`learn_guards.py import 守卫库.json` 导入（同术语跳过、新术语追加，`--dry-run`
+可先预览）。守卫库是纯 JSON（scripts/user_guards.json），也可纳入版本管理。

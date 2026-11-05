@@ -50,11 +50,11 @@ def test_manifest():
 def test_permissions_consistency():
     perm = open(os.path.join(ROOT, "references/permissions.md"), encoding="utf-8").read()
     src = open(os.path.join(SCRIPTS, "pipeline.py"), encoding="utf-8").read()
-    check("perm.9件口径", "写 00-09 共 10 个编号件" in perm and "写入清单" in perm)
+    check("perm.9件口径", "写 00-10 共 11 个编号件" in perm and "写入清单" in perm)
     check("perm.旧口径清除", "写 8 个文件" not in perm)
     # 实际编号件
     items = set(re.findall(r'os\.path\.join\(bdir, "(\d{2})_', src))
-    check("perm.编号件10", len(items) == 10, str(sorted(items)))
+    check("perm.编号件11", len(items) == 11, str(sorted(items)))
     # 对账闸 ⑧ 覆盖（源码含 permissions 对账段）
     cc = open(os.path.join(ROOT, "tests/check_doc_counts.py"), encoding="utf-8").read()
     check("perm.对账闸扩容", "permissions 称写" in cc)
@@ -66,7 +66,7 @@ def test_bilingual_disclosure():
 
 
 def test_version_and_docs():
-    check("ver.5.4.0", hxt_core.__version__ == "5.5.1", hxt_core.__version__)
+    check("ver.5.4.0", hxt_core.__version__ == "5.6.0", hxt_core.__version__)
     fs = open(os.path.join(ROOT, "references/feature_status.md"), encoding="utf-8").read()
     check("doc.feature_status_v54", fs.count("v5.4") >= 2)
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()
