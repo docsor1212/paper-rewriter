@@ -437,7 +437,7 @@ def build_review_md(text, scan_result, verify_result=None, source=""):
 def render_dashboard(ro, rn, vr, prof, st_issues, t_issues, led, meta=""):
     """v5.0.0 旗舰：投稿自查包 2.0 单页交互体检报告。
 
-    聚合六件数据：分数卡（前→后）/完整性判定/命中行号定位表（含依据折叠，
+    聚合各件数据：分数卡（前→后）/完整性判定/命中行号定位表（含依据折叠，
     details 原生折叠零 JS）/术语+统计一致性面板/问题台账/处置清单。"""
     now = _now()
     delta = rn.get("score", 0) - ro.get("score", 0)

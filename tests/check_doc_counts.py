@@ -81,6 +81,20 @@ elif mp:
 if re.search(r"写 8 个文件", perm):
     fails.append("permissions.md 残留旧口径「写 8 个文件」")
 
+
+# ⑨ 全文档旧口径终扫（v5.7.0）：包内全部 .md 出现旧件数词形即 FAIL
+# （评测员两轮 grep 命中历史条目——历史叙述也必须中性化）
+LEGACY = ("六件套", "六件数据", "写 8 个文件", "00-09 共 10", "8 numbered items",
+          "10 numbered items", "9 numbered items")
+import glob as _glob
+for md in _glob.glob(os.path.join(ROOT, "**", "*.md"), recursive=True):
+    if "/tests/" in md or "/.git/" in md:
+        continue
+    mt = open(md, encoding="utf-8").read()
+    for w in LEGACY:
+        if w in mt:
+            fails.append("旧口径「%s」残留：%s" % (w, os.path.relpath(md, ROOT)))
+
 if fails:
     print("COUNT_MISMATCH:")
     for f in fails:

@@ -356,7 +356,7 @@ python scripts/check_stats.py --batch 章节目录
 # 时点差异（随机化 vs 完成随访）标为候选，不计入退出码
 ```
 
-### 投稿自查包（--bundle，六件套）
+### 投稿自查包（--bundle，11 件）
 
 ```bash
 python scripts/pipeline.py draft.txt -o out.txt --bundle 自查材料
@@ -605,4 +605,13 @@ python scripts/learn_guards.py import 守卫库.json             # 新术语追�
 # ② 自查包新增 10_前后对照.html（render_compare 直出：L 行号锚+依据节）
 python scripts/pipeline.py 原稿.txt --rewrite 改稿.txt --bundle 自查材料/
 # 自查包 00-10 共 11 件
+```
+
+### v5.7.0 新能力速览：守卫处方报告 + 口径大扫除
+
+```bash
+python scripts/verify.py 原稿.txt 改稿.txt --html 守卫报告.html
+# PASS：简洁通过卡（数字/DOI/术语 全部保全）
+# FAIL：单页处方——违规类别+原句锚点+怎么修+修复三步，打印即可发给协助者
+#（复用 reporter 打印友好样式；exit 0 才算过）
 ```

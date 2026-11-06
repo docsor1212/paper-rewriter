@@ -72,7 +72,7 @@ def main():
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--bundle", metavar="目录",
                     help="投稿自查包（v3.4.0）：在指定目录下生成带时间戳子目录，汇集"
-                         "检测报告/修订记录/风格画像/统计一致性/术语一致性/完整性判定六件")
+                         "检测报告/修订记录/风格画像/统计一致性/术语一致性/完整性判定等各件")
     ap.add_argument("--raw-markdown", action="store_true",
                     help="对 .md 输入保留 markdown 标记扫描（缺省 v3.6.0 起自动剥离"
                          "结构后扫描正文；清理与完整性守卫始终基于原文）")
@@ -584,7 +584,7 @@ def main():
                 f.write("| 问题 | 说明 | 改前 | 改后 | 状态 |\n|---|---|---|---|---|\n")
                 for cid, label, b, a, st in led:
                     f.write("| %s | %s | %d | %d | %s |\n" % (cid, label, b, a, st))
-            # ⑧ 体检报告 dashboard（v5.0.0 旗舰：单页交互聚合——六件数据一页读）
+            # ⑧ 体检报告 dashboard（v5.0.0 旗舰：单页交互聚合——各件数据一页读）
             try:
                 _reg(os.path.join(bdir, "08_体检报告.html"), "体检报告 dashboard", "--bundle")
                 with open(os.path.join(bdir, "08_体检报告.html"), "w", encoding="utf-8") as f:
@@ -593,7 +593,7 @@ def main():
                         meta=os.path.basename(str(args.file or "stdin"))))
                 print("[体检报告] 08_体检报告.html 已并入自查包", file=sys.stderr)
             except OSError as e:
-                print("[提示] 体检报告写盘失败（不影响其余六件）：%s" % e, file=sys.stderr)
+                print("[提示] 体检报告写盘失败（不影响其余件）：%s" % e, file=sys.stderr)
             # ⑨ 深改指令单（v5.3.0：08 行动清单②段直连——bundle 自包含「改哪里+怎么改」）
             try:
                 import plan as _plan_mod
