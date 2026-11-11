@@ -53,6 +53,8 @@ Word 文件直接传 .docx 即可（支持直读）——不要自己另存成 .
 两层解决：①词表自带术语保护（mutational landscape、pivotal trial、robust regression、序列对齐、沉淀反应、心室重塑、串联质谱等已豁免）；②仍误报的，用 `learn_guards.py from-text 术语 样本.txt` 固化成用户守卫（升级不丢），或在 `scripts/patterns_*.json` 的 `term_guards` 加一条你的搭配（allow_before/allow_after），并欢迎反馈补充词表。
 
 **Q9：分数多少算"有问题"？**
+
+分数没有统一及格线（跨档分数不可比）；密度类信号（破折号/段落开头）的阈值依据可在 `python scripts/calibrate.py` 一键复核——阈值-语料对照表见 [calibration.md](calibration.md)。
 0-27 低（正常）；28-49 中（有模板腔，可改可不改）；50+ 高（建议按指南深改）；报告会给出具体剩余特征清单。分数是密度统计，短文本（<15 单元）自动降权并标注"仅供参考"。
 两个实用读法：①看**结构分布**比看总分有用——报告按类别列出剩余特征，套话 12 处+翻译腔 3 处的 40 分，远比单一「en_vocab 12 处」的 40 分好改；②用 `stylecheck.py 改稿 --compare 原稿` 看分项差值，总分不降但句长 CV 从 0.2 升到 0.45，就是节奏真改好了。
 

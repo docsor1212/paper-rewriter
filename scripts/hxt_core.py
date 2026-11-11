@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "5.8.1"
+__version__ = "5.9.0"
 
 import json
 import os
@@ -1188,6 +1188,21 @@ _EN_CONNECTORS = ["however", "moreover", "furthermore", "additionally", "in addi
 SCAN_TIME_BUDGET = 120.0  # 秒
 
 
+# ── 密度信号阈值单一真源（v5.9.0 常量化：calibrate.py 与 scan 共用此表，
+# 校准报告的阈值即运行时阈值——不存在第二处字面量）──
+DENSITY_THRESHOLDS = {
+    # key: (stats 密度键, 触发下限, 最低命中数, 规模门槛 stats 键, 规模门槛值, 说明)
+    "en_dash":      ("em_dash_density", 5.0, 3, "words_en", 400, "em_dash_count",
+                     "em-dash/千词 ≥5 且全文 ≥3 处（≥400 词启用；正常学术 <1）"),
+    "en_paraopen":  ("para_open_ratio", 0.40, 3, None, None, "para_open_hits",
+                     "框架化副词开头段落占比 ≥40% 且 ≥3 段（≥5 段启用）"),
+    "zh_dash":      ("zh_dash_density", 4.0, 3, "zh_chars", 400, "zh_dash_count",
+                     "「——」/千字 ≥4 且全文 ≥3 处（≥400 字启用；正常学术 <1）"),
+    "zh_paraopen":  ("zh_para_open_ratio", 0.40, 3, None, None, "zh_para_open_hits",
+                     "公式词开头段落占比 ≥40% 且 ≥3 段（≥5 段启用）"),
+}
+
+
 def scan(text, lang=None, profile="academic", source_ext="",
          time_budget=SCAN_TIME_BUDGET, base_line=1):
     """全量扫描。返回结构化 dict：
@@ -1359,45 +1374,51 @@ def scan(text, lang=None, profile="academic", source_ext="",
         # em-dash 是绝对密度：全文 ≥400 词才启用（短文一两个破折号就爆表），
         # 且实际个数 ≥3 才计分（400 词 2 个破折号是正常会议摘要写法）；
         # 阈值 5.0/千词=「泛滥」区间（正常学术 <1，2026 高发 5-15）。
-        if stats.get("words_en", 0) >= 400:
-            em_d = stats.get("em_dash_density")
-            if em_d is not None and em_d >= 5.0 and stats.get("em_dash_count", 0) >= 3:
-                _mult = min(3, int(em_d // 5.0))
+        _dt_en_dash = DENSITY_THRESHOLDS["en_dash"]
+        if stats.get("words_en", 0) >= (_dt_en_dash[4] or 0):
+            em_d = stats.get(_dt_en_dash[0])
+            if em_d is not None and em_d >= _dt_en_dash[1] and stats.get("em_dash_count", 0) >= _dt_en_dash[2]:
+                _mult = min(3, int(em_d // _dt_en_dash[1]))
                 add_cat("en_dash", "em-dash 密度过载", round(0.8 * _gw, 4), _mult,
-                        ["%d 处、密度 %.1f/千词（阈值 5.0 且 ≥3 处）——"
-                         "改用逗号/括号/分号拆分" % (stats["em_dash_count"], em_d)])
+                        ["%d 处、密度 %.1f/千词（阈值 %s 且 ≥%d 处）——"
+                         "改用逗号/括号/分号拆分" % (stats["em_dash_count"], em_d, _dt_en_dash[1], _dt_en_dash[2])])
             _tick("密度信号")
         # 段落开头占比是相对信号：统计层已保证 ≥5 段，占比本身跨规模稳定，
         # 不套词数门槛；且命中段 ≥3 才计分（5 段 2 段的 0.4 太弱，However 类
         # 正当段首不算框架化副词——opener 表已收窄）
-        po = stats.get("para_open_ratio")
-        if po is not None and po >= 0.4 and stats.get("para_open_hits", 0) >= 3:
+        _dt_en_po = DENSITY_THRESHOLDS["en_paraopen"]
+        po = stats.get(_dt_en_po[0])
+        if po is not None and po >= _dt_en_po[1] and stats.get("para_open_hits", 0) >= _dt_en_po[2]:
             add_cat("en_paraopen", "段落开头副词均匀化", round(0.9 * _gw, 4), 1,
-                    ["%.0f%% 段落以框架化副词开头（%d/%d，阈值 40%% 且 ≥3 段）——"
+                    ["%.0f%% 段落以框架化副词开头（%d/%d，阈值 %.0f%% 且 ≥%d 段）——"
                      "部分段落直接以内容起句" % (po * 100,
                                                 stats.get("para_open_hits", 0),
-                                                max(1, len([p for p in re.split(r"\n\s*\n|\n", text) if p.strip()])))])
+                                                max(1, len([p for p in re.split(r"\n\s*\n|\n", text) if p.strip()])),
+                                                _dt_en_po[1] * 100, _dt_en_po[2])])
     if lang in ("zh", "mix"):
         # 中文密度阈值（v4.6.0，镜像 EN 校准哲学：阈值以下属正常修辞）——
         # 「——」：≥400 汉字才启用、≥4/千字且 ≥3 处才计分（正常学术 <1/千字）；
         # 段落开头公式词：占比 ≥40% 且 ≥3 段才计分
-        if stats.get("zh_chars", 0) >= 400:
-            zd = stats.get("zh_dash_density")
-            if zd is not None and zd >= 4.0 and stats.get("zh_dash_count", 0) >= 3:
-                _mult = min(3, int(zd // 4.0))
+        _dt_zh_dash = DENSITY_THRESHOLDS["zh_dash"]
+        if stats.get("zh_chars", 0) >= (_dt_zh_dash[4] or 0):
+            zd = stats.get(_dt_zh_dash[0])
+            if zd is not None and zd >= _dt_zh_dash[1] and stats.get("zh_dash_count", 0) >= _dt_zh_dash[2]:
+                _mult = min(3, int(zd // _dt_zh_dash[1]))
                 add_cat("zh_dash", "「——」连接滥用", round(0.8 * _gw, 4), _mult,
-                        ["%d 处、密度 %.1f/千字（阈值 4.0 且 ≥3 处）——"
+                        ["%d 处、密度 %.1f/千字（阈值 %s 且 ≥%d 处）——"
                          "句间改用句号或分号；解释插入保留一处即可"
-                         % (stats["zh_dash_count"], zd)])
+                         % (stats["zh_dash_count"], zd, _dt_zh_dash[1], _dt_zh_dash[2])])
             _tick("密度信号")
-        zpo = stats.get("zh_para_open_ratio")
-        if zpo is not None and zpo >= 0.4 and stats.get("zh_para_open_hits", 0) >= 3:
+        _dt_zh_po = DENSITY_THRESHOLDS["zh_paraopen"]
+        zpo = stats.get(_dt_zh_po[0])
+        if zpo is not None and zpo >= _dt_zh_po[1] and stats.get("zh_para_open_hits", 0) >= _dt_zh_po[2]:
             add_cat("zh_paraopen", "段落开头公式化", round(0.9 * _gw, 4), 1,
                     ["%.0f%% 段落以「随着…/近年来/为了…/针对…」类公式词开头"
-                     "（%d/%d，阈值 40%% 且 ≥3 段）——部分段落直接以内容起句"
+                     "（%d/%d，阈值 %.0f%% 且 ≥%d 段）——部分段落直接以内容起句"
                      % (zpo * 100,
                         stats.get("zh_para_open_hits", 0),
-                        max(1, len([p for p in re.split(r"\n\s*\n|\n", text) if p.strip()])))])
+                        max(1, len([p for p in re.split(r"\n\s*\n|\n", text) if p.strip()])),
+                        _dt_zh_po[1] * 100, _dt_zh_po[2])])
 
     pts = pts_acc[0]
 

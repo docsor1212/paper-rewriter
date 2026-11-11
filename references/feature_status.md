@@ -10,6 +10,7 @@
 
 | 能力 | 状态 | 版本 |
 |---|---|---|
+| **阈值校准证据化**（密度阈值常量化进 hxt_core.DENSITY_THRESHOLDS〔评分与校准共用单一真源〕·scripts/calibrate.py 语料实测校准表〔人稿以运行时同款条件触发即 exit 1——阈值合理性从文档声明变成机器可验断言〕·包内随附演示语料 references/calib_corpus/ 四件·证据文档 references/calibration.md〔阈值-语料-复现命令三列〕·bundle README 十二件说明补全+⑧⑩⑪ 异常全降级） | 稳定 | v5.9 |
 | **包内自检 selfcheck**（v5.8.0，一键四段：环境/结构/核心功能冒烟/文档对账——发布包可见的质量自证入口，CI/agent 门禁 --json；对账段镜像仓库侧计数闸）·**bundle ⑪ 守卫处方**（verify 处方报告随自查包，单页可打印带修复三步；10 号件前后对照写入清单补登记——14 项全对账）·**主文档功能状态行五类分组收口**（速览按诊断/深改/守卫/批量/交付五类短语化，版本细节留在本文件） | 稳定 | v5.8 |
 | ⚠️ **PDF 直读+置信度自评**（嵌字体/ToUnicode 先试抽取封顶「中」；硬门闸校准表见 references/pdf_confidence.md；**v3.8.0 起缺省门=中**——乱码形态默认拒收，`--pdf-min-confidence 低` 恢复仅标注） | ⚠️ 实验性 | v1.6–3.8 |
 | 核心五件·章节感知·句级计划（plan --handoff）·守卫自学习·机器退出码·超时/批量重试·集中异常·--deep·全角归一 | 稳定 | v1.0–2.9 |
@@ -68,6 +69,7 @@
 | **Guard library export/import** (learn_guards gains two subcommands — export the guard library to JSON / import with term-level dedup 〔existing terms skipped, new ones appended; --dry-run preview〕, so guards are no longer locked to one machine or project) · **bundle ⑩ side-by-side compare** (--bundle now emits 10_前后对照.html via render_compare 〔line anchors + rationale〕, the verification companion of the dashboard action checklist; numbered items now 00-10 = 11) | Stable | v5.6 |
 | **verify --html prescription report** (concise PASS card / FAIL single-page prescription: violation classes + original-sentence anchors + how-to-fix + repair steps, on the print-friendly reporter skeleton — guard results can go straight to advisors/editors) · **wording sweep 2.0** (legacy item-count forms purged repo-wide〔六件/十件/00-09 residue zeroed〕+ history entries neutralized + reconciliation gate ⑨ ultimate scan 〔any legacy form in any packaged .md fails the battery〕 — mechanism fix for the stale-wording root causes) | Stable | v5.7 |
 | **In-package selfcheck** (one command, four sections: environment / structure / core-feature smoke / doc reconciliation — a package-visible quality self-evidence entry, CI/agent gate via --json; mirrors the repo-side reconciliation gates) · **bundle ⑪ guard prescription** (verify's prescription report ships in the bundle as a single printable page with repair steps; item 10 compare sheet now registered in the write manifest — 14 writes fully accounted) · **main-doc status line regrouped into five verbs** (diagnose / deep-rewrite / guard / batch / deliver; version details stay in this file) | Stable | v5.8 |
+| **Calibration evidence for density thresholds** (thresholds centralized in hxt_core.DENSITY_THRESHOLDS 〔single source shared by scoring and calibration〕 · scripts/calibrate.py measures signal densities on a corpus 〔human files triggering any density signal under the exact runtime condition = exit 1 — threshold sanity becomes a machine-checkable assertion〕 · bundled demo corpus references/calib_corpus/ · evidence doc references/calibration.md 〔threshold / corpus / reproduction-command〕 · bundle README covers all twelve items + inner exceptions fully degrade) | Stable | v5.9 |
 
 Scale envelope: 800K-char chunks (2K overlap) · 50MB file cap · 120s step budget.
 

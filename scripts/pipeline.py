@@ -592,8 +592,8 @@ def main():
                         ro, rn, vr, prof, st_issues, t_issues, led,
                         meta=os.path.basename(str(args.file or "stdin"))))
                 print("[体检报告] 08_体检报告.html 已并入自查包", file=sys.stderr)
-            except OSError as e:
-                print("[提示] 体检报告写盘失败（不影响其余件）：%s" % e, file=sys.stderr)
+            except Exception as e:
+                print("[提示] 体检报告写盘失败（不影响其余件）：%s" % str(e)[:80], file=sys.stderr)
             # ⑨ 深改指令单（v5.3.0：08 行动清单②段直连——bundle 自包含「改哪里+怎么改」）
             try:
                 import plan as _plan_mod
@@ -619,8 +619,8 @@ def main():
                 with open(os.path.join(bdir, "10_前后对照.html"), "w", encoding="utf-8") as f:
                     f.write(_rep.render_compare(orig, new, ro, rn, vr))
                 print("[前后对照] 10_前后对照.html 已并入自查包", file=sys.stderr)
-            except OSError as e:
-                print("[提示] 前后对照写盘失败（不影响其余件）：%s" % e, file=sys.stderr)
+            except Exception as e:
+                print("[提示] 前后对照写盘失败（不影响其余件）：%s" % str(e)[:80], file=sys.stderr)
             # ⑪ 守卫处方（v5.8.0：verify 处方报告随包——单页可打印，FAIL 带三步处方）
             try:
                 import verify as _vf
@@ -630,8 +630,8 @@ def main():
                     f.write(_vf.render_report_html(vr, _rem11,
                                                    terms_flag=bool(getattr(args, "terms", None))))
                 print("[守卫处方] 11_守卫处方.html 已并入自查包", file=sys.stderr)
-            except OSError as e:
-                print("[提示] 守卫处方写盘失败（不影响其余件）：%s" % e, file=sys.stderr)
+            except Exception as e:
+                print("[提示] 守卫处方写盘失败（不影响其余件）：%s" % str(e)[:80], file=sys.stderr)
             _reg(os.path.join(bdir, "README.txt"), "包说明", "--bundle")
             with open(os.path.join(bdir, "README.txt"), "w", encoding="utf-8") as f:
                 f.write(
@@ -639,9 +639,10 @@ def main():
                     "各件说明：01 改稿风格自查报告（本地启发式口径，非任何官方检测）；"
                     "02 机械清理修订记录（可审计；--rewrite 模式下本件为空属正常）；"
                     "03 前后风格画像对比；04 统计一致性（以原始数据为准）；"
-                    "05 术语一致性；06 完整性守卫判定（ok=true 才算过）；"
-                    "08 体检报告（单页聚合——分数卡/命中行号/依据/台账）；10 前后对照（L 行号锚）；"
-                    "11 守卫处方（单页修复处方，FAIL 时照修复三步执行）。\n"
+                    "05 术语一致性；06 完整性守卫判定（ok=true 才算过）；07 问题台账（逐项标记处理状态）；"
+                    "08 体检报告（单页聚合——分数卡/命中行号/依据/台账）；09 深改指令单（逐句改哪里怎么改）；"
+                    "10 前后对照（L 行号锚）；11 守卫处方（单页修复处方，FAIL 时照修复三步执行）；"
+                    "00 写入清单（本次全部写入路径实测）。\n"
                     % (hxt_core.__version__, mode,
                        _dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
                        str(args.file)))

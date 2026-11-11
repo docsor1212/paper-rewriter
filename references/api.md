@@ -142,3 +142,7 @@ plan 的逐句贡献与投影均为近似口径（同类同权线性近似）；
 ## selfcheck（v5.8.0 包内自检）
 
 `python scripts/selfcheck.py [--json]`——环境/结构/核心功能冒烟/文档对账四段一条命令；exit 0=全过（CI/agent 门禁可用）。零网络、零子进程、只读包内文件、不写盘；对账段镜像仓库侧计数闸（版本行/件数口径/写入清单覆盖），发布包内即可复验。
+
+## calibrate（v5.9.0 阈值校准证据工具）
+
+`python scripts/calibrate.py [--corpus-dir 目录] [--json]`——在语料上实测四密度信号分布，输出阈值-语料校准表；人稿（human_* 前缀）以运行时同款条件触发任一密度信号即 exit 1（校准失效）。阈值真源=`hxt_core.DENSITY_THRESHOLDS`（评分与校准共用，见 references/calibration.md）；包内自带演示语料 references/calib_corpus/。零网络、零子进程、只读不写盘。

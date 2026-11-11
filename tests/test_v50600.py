@@ -72,7 +72,7 @@ def test_bundle_compare():
 
 
 def test_version_and_docs():
-    check("ver.5.6.0", hxt_core.__version__ == "5.8.1", hxt_core.__version__)
+    check("ver.5.6.0", hxt_core.__version__ == "5.9.0", hxt_core.__version__)
     fs = open(os.path.join(ROOT, "references/feature_status.md"), encoding="utf-8").read()
     check("doc.feature_status_v56", fs.count("v5.6") >= 2)
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()

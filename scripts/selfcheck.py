@@ -133,6 +133,16 @@ def main():
         meta="selfcheck")
     check("S3.体检报告渲染", "行动" in dash or "card" in dash)
 
+    import calibrate as _cal
+    _cd = os.path.join(ROOT, "references", "calib_corpus")
+    try:
+        _c58 = _cal.calibrate(_cd)
+        _warn = any(r["signal"] == "__warning__" for r in _c58["table"])
+        check("S3.阈值校准", not _c58["violations"] and not _warn,
+              "violations=%s" % (_c58["violations"][:2],))
+    except ValueError as e:
+        check("S3.阈值校准", False, "语料缺失: %s" % str(e)[:80])
+
     # ── S4 文档对账（仓库闸的包内镜像——件数/版本/清单覆盖）──
     section("S4 对账")
     zh = _rd(os.path.join(ROOT, "SKILL_ZH.md"))
