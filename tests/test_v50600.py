@@ -4,7 +4,7 @@
 覆盖：
   1. learn_guards export/import 全链（add→export→remove→import→去重→dry-run）
   2. bundle ⑩前后对照.html（L 行号锚+依据节）
-  3. 11 件口径（对账闸+编号件清单）
+  3. 编号件口径（对账闸+编号件清单；v5.8 起 00-11 共 12 件）
   4. 版本锚与文档接线
 """
 import json
@@ -68,15 +68,15 @@ def test_bundle_compare():
         check("b10.L锚列", len(re.findall(r"L\d+→L\d+", html)) >= 1)
         check("b10.printCSS", "@media print" in html)
         items = sorted(set(re.findall(r"(\d{2})_", "\n".join(os.listdir(pkgs[0])))))
-        check("b10.编号件11", len(items) == 11, str(items))
+        check("b10.编号件12", len(items) == 12, str(items))
 
 
 def test_version_and_docs():
-    check("ver.5.6.0", hxt_core.__version__ == "5.7.0", hxt_core.__version__)
+    check("ver.5.6.0", hxt_core.__version__ == "5.8.0", hxt_core.__version__)
     fs = open(os.path.join(ROOT, "references/feature_status.md"), encoding="utf-8").read()
     check("doc.feature_status_v56", fs.count("v5.6") >= 2)
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()
-    check("doc.ZH_v56", "守卫库共享" in zh)
+    check("doc.ZH_v56", "导出共享" in zh)
 
 
 def main():

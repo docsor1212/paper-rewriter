@@ -121,12 +121,12 @@ def test_md_and_section_lineno():
 
 
 def test_version_and_docs():
-    check("ver.__version__", hxt_core.__version__ == "5.7.0",
+    check("ver.__version__", hxt_core.__version__ == "5.8.0",
           hxt_core.__version__)
     fs = open(os.path.join(ROOT, "references/feature_status.md"), encoding="utf-8").read()
     check("doc.feature_status_v49", fs.count("v4.9") >= 2)
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()
-    check("doc.ZH_v49功能行", "命中行号定位" in zh)
+    check("doc.ZH_v49功能行", "行号锚" in zh)
 
 
 def main():

@@ -356,13 +356,14 @@ python scripts/check_stats.py --batch 章节目录
 # 时点差异（随机化 vs 完成随访）标为候选，不计入退出码
 ```
 
-### 投稿自查包（--bundle，11 件）
+### 投稿自查包（--bundle，00-11 共 12 个编号件）
 
 ```bash
 python scripts/pipeline.py draft.txt -o out.txt --bundle 自查材料
 # 生成 自查材料/自查包_YYYYMMDD_HHMMSS/：
-#   01_风格自查报告.html 02_修订记录.md/.json 03_风格画像对比.md
-#   04_统计一致性.md 05_术语一致性.md 06_完整性判定.json README.txt
+#   00_写入清单.json 01_风格自查报告.html 02_修订记录.md/.json 03_风格画像对比.md
+#   04_统计一致性.md 05_术语一致性.md 06_完整性判定.json 07_问题台账.md
+#   08_体检报告.html 09_深改指令单.md 10_前后对照.html 11_守卫处方.html README.txt
 ```
 
 ### verify FAIL 的处方化输出（v3.9.0）
@@ -604,7 +605,7 @@ python scripts/learn_guards.py import 守卫库.json             # 新术语追�
 
 # ② 自查包新增 10_前后对照.html（render_compare 直出：L 行号锚+依据节）
 python scripts/pipeline.py 原稿.txt --rewrite 改稿.txt --bundle 自查材料/
-# 自查包 00-10 共 11 件
+# 自查包 00-11 共 12 件
 ```
 
 ### v5.7.0 新能力速览：守卫处方报告 + 口径大扫除

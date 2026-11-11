@@ -131,10 +131,14 @@ max_cjk_shift=0.12) -> {"ok": bool, "violations": [...], "warnings": [...], "sta
 | `hxt_core.PdfGateRejected` / `pdf_gate_error`（v3.7.0/v3.8.0） | PDF 置信度门闸统一报错（ValueError）：4 处 CLI 调用点共用一处人话化文案（原因+已拒收+三条出路；「低于门闸」短语为测试锚） |
 | `hxt_core.strip_markdown(text)` / `scan_md(...)`（v3.6.0） | markdown 感知：结构剥离（代码块/表格行/标题/列表/粗体）+结构统计；detect/pipeline/stylecheck 对 .md/.markdown 自动启用，--raw-markdown 保留原样 |
 | `pipeline.py --check-stats`（v3.3.0） | 管线统计一致性阶段：对原稿三查，JSON `stats_consistency` 字段；仅提示不改退出码 |
-| `pipeline.py --bundle 目录`（v3.4.0） | 投稿自查包：带时间戳子目录汇集 01 检测报告(.html)/02 修订记录(.md+.json)/03 画像对比/04 统计一致性/05 术语一致性/06 完整性判定(.json)+README |
+| `pipeline.py --bundle 目录`（v3.4.0 起） | 投稿自查包：带时间戳子目录汇集 00 写入清单/01 检测报告(.html)/02 修订记录(.md+.json)/03 画像对比/04 统计一致性/05 术语一致性/06 完整性判定(.json)/07 问题台账/08 体检报告(.html)/09 深改指令单/10 前后对照(.html)/11 守卫处方(.html)+README |
 | `detect/pipeline/plan --pdf-min-confidence 高/中/低`（v3.3.0；v3.8.0 起缺省=中） | PDF 置信度硬门闸：低于阈值拒收并提示导出 UTF-8；「低」恢复仅标注旧行为 |
 | `hxt_core.pdf_confidence_ok(conf, min)` | 门闸秩比较（低<中<高） |
 | `learn_guards.py add/from-text/list/remove/test` | 误报→守卫固化；语义同内置 term_guards（±30 字符窗口豁免） |
 
 plan 的逐句贡献与投影均为近似口径（同类同权线性近似）；learn_guards 只写
 `scripts/user_guards.json` 一个文件，原子替换（tmp+rename）。
+
+## selfcheck（v5.8.0 包内自检）
+
+`python scripts/selfcheck.py [--json]`——环境/结构/核心功能冒烟/文档对账四段一条命令；exit 0=全过（CI/agent 门禁可用）。零网络、零子进程、只读包内文件、不写盘；对账段镜像仓库侧计数闸（版本行/件数口径/写入清单覆盖），发布包内即可复验。

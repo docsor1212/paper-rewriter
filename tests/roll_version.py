@@ -19,7 +19,7 @@ def main():
     open(p, "w", encoding="utf-8", newline="").write(t2)
     print("hxt_core ->", new)
     n = 0
-    for f in glob.glob("tests/test_v5*.py"):
+    for f in glob.glob("tests/test_v[0-9]*.py"):
         t = open(f, encoding="utf-8").read()
         t2 = re.sub(r'(hxt_core\.__version__ == ")[0-9.]+(")', r"\g<1>%s\g<2>" % new, t)
         if t2 != t:

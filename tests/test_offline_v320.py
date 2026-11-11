@@ -163,7 +163,7 @@ def test_docs():
           "统计一致性" in zh and "查查数字有没有前后打架" in zh)
     check("docs.ZH 协议 bullet", "数字前后打架" in zh)
     check("docs.EN 状态行/能力行/协议",
-          "Statistical consistency guard" in en
+          "statistical consistency" in en
           and "Numeric consistency" in en
           and "check_stats.py file" in en)
     check("docs.EN 触发词扩容（新增自然口语短语）",

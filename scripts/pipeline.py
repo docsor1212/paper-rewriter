@@ -615,11 +615,23 @@ def main():
                 print("[提示] 深改指令单写盘失败（不影响其余件）：%s" % e, file=sys.stderr)
             # ⑩ 前后对照（v5.6.0：体检报告行动清单的复核件——render_compare 直出）
             try:
+                _reg(os.path.join(bdir, "10_前后对照.html"), "前后对照", "--bundle")
                 with open(os.path.join(bdir, "10_前后对照.html"), "w", encoding="utf-8") as f:
                     f.write(_rep.render_compare(orig, new, ro, rn, vr))
                 print("[前后对照] 10_前后对照.html 已并入自查包", file=sys.stderr)
             except OSError as e:
                 print("[提示] 前后对照写盘失败（不影响其余件）：%s" % e, file=sys.stderr)
+            # ⑪ 守卫处方（v5.8.0：verify 处方报告随包——单页可打印，FAIL 带三步处方）
+            try:
+                import verify as _vf
+                _rem11 = _vf.build_remedies(orig, vr)
+                _reg(os.path.join(bdir, "11_守卫处方.html"), "守卫处方报告", "--bundle")
+                with open(os.path.join(bdir, "11_守卫处方.html"), "w", encoding="utf-8") as f:
+                    f.write(_vf.render_report_html(vr, _rem11,
+                                                   terms_flag=bool(getattr(args, "terms", None))))
+                print("[守卫处方] 11_守卫处方.html 已并入自查包", file=sys.stderr)
+            except OSError as e:
+                print("[提示] 守卫处方写盘失败（不影响其余件）：%s" % e, file=sys.stderr)
             _reg(os.path.join(bdir, "README.txt"), "包说明", "--bundle")
             with open(os.path.join(bdir, "README.txt"), "w", encoding="utf-8") as f:
                 f.write(
@@ -628,7 +640,8 @@ def main():
                     "02 机械清理修订记录（可审计；--rewrite 模式下本件为空属正常）；"
                     "03 前后风格画像对比；04 统计一致性（以原始数据为准）；"
                     "05 术语一致性；06 完整性守卫判定（ok=true 才算过）；"
-                    "08 体检报告（v5.0.0：单页聚合——分数卡/命中行号/依据/台账）。\n"
+                    "08 体检报告（单页聚合——分数卡/命中行号/依据/台账）；10 前后对照（L 行号锚）；"
+                    "11 守卫处方（单页修复处方，FAIL 时照修复三步执行）。\n"
                     % (hxt_core.__version__, mode,
                        _dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
                        str(args.file)))
@@ -638,7 +651,7 @@ def main():
                     json.dump(_manifest, f, ensure_ascii=False, indent=1)
             except OSError:
                 pass
-            print("投稿自查包: %s（00-10 共 11 件）" % bdir, file=sys.stderr)
+            print("投稿自查包: %s（00-11 共 12 件）" % bdir, file=sys.stderr)
         except Exception as e:  # 自查包是辅助产物：失败降级为警告，主报告照常输出
             print("[提示] 自查包生成失败（%s），主流程结果不受影响" % str(e)[:80],
                   file=sys.stderr)

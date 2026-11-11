@@ -50,11 +50,11 @@ for mm in re.finditer(r"pitfalls\.md（(\d+) 条", bp):
 # ⑥ 自查包口径：文档「N 件」声明 vs bundle 实际产出数
 src_pl = read("scripts/pipeline.py")
 n_items = len(set(re.findall(r'os\.path\.join\(bdir, "(\d{2})_', src_pl)))
-if n_items != 11:
-    fails.append("bundle 编号件 %d ≠ 11（00-10，口径漂移）" % n_items)
+if n_items != 12:
+    fails.append("bundle 编号件 %d ≠ 12（00-11，口径漂移）" % n_items)
 for name, doc in (("SKILL_ZH.md", zh), ("SKILL.md", read("SKILL.md"))):
     for mm in re.finditer(r"(六件|七件|八件)", doc):
-        fails.append("%s 仍用旧口径「%s」（现役=九件）" % (name, mm.group(1)))
+        fails.append("%s 仍用旧口径「%s」（现役=00-11 共 12 件）" % (name, mm.group(1)))
     for mm in re.finditer(r"[（(](\d+)\s*件[）)]", doc):
         if int(mm.group(1)) != n_items:
             fails.append("%s 自查包「%s 件」vs 实际 %d 件" % (name, mm.group(1), n_items))
@@ -70,10 +70,10 @@ print("feature_status tests 引用 ✓")
 
 # ⑧ permissions.md 的 bundle 写入件数声明 vs 实际
 perm = read("references/permissions.md")
-mp = re.search(r"写 (\d+) 个编号件", perm)
-n_items_p = len(set(re.findall(r'os\.path\.join\(bdir, "(\d{2})_', src_pl)))  # 00-09 含写入清单
+mp = re.search(r"写 (?:[\d-]+ 共 )?(\d+) 个编号件", perm)
+n_items_p = len(set(re.findall(r'os\.path\.join\(bdir, "(\d{2})_', src_pl)))  # 编号件全集（含写入清单）
 if mp and int(mp.group(1)) != n_items_p:
-    fails.append("permissions 称写 %s 件 vs bundle 实际 %d 件（00-09）"
+    fails.append("permissions 称写 %s 件 vs bundle 实际 %d 件（编号件全集）"
                  % (mp.group(1), n_items_p))
 elif mp:
     print("permissions bundle 计数 %s ✓" % mp.group(1))
@@ -85,7 +85,8 @@ if re.search(r"写 8 个文件", perm):
 # ⑨ 全文档旧口径终扫（v5.7.0）：包内全部 .md 出现旧件数词形即 FAIL
 # （评测员两轮 grep 命中历史条目——历史叙述也必须中性化）
 LEGACY = ("六件套", "六件数据", "写 8 个文件", "00-09 共 10", "8 numbered items",
-          "10 numbered items", "9 numbered items")
+          "10 numbered items", "9 numbered items", "00-10 共 11", "11 numbered items",
+          "九件")
 import glob as _glob
 for md in _glob.glob(os.path.join(ROOT, "**", "*.md"), recursive=True):
     if "/tests/" in md or "/.git/" in md:

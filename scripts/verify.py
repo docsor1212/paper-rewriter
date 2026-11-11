@@ -310,6 +310,48 @@ def build_remedies(orig, r):
     return remedies
 
 
+def render_report_html(r, remedies, terms_flag=False):
+    """守卫处方报告（v5.7.0 --html；v5.8.0 抽出函数供 --bundle ⑪ 件复用）。
+
+    PASS 简洁卡 / FAIL 处方：违规类别+原句锚点+怎么修+修复三步，打印友好。
+    """
+    import reporter as _rep
+    from html import escape as _esc
+    head = "PASS ✓" if r["ok"] else "FAIL ✗（学术安全红线）"
+    color = "#1a7f37" if r["ok"] else "#cf222e"
+    cards = ["<div class='card'><h1>完整性守卫报告</h1>"
+             "<p style='color:%s;font-weight:700'>%s</p>"
+             "<p class='meta'>%d → %d 字符 · CJK 漂移 %.3f · 术语表：%s</p></div>" % (
+                 color, _esc(head), r["stats"]["orig_chars"],
+                 r["stats"]["new_chars"], r["stats"].get("cjk_shift", 0.0),
+                 "有" if terms_flag else "无")]
+    if r["violations"]:
+        lis = []
+        for v in r["violations"]:
+            rem = next((x["remedy"] for x in remedies
+                        if x["check"] == v["check"]), "对照原稿恢复")
+            ctxs = next((x.get("context", []) for x in remedies
+                         if x["check"] == v["check"]), [])
+            ctx_html = "".join("<br>原句锚点: <code>%s</code>" % _esc(c)
+                               for c in ctxs[:3])
+            lis.append("<li><b>[%s]</b> %s<br><span class='meta'>处方: %s</span>%s</li>"
+                       % (_esc(v["check"]), _esc(v.get("detail", "")),
+                          _esc(rem), ctx_html))
+        cards.append("<div class='card'><h2>违规（%d 项，学术安全红线）</h2><ul>%s</ul></div>"
+                     % (len(r["violations"]), "".join(lis)))
+    if r["warnings"]:
+        lis = ["<li><b>[%s]</b> %s</li>" % (_esc(w["check"]), _esc(w.get("detail", "")))
+               for w in r["warnings"]]
+        cards.append("<div class='card'><h2>告警（%d 项，人工核对）</h2><ul>%s</ul></div>"
+                     % (len(r["warnings"]), "".join(lis)))
+    if remedies:
+        steps = "".join("<li>%s</li>" % _esc(x["remedy"]) for x in remedies[:8])
+        cards.append("<div class='card'><h2>修复三步（按序执行）</h2><ol>%s</ol></div>" % steps)
+    cards.append("<div class='card'><p class='meta'>原句锚点=原文原句；修复后重跑本命令复核，"
+                 "exit 0 才算过。</p></div>")
+    return _rep._page("完整性守卫报告", "".join(cards))
+
+
 def main():
     ap = argparse.ArgumentParser(description="完整性守卫（改写不得动数据/引用/术语）")
     ap.add_argument("orig", help="原稿")
@@ -332,43 +374,8 @@ def main():
     remedies = build_remedies(orig, r)
 
     if args.html:
-        # v5.7.0 处方报告：复用 reporter 骨架（同款打印友好样式）
-        import reporter as _rep
-        from html import escape as _esc
-        head = "PASS ✓" if r["ok"] else "FAIL ✗（学术安全红线）"
-        color = "#1a7f37" if r["ok"] else "#cf222e"
-        cards = ["<div class='card'><h1>完整性守卫报告</h1>"
-                 "<p style='color:%s;font-weight:700'>%s</p>"
-                 "<p class='meta'>%d → %d 字符 · CJK 漂移 %.3f · 术语表：%s</p></div>" % (
-                     color, _esc(head), r["stats"]["orig_chars"],
-                     r["stats"]["new_chars"], r["stats"].get("cjk_shift", 0.0),
-                     "有" if args.terms else "无")]
-        if r["violations"]:
-            lis = []
-            for v in r["violations"]:
-                rem = next((x["remedy"] for x in remedies
-                            if x["check"] == v["check"]), "对照原稿恢复")
-                ctxs = next((x.get("context", []) for x in remedies
-                             if x["check"] == v["check"]), [])
-                ctx_html = "".join("<br>原句锚点: <code>%s</code>" % _esc(c)
-                                   for c in ctxs[:3])
-                lis.append("<li><b>[%s]</b> %s<br><span class='meta'>处方: %s</span>%s</li>"
-                           % (_esc(v["check"]), _esc(v.get("detail", "")),
-                              _esc(rem), ctx_html))
-            cards.append("<div class='card'><h2>违规（%d 项，学术安全红线）</h2><ul>%s</ul></div>"
-                         % (len(r["violations"]), "".join(lis)))
-        if r["warnings"]:
-            lis = ["<li><b>[%s]</b> %s</li>" % (_esc(w["check"]), _esc(w.get("detail", "")))
-                   for w in r["warnings"]]
-            cards.append("<div class='card'><h2>告警（%d 项，人工核对）</h2><ul>%s</ul></div>"
-                         % (len(r["warnings"]), "".join(lis)))
-        if remedies:
-            steps = "".join("<li>%s</li>" % _esc(x["remedy"]) for x in remedies[:8])
-            cards.append("<div class='card'><h2>修复三步（按序执行）</h2><ol>%s</ol></div>" % steps)
-        cards.append("<div class='card'><p class='meta'>原句锚点=原文原句；修复后重跑本命令复核，"
-                     "exit 0 才算过。</p></div>")
         with open(args.html, "w", encoding="utf-8") as hf:
-            hf.write(_rep._page("完整性守卫报告", "".join(cards)))
+            hf.write(render_report_html(r, remedies, terms_flag=bool(args.terms)))
         print("守卫处方报告已写入 %s" % args.html, file=sys.stderr)
     if args.json:
         r["remedies"] = remedies

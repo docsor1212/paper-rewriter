@@ -134,7 +134,7 @@ def test_docs():
     check("docs.ZH 状态行/工作流行/话术行",
           "投稿自查包" in zh and "--bundle 目录" in zh
           and "发给导师/编辑" in zh)
-    check("docs.EN 状态行", "Submission self-check bundle" in en)
+    check("docs.EN 状态行", "12-item submission bundle" in en)
     check("docs.api 行", "--bundle 目录" in
           open(os.path.join(ROOT, "references/api.md"), encoding="utf-8").read())
 
