@@ -66,7 +66,7 @@ def test_bilingual_disclosure():
 
 
 def test_version_and_docs():
-    check("ver.5.4.0", hxt_core.__version__ == "5.9.0", hxt_core.__version__)
+    check("ver.5.4.0", hxt_core.__version__ == "5.10.0", hxt_core.__version__)
     fs = open(os.path.join(ROOT, "references/feature_status.md"), encoding="utf-8").read()
     check("doc.feature_status_v54", fs.count("v5.4") >= 2)
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()

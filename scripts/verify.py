@@ -13,7 +13,7 @@
     python scripts/verify.py 原稿.txt 改稿.txt
     python scripts/verify.py 原稿.txt 改稿.txt --terms terms.txt --json
 
-退出码: 0 通过 | 1 有违约 | 2 用法/文件错误
+退出码: 0 通过 | 1 有违约（--strict 时警告也算违约） | 2 用法/文件错误
 """
 
 import argparse
@@ -360,6 +360,9 @@ def main():
     ap.add_argument("--max-length-change", type=float, default=25.0)
     ap.add_argument("--max-cjk-shift", type=float, default=0.12)
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--strict", action="store_true",
+                    help="警告升级：任何 warning（如新增句子）也判失败 exit 1"
+                         "（缺省警告不拦停，仅人工核对；分级表见 references/errors.md）")
     ap.add_argument("--html", help="守卫处方报告（v5.7.0）：单页 HTML——PASS 简洁卡/"
                     "FAIL 违规类别+原句锚点+怎么修+修复三步，可直接呈导师/编辑")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
@@ -382,7 +385,10 @@ def main():
         print(json.dumps(r, ensure_ascii=False, indent=2))
     else:
         print("=" * 62)
-        print("完整性守卫 verify：%s" % ("PASS ✓" if r["ok"] else "FAIL ✗（学术安全红线）"))
+        _head = "PASS ✓" if r["ok"] else "FAIL ✗（学术安全红线）"
+        if r.get("warnings"):
+            _head += "（%d 条警告，缺省不拦停；--strict 会判失败）" % len(r["warnings"])
+        print("完整性守卫 verify：%s" % _head)
         print("=" * 62)
         print("规模: %d → %d 字符（%+.1f%%）| CJK 占比漂移 %.3f"
               % (r["stats"]["orig_chars"], r["stats"]["new_chars"],
@@ -404,7 +410,14 @@ def main():
             print("修复三步: ①按上方「怎么修」逐条恢复改稿（术语误伤用 learn_guards.py "
                   "固化豁免，不要绕守卫）")
             print("          ②重跑本命令至 PASS ③交付前建议再跑 compare.py 留档")
-    sys.exit(0 if r["ok"] else 1)
+    # 分级语义（v5.10.0 HR2）：violations=硬失败；warnings=人工核对不拦停；
+    # --strict 把警告升级为失败（集成方需要零警告门禁时用）
+    strict_fail = args.strict and bool(r.get("warnings"))
+    if strict_fail:
+        print("--strict：%d 条警告按失败处理（分级表见 references/errors.md）"
+              % len(r["warnings"]), file=sys.stderr)
+    _failed = (not r["ok"]) or strict_fail
+    sys.exit(1 if _failed else 0)
 
 
 if __name__ == "__main__":

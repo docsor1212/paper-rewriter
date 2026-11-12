@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 5.9.0
+version: 5.10.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: paper rewriting with AI-flavor
   self-check and style naturalization (scan reports are detection only),
@@ -36,9 +36,9 @@ and natural register — with integrity guardrails on every step.
 > (paper-polisher-pro); de-templating, model-residue cleanup, AI-flavor style
 > self-check and rewriting → this tool. Need both? Polish first, then run this pipeline.
 
-## Feature status (v5.9.0)
+## Feature status (v5.10.0)
 
-⚠️ rows = experimental (may reject valid files; review output). **The full per-generation capability list has moved to [references/feature_status.md](references/feature_status.md)**; per-item details live in references/errors.md and topic docs. Stable highlights (all stable), grouped: **Diagnose** (style self-check + per-section focus · statistical consistency · term drift / unification sheet · calibration evidence for density thresholds) · **Deep-rewrite** (sentence-level plan with line anchors · pipeline --handoff sheets · EN/CN signal libraries + density mirrors) · **Guard** (integrity verify + prescription report · fabrication defense · exportable learned guards) · **Batch** (resume / concurrency isolation · worksheet + stats card · revision records) · **Deliver** (12-item submission bundle with write-manifest self-evidence · dashboard + compare sheets · docx write-back · print-friendly reports · in-package selfcheck).
+⚠️ rows = experimental (may reject valid files; review output). **The full per-generation capability list has moved to [references/feature_status.md](references/feature_status.md)**; per-item details live in references/errors.md and topic docs. Stable highlights (all stable), grouped: **Diagnose** (style self-check + per-section focus · statistical consistency · term drift / unification sheet · calibration evidence for density thresholds) · **Deep-rewrite** (sentence-level plan with line anchors · pipeline --handoff sheets · EN/CN signal libraries + density mirrors) · **Guard** (integrity verify + prescription report · fabrication defense · exportable learned guards · output grading [violations fail / warnings advisory / --strict upgrade]) · **Batch** (resume / concurrency isolation · worksheet + stats card · revision records) · **Deliver** (12-item submission bundle with write-manifest self-evidence · dashboard + compare sheets · docx write-back · print-friendly reports · in-package selfcheck).
 
 | Capability | Status | Since |
 |---|---|---|

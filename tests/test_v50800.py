@@ -124,7 +124,7 @@ def test_docs():
 
 
 def test_version_and_docs():
-    check("ver.5.8.0", hxt_core.__version__ == "5.9.0", hxt_core.__version__)
+    check("ver.5.8.0", hxt_core.__version__ == "5.10.0", hxt_core.__version__)
     # selfcheck 模块级卫生：禁词不得出现（permissions 验证命令口径）
     scsrc = open(os.path.join(SCRIPTS, "selfcheck.py"), encoding="utf-8").read()
     forbidden = [w for w in ("urllib", "requests", "socket", "subprocess", "os.environ")

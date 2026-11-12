@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "5.9.0"
+__version__ = "5.10.0"
 
 import json
 import os
@@ -1200,6 +1200,8 @@ DENSITY_THRESHOLDS = {
                      "「——」/千字 ≥4 且全文 ≥3 处（≥400 字启用；正常学术 <1）"),
     "zh_paraopen":  ("zh_para_open_ratio", 0.40, 3, None, None, "zh_para_open_hits",
                      "公式词开头段落占比 ≥40% 且 ≥3 段（≥5 段启用）"),
+    "zh_aifreq":    ("zh_aifreq_density", 10.0, 3, "zh_chars", 400, "zh_aifreq_count",
+                     "AI 高频软词/千字 ≥10 且 ≥3 处（≥400 字启用；单次出现属正当行文，堆叠才是信号）"),
 }
 
 
@@ -1419,6 +1421,31 @@ def scan(text, lang=None, profile="academic", source_ext="",
                         stats.get("zh_para_open_hits", 0),
                         max(1, len([p for p in re.split(r"\n\s*\n|\n", text) if p.strip()])),
                         _dt_zh_po[1] * 100, _dt_zh_po[2])])
+        # v5.10.0（真实使用反馈：高信号 ZH 段得分偏低=中文弱信号覆盖偏薄）：
+        # AI 高频软词密度信号——此外/至关重要/深入探讨 等单次出现是正当行文，
+        # 不逐命中扣分；堆叠（密度阈值+最低命中数）才计分。阈值证据走 calibrate。
+        _dt_zh_af = DENSITY_THRESHOLDS["zh_aifreq"]
+        if stats.get("zh_chars", 0) >= (_dt_zh_af[4] or 0):
+            _af_n = 0
+            for _af_e in ((zh_pats or {}).get("ai_freq_vocab") or []):
+                for _af_m in re.finditer(re.escape(_af_e["w"]), text):
+                    _af_g = guard_hit(_af_e["w"],
+                                      text[max(0, _af_m.start() - 30):_af_m.start()],
+                                      text[_af_m.end():_af_m.end() + 30], guards_zh)
+                    if _af_g:
+                        guards_applied.append({"hit": _af_e["w"], "guard": _af_g,
+                                               "position": _af_m.start()})
+                    else:
+                        _af_n += 1
+            stats["zh_aifreq_count"] = _af_n
+            stats["zh_aifreq_density"] = round(_af_n / max(1, stats["zh_chars"]) * 1000, 2)
+            if _af_n >= _dt_zh_af[2] and stats["zh_aifreq_density"] >= _dt_zh_af[1]:
+                add_cat("zh_aifreq", "AI 高频软词堆叠", round(0.7 * _gw, 4), 1,
+                        ["%d 处、密度 %.1f/千字（阈值 %s 且 ≥%d 处）——高词频族"
+                         "（此外/值得注意的是/至关重要 等）堆叠是模板腔特征：删一半，"
+                         "或换成与内容直接相关的衔接" % (_af_n, stats["zh_aifreq_density"],
+                                                        _dt_zh_af[1], _dt_zh_af[2])])
+            _tick("密度信号")
 
     pts = pts_acc[0]
 

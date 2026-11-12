@@ -28,7 +28,7 @@ def run_cli(args):
 def test_thresholds_source():
     TH = getattr(hxt_core, "DENSITY_THRESHOLDS", None)
     check("th.存在", isinstance(TH, dict))
-    check("th.四信号", set(TH) == {"en_dash", "en_paraopen", "zh_dash", "zh_paraopen"})
+    check("th.信号集扩容", {"en_dash", "en_paraopen", "zh_dash", "zh_paraopen"} <= set(TH))
     check("th.七元组", all(len(v) == 7 for v in TH.values()))
     # scan 引用同表：scan 源码不得再有内联阈值字面量（0.4/4.0/5.0 的密度比较）
     src = open(os.path.join(SCRIPTS, "hxt_core.py"), encoding="utf-8").read()
@@ -49,8 +49,8 @@ def test_calibrate_cli():
     ok = False; det = ""
     try:
         d = json.loads(r2.stdout)
-        ok = (d["violations"] == [] and len(d["table"]) == 4
-              and len(d["files"]) == 4)
+        ok = (d["violations"] == [] and len(d["table"]) >= 4
+              and len(d["files"]) >= 4)  # v5.10 起五信号五语料
         det = "files=%d table=%d" % (len(d["files"]), len(d["table"]))
     except Exception as e:
         det = str(e)[:80]
@@ -137,7 +137,7 @@ def test_docs():
 
 
 def test_version_and_docs():
-    check("ver.5.9.0", hxt_core.__version__ == "5.9.0", hxt_core.__version__)
+    check("ver.5.9.0", hxt_core.__version__ == "5.10.0", hxt_core.__version__)
     # calibrate 卫生：禁词零（permissions 验证命令口径）
     csrc = open(os.path.join(SCRIPTS, "calibrate.py"), encoding="utf-8").read()
     forbidden = [w for w in ("urllib", "requests", "socket", "subprocess", "os.environ")
