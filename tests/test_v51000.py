@@ -85,7 +85,7 @@ def test_hr1_signal():
            "证据在积累。此外，方法在标准化。") * 3
     _orig = hxt_core.load_patterns
     try:
-        hxt_core.load_patterns = lambda lang: dict(_orig(lang), term_guards=[])
+        hxt_core.load_patterns = lambda *a, **kw: dict(_orig(*a, **kw), term_guards=[])
         hxt_core.clear_pattern_cache()
         r0 = hxt_core.scan(bio, source_ext=".txt")
         _n0 = r0["stats"].get("zh_aifreq_count") or 0
@@ -177,7 +177,7 @@ def test_docs():
 
 
 def test_version_and_docs():
-    check("ver.5.10.0", hxt_core.__version__ == "5.10.0", hxt_core.__version__)
+    check("ver.5.10.0", hxt_core.__version__ == "5.11.0", hxt_core.__version__)
 
 
 def main():

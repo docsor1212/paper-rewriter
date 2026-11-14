@@ -71,6 +71,9 @@ def main():
                          "缺省恒 0（判定写在报告里，人读口径不变）")
     ap.add_argument("--ci", action="store_true", dest="exit_verdict",
                  help="CI 门禁模式：--exit-verdict 的短别名（机器退出码 0/3/4；1 仅 pipeline）")
+    ap.add_argument("--lexicon", metavar="文件",
+                    help="外挂词表 JSON（v5.11.0）：与内置词表同名键逐项追加——多 skill 共享"
+                         "同一外部词表（单一来源）；schema 见 references/customization.md")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
 
@@ -115,10 +118,12 @@ def main():
                 return (fn, -1, "空文件", False, "-")
             _ext = os.path.splitext(fn)[1].lower()
             rr = (hxt_core.scan_chunked(t, lang=None if args.lang == "auto" else args.lang,
+                            lexicon=getattr(args, "lexicon", None),
                                         profile=args.profile, source_ext=_ext,
                                         time_budget=time_budget, degrade=True)
                   if len(t) > 1_000_000 else
                   hxt_core.scan(t, lang=None if args.lang == "auto" else args.lang,
+                            lexicon=getattr(args, "lexicon", None),
                                 profile=args.profile, source_ext=_ext,
                                 time_budget=time_budget))
             lvl = rr["level"] + (" [置信度:%s]" % pdf_conf if pdf_conf else "")
@@ -355,6 +360,7 @@ def main():
         _seg_base = _stext.count("\n", 0, s0) + 1
         try:
             r = hxt_core.scan(seg, lang=None if args.lang == "auto" else args.lang,
+                            lexicon=getattr(args, "lexicon", None),
                               profile=args.profile, source_ext=_ext,
                               base_line=_seg_base)
         except ValueError as e:
@@ -406,6 +412,7 @@ def main():
             _stext = _re.sub(r"\*\*([^*\n]+)\*\*", r"\1", _stext)
         try:
             rs = hxt_core.scan_sections(_stext, lang=None if args.lang == "auto" else args.lang,
+                            lexicon=getattr(args, "lexicon", None),
                                         profile=args.profile, source_ext=_ext)
         except ValueError as e:
             print("错误: %s" % e, file=sys.stderr)
@@ -462,6 +469,7 @@ def main():
     try:
         if len(text) > 1_000_000:
             r = hxt_core.scan_chunked(text, lang=None if args.lang == "auto" else args.lang,
+                            lexicon=getattr(args, "lexicon", None),
                                       profile=args.profile,
                                       source_ext=os.path.splitext(args.file or "")[1].lower(),
                                       degrade=True)
@@ -471,6 +479,7 @@ def main():
                       % len(r["degraded_chunks"]), file=sys.stderr)
         else:
             r = hxt_core.scan(text, source_ext=os.path.splitext(args.file or "")[1].lower(), lang=None if args.lang == "auto" else args.lang,
+                            lexicon=getattr(args, "lexicon", None),
                               profile=args.profile)
     except ValueError as e:
         print("错误: %s" % e, file=sys.stderr)

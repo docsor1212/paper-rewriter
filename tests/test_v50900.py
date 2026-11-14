@@ -137,7 +137,7 @@ def test_docs():
 
 
 def test_version_and_docs():
-    check("ver.5.9.0", hxt_core.__version__ == "5.10.0", hxt_core.__version__)
+    check("ver.5.9.0", hxt_core.__version__ == "5.11.0", hxt_core.__version__)
     # calibrate 卫生：禁词零（permissions 验证命令口径）
     csrc = open(os.path.join(SCRIPTS, "calibrate.py"), encoding="utf-8").read()
     forbidden = [w for w in ("urllib", "requests", "socket", "subprocess", "os.environ")

@@ -9,7 +9,7 @@
   沉淀反应）不误报。朴素词表会把它们当机器腔特征，这是本引擎的核心差异化。
 """
 
-__version__ = "5.10.0"
+__version__ = "5.11.0"
 
 import json
 import os
@@ -814,7 +814,7 @@ def detect_sections(text):
     return result
 
 
-def scan_sections(text, lang=None, profile="academic", source_ext=""):
+def scan_sections(text, lang=None, profile="academic", source_ext="", lexicon=None):
     """章节感知扫描：分章节独立 scan，按章节性质加权。
 
     方法/结果段的固定句式是文体常态，特征分降权（方法 ×0.5、结果 ×0.7）；
@@ -836,7 +836,7 @@ def scan_sections(text, lang=None, profile="academic", source_ext=""):
         if not seg.strip():
             continue
         w = SECTION_W.get(key, 1.0)
-        r = scan(seg, lang=lang, profile=profile, source_ext=source_ext)
+        r = scan(seg, lang=lang, profile=profile, source_ext=source_ext, lexicon=lexicon)
         any_critical = any_critical or bool(r["critical_hit"])
         out_sections.append({"key": key, "label": SECTION_LABEL.get(key, key),
                              "score": r["score"], "level": r["level"],
@@ -1069,14 +1069,20 @@ def clear_pattern_cache():
     _PATTERN_CACHE.clear()
 
 
-def load_patterns(lang):
+def load_patterns(lang, extra=None):
     """lang: 'en' | 'zh' -> dict。带缓存，并合并用户自定义守卫（v2.2.0）。
 
     用户守卫追加在内置 term_guards 之后（guard_hit 任一命中即豁免，顺序无关）；
     内置同名词守卫优先，用户同名条目不重复并入。learn_guards.py 修改文件后
-    同进程内需调 clear_pattern_cache() 使缓存失效。"""
-    if lang in _PATTERN_CACHE:
-        return _PATTERN_CACHE[lang]
+    同进程内需调 clear_pattern_cache() 使缓存失效。
+
+    extra（v5.11.0 HR3）：外挂词表 JSON 路径——多 skill 共享同一外部词表文件
+    （单一来源，包内不嵌副本）。schema 与内置词表同名键：vocabulary /
+    ai_freq_vocab / term_guards / auto_fixes / aggressive_fixes，逐项追加；
+    文件不可读时响亮报错（ValueError），不静默降级。缓存键含 extra 路径。"""
+    ck = (lang, os.path.abspath(extra)) if extra else lang
+    if ck in _PATTERN_CACHE:
+        return _PATTERN_CACHE[ck]
     path = os.path.join(HERE, "patterns_%s.json" % lang)
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
@@ -1100,7 +1106,30 @@ def load_patterns(lang):
                         + [w.lower() for w in g.get(k, [])]))
             else:
                 data["term_guards"].append(g)
-    _PATTERN_CACHE[lang] = data
+    if extra:
+        try:
+            with open(extra, encoding="utf-8") as f:
+                ext = json.load(f)
+        except Exception as e:
+            raise ValueError("外挂词表不可读 %s：%s" % (extra, e))
+        if not isinstance(ext, dict):
+            raise ValueError("外挂词表须为 JSON 对象：%s" % extra)
+        for key in ("vocabulary", "ai_freq_vocab", "term_guards",
+                    "auto_fixes", "aggressive_fixes"):
+            items = ext.get(key) or []
+            if not isinstance(items, list):
+                raise ValueError("外挂词表 %s 须为数组：%s" % (key, extra))
+            for it in items:
+                if key == "term_guards":
+                    it = {"term": it.get("term", it.get("when", "")),
+                          "allow_before": list(it.get("allow_before", [])),
+                          "allow_after": list(it.get("allow_after", []))}
+                elif key in ("vocabulary", "ai_freq_vocab"):
+                    it = dict(it)
+                    it.setdefault("weight", 1.0)
+                    it.setdefault("fam", "custom")
+                data.setdefault(key, []).append(it)
+    _PATTERN_CACHE[ck] = data
     return data
 
 
@@ -1206,7 +1235,7 @@ DENSITY_THRESHOLDS = {
 
 
 def scan(text, lang=None, profile="academic", source_ext="",
-         time_budget=SCAN_TIME_BUDGET, base_line=1):
+         time_budget=SCAN_TIME_BUDGET, base_line=1, lexicon=None):
     """全量扫描。返回结构化 dict：
     {
       lang, score, level, critical_hit, units, sentences,
@@ -1276,8 +1305,8 @@ def scan(text, lang=None, profile="academic", source_ext="",
                         continue
                 add_cat(cat_id, label, weight, 1, ["L%d: %s" % (_line(m.start()), hit)])
 
-    zh_pats = load_patterns("zh") if lang in ("zh", "mix") else None
-    en_pats = load_patterns("en") if lang in ("en", "mix") else None
+    zh_pats = load_patterns("zh", extra=lexicon) if lang in ("zh", "mix") else None
+    en_pats = load_patterns("en", extra=lexicon) if lang in ("en", "mix") else None
 
     # --- critical：模型残留 / 聊天客套 / 知识截止 ---
     for pats, tag in ((zh_pats, "zh"), (en_pats, "en")):

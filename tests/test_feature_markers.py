@@ -18,6 +18,8 @@ MARKERS = [
     ("v5.10 阈值真源扩容", "scripts/hxt_core.py", '"zh_aifreq"'),
     ("v5.10 词族", "scripts/patterns_zh.json", "ai_freq_vocab"),
     ("v5.10 strict", "scripts/verify.py", "--strict"),
+    ("v5.11 外挂词表", "scripts/hxt_core.py", "外挂词表不可读"),
+    ("v5.11 CLI 旗标", "scripts/detect.py", "--lexicon"),
     ("v5.3 bundle 指令单", "scripts/pipeline.py", "09_深改指令单"),
     ("v5.3 批量修订记录", "scripts/pipeline.py", "批量修订记录"),
     ("v5.4 写入清单", "scripts/pipeline.py", "00_写入清单"),

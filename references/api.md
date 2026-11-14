@@ -22,6 +22,7 @@
 | `--unify 统一稿` | check_terms 生成术语统一稿（建议产物，复核清单后采用） |
 | `--section abstract` | detect 章节专项：只切出指定章节独立诊断 |
 | `--handoff 文件` | 一句命令随管线产出逐句深改指令单 |
+| `--lexicon 文件`（v5.11.0，detect/transform/pipeline） | 外挂词表 JSON：同名键逐项追加内置词表——多 skill 共享同一外部文件（单一来源）；schema 见 customization.md |
 
 ## hxt_core
 

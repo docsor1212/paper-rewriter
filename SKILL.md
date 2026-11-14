@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 5.10.0
+version: 5.11.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: paper rewriting with AI-flavor
   self-check and style naturalization (scan reports are detection only),
@@ -29,16 +29,21 @@ allowed-tools:
 Bilingual (CN/EN) style naturalization for academic & medical writing: find stiff,
 templated or machine-flavored patterns, clean mechanical debris, revise for clarity
 and natural register — with integrity guardrails on every step.
-**Reading map (30-second routing; equivalent of [references/INDEX.md](references/INDEX.md))**: first time → quick start · troubleshooting → pitfalls + errors · ci/agent → automation · limits → honest_boundaries · scenarios → best_practices · deep-rewrite → [deep_rewrite_guide](references/deep_rewrite_guide.md) · pdf confidence → [pdf_confidence](references/pdf_confidence.md) · permissions → [permissions](references/permissions.md) · programmatic → [api](references/api.md) · threshold calibration → [calibration](references/calibration.md).
+**Reading map (30-second routing; equivalent of [references/INDEX.md](references/INDEX.md))** — take what you need:
+
+- **Start / troubleshoot**: quick start · [pitfalls](references/pitfalls.md) + [errors](references/errors.md)
+- **Flow / scenarios**: [deep_rewrite_guide](references/deep_rewrite_guide.md) · [best_practices](references/best_practices.md) · CI/agent → automation
+- **Limits / compliance**: [honest_boundaries](references/honest_boundaries.md) · [permissions](references/permissions.md) · [compliance](references/compliance.md)
+- **Reference / tools**: [api](references/api.md) · [pdf_confidence](references/pdf_confidence.md) · [calibration](references/calibration.md) · [customization](references/customization.md)
 **Two layers in one line**: mechanical cleanup (transform/pipeline, deterministic) vs quality revision (agent per style guide) — run pipeline first, read the report, then decide what to deep-revise.
 
 > **Routing in one line**: grammar/fluency/journal-format polish → use a polisher
 > (paper-polisher-pro); de-templating, model-residue cleanup, AI-flavor style
 > self-check and rewriting → this tool. Need both? Polish first, then run this pipeline.
 
-## Feature status (v5.10.0)
+## Feature status (v5.11.0)
 
-⚠️ rows = experimental (may reject valid files; review output). **The full per-generation capability list has moved to [references/feature_status.md](references/feature_status.md)**; per-item details live in references/errors.md and topic docs. Stable highlights (all stable), grouped: **Diagnose** (style self-check + per-section focus · statistical consistency · term drift / unification sheet · calibration evidence for density thresholds) · **Deep-rewrite** (sentence-level plan with line anchors · pipeline --handoff sheets · EN/CN signal libraries + density mirrors) · **Guard** (integrity verify + prescription report · fabrication defense · exportable learned guards · output grading [violations fail / warnings advisory / --strict upgrade]) · **Batch** (resume / concurrency isolation · worksheet + stats card · revision records) · **Deliver** (12-item submission bundle with write-manifest self-evidence · dashboard + compare sheets · docx write-back · print-friendly reports · in-package selfcheck).
+⚠️ rows = experimental (may reject valid files; review output). **The full per-generation capability list has moved to [references/feature_status.md](references/feature_status.md)**; per-item details live in references/errors.md and topic docs. Stable highlights (all stable), grouped: **Diagnose** (style self-check + per-section focus · statistical consistency · term drift / unification sheet · calibration evidence for density thresholds) · **Deep-rewrite** (sentence-level plan with line anchors · pipeline --handoff sheets · EN/CN signal libraries + density mirrors) · **Guard** (integrity verify + prescription report · fabrication defense · exportable learned guards · output grading [violations fail / warnings advisory / --strict upgrade]) · **Batch** (resume / concurrency isolation · worksheet + stats card · revision records) · **Deliver** (12-item submission bundle with write-manifest self-evidence · dashboard + compare sheets · docx write-back · print-friendly reports · in-package selfcheck · external lexicon (--lexicon, shared across skills).
 
 | Capability | Status | Since |
 |---|---|---|

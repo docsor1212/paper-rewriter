@@ -27,12 +27,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import hxt_core
 
 
-def load_fixes(lang, aggressive):
+def load_fixes(lang, aggressive, lexicon=None):
     """返回 (rx, repl, note, guards) 四元组；guards 来自词库 term_guards，
-    机械替换执行前先过守卫——financial leverage 这类正当搭配绝不改写。"""
+    机械替换执行前先过守卫——financial leverage 这类正当搭配绝不改写。
+    lexicon（v5.11.0）：外挂词表路径，透传 load_patterns 合并。"""
     fixes = []
     for code in ([lang] if lang in ("zh", "en") else ["zh", "en"]):
-        pats = hxt_core.load_patterns(code)
+        pats = hxt_core.load_patterns(code, extra=lexicon)
         guards = pats.get("term_guards", [])
         fixes += [(re.compile(f["pattern"], re.IGNORECASE), f["replacement"], f["note"], guards)
                   for f in pats.get("auto_fixes", [])]
@@ -213,6 +214,8 @@ def main():
     ap.add_argument("--track", help="输出修订记录到此路径（同时生成 .md 与 .json）")
     ap.add_argument("-q", "--quiet", action="store_true", help="只写文件不打印报告")
     ap.add_argument("--lang", choices=["zh", "en", "auto"], default="auto")
+    ap.add_argument("--lexicon", metavar="文件",
+                    help="外挂词表 JSON（v5.11.0）：同名键逐项追加，多 skill 共享同一外部词表")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
 
@@ -239,7 +242,7 @@ def main():
 
     # 机械修复始终双语加载：中文文本照样可能有英文模型残留（[cite:]/oaicite），
     # 反之亦然；词表本身语言互斥，双语应用无误伤。--lang 仅影响诊断语言报告。
-    fixes = load_fixes(None, args.aggressive)
+    fixes = load_fixes(None, args.aggressive, lexicon=getattr(args, "lexicon", None))
     out, applied = apply_auto_fixes(text, fixes)
     out, removed = drop_flagged_sentences(out)
     out, n_quotes = normalize_quotes(out)

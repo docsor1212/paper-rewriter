@@ -97,6 +97,9 @@ def main():
                     help="单步墙钟预算秒（v2.5.0，缺省 120，须 >0）：清理与扫描各阶段"
                          "超时即干净报错（exit 2）并给拆分建议；分块扫描时为每块独立"
                          "预算（最坏 k 块 k 倍）；JSON 报告含各步耗时")
+    ap.add_argument("--lexicon", metavar="文件",
+                    help="外挂词表 JSON（v5.11.0）：同名键逐项追加——多 skill 共享同一外部词表；"
+                         "透传扫描与清理")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
 
@@ -130,7 +133,7 @@ def main():
                 pdf_conf = ""
             if not o.strip():
                 return (os.path.basename(fp), "-", "-", "空文件", "-")
-            fx = tf.load_fixes(None, False)
+            fx = tf.load_fixes(None, False, lexicon=getattr(args, "lexicon", None))
             n, _af = tf.apply_auto_fixes(o, fx)
             n, _rm = tf.drop_flagged_sentences(n)
             n, _nq = tf.normalize_quotes(n)
@@ -147,8 +150,10 @@ def main():
                     print("[降级] %s：%d 块超时未评分（重试未恢复），该行仅覆盖部分正文"
                           % (os.path.basename(fp), deg), file=sys.stderr)
             else:
-                before = hxt_core.scan(o, time_budget=time_budget)
-                after = hxt_core.scan(n, time_budget=time_budget)
+                before = hxt_core.scan(o, time_budget=time_budget,
+                                       lexicon=getattr(args, "lexicon", None))
+                after = hxt_core.scan(n, time_budget=time_budget,
+                                      lexicon=getattr(args, "lexicon", None))
             conf_suffix = (" [置信度:%s]" % pdf_conf) if pdf_conf else ""
             deg_mark = " ⚠[降级:%d 块]" % deg if deg else ""
             if getattr(args, "track", None):
@@ -346,7 +351,7 @@ def main():
     else:
         t_clean = time.monotonic()
         _deadline = t_clean + args.step_timeout
-        fixes = tf.load_fixes(None, False)
+        fixes = tf.load_fixes(None, False, lexicon=getattr(args, "lexicon", None))
         new, applied = tf.apply_auto_fixes(orig, fixes)
         if time.monotonic() > _deadline:
             hxt_core.fail("清理阶段超时（预算 %g 秒）" % args.step_timeout,
