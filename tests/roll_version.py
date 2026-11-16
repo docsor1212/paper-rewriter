@@ -3,7 +3,7 @@
 """版本滚动工具（v5.5.0 起）：python3 tests/roll_version.py <新版本>
 一键更新：hxt_core __version__、双语功能状态行、全部 test_v5* 版本锚。
 用法入电池前先手动跑（不在电池内——电池按当前版本断言）。"""
-import glob, re, sys
+import glob, os, re, sys
 
 def main():
     if len(sys.argv) != 2:
@@ -25,6 +25,14 @@ def main():
         if t2 != t:
             open(f, "w", encoding="utf-8", newline="").write(t2)
             n += 1
+    # README 版本行（v5.12.0 起，对账闸⑩ 看护）
+    rp = "README.md"
+    if os.path.exists(rp):
+        t = open(rp, encoding="utf-8").read()
+        t2 = re.sub(r"Current: v[\d.]+", "Current: v%s" % new, t)
+        if t2 != t:
+            open(rp, "w", encoding="utf-8", newline="").write(t2)
+            print("README 版本行 ->", new)
     print("test_v5* 锚滚动 %d 个" % n)
     print("TODO 手动项：双语功能状态行/feature_status v 行/examples 速览/CHANGELOG——见发布清单")
 

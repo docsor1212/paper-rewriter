@@ -82,6 +82,21 @@ if re.search(r"写 8 个文件", perm):
     fails.append("permissions.md 残留旧口径「写 8 个文件」")
 
 
+# ⑩ README 版本行 == 引擎版本（v5.12.0：版本信息不统一的机制收口）
+import re as _re
+try:
+    _core = read("scripts/hxt_core.py")
+    _mv = _re.search(r'__version__ = "([\d.]+)"', _core)
+    _readme = read("README.md")
+    _mr = _re.search(r"Current: v([\d.]+)", _readme)
+    if _mv and _mr and _mv.group(1) != _mr.group(1):
+        fails.append("README 版本行 v%s ≠ 引擎 %s（roll_version 应同步）"
+                     % (_mr.group(1), _mv.group(1)))
+    elif _mv and _mr:
+        print("README 版本行 v%s ✓" % _mv.group(1))
+except OSError:
+    pass
+
 # ⑨ 全文档旧口径终扫（v5.7.0）：包内全部 .md 出现旧件数词形即 FAIL
 # （评测员两轮 grep 命中历史条目——历史叙述也必须中性化）
 LEGACY = ("六件套", "六件数据", "写 8 个文件", "00-09 共 10", "8 numbered items",

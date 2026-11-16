@@ -2,6 +2,8 @@
 
 [![GitHub Stars](https://img.shields.io/github/stars/docsor1212/paper-rewriter?style=social&label=Star)](https://github.com/docsor1212/paper-rewriter)
 
+> **Current: v5.12.0** — see `scripts/hxt_core.py` (`__version__`) and per-release notes on the GitHub Releases page; in-package verification: `python scripts/selfcheck.py`.
+
 Bilingual (CN/EN) style naturalization for academic & medical writing: find stiff,
 templated or machine-flavored patterns, clean mechanical debris, revise for clarity
 and natural register — with integrity guardrails on every step.
@@ -31,6 +33,30 @@ cat SKILL.md
 ```
 
 **China mirror (ModelScope 魔搭)**: <https://modelscope.cn/skills/Docsor/paper-rewriter> — if you find this skill useful, a like there helps others find it.
+
+## What you get
+
+- **Style self-check** — pattern-level hits with line numbers and a plain-language
+  rationale per hit (local heuristic scoring; explicitly *not* an AI-detection score)
+- **Deterministic cleanup** — model artifacts (oaicite/[cite:] debris), punctuation,
+  filler phrases; every edit logged for audit (`--track`)
+- **Sentence-level plan** — P0 queue of what to rewrite first, with section context
+- **Integrity guard** — numbers, p-values, DOIs, PMIDs, years and terminology must
+  survive rewriting; violations fail loudly with a printable prescription report
+- **Submission bundle** — 12 numbered items (dashboard, compare sheet, guard
+  prescription, write manifest) in one directory
+- **In-package selfcheck** — `python scripts/selfcheck.py` verifies environment,
+  structure, core features and doc reconciliation in one command (exit 0 = healthy)
+- **External lexicon** — `--lexicon file.json` appends team/discipline word families
+  without touching the package (single source, shareable across skills)
+
+## Verification
+
+```bash
+python scripts/selfcheck.py          # in-package: env/structure/smoke/reconciliation
+python scripts/calibrate.py          # density-threshold evidence table (reproducible)
+python3 -m pytest tests/ -q          # full offline battery (repo clone)
+```
 
 ## Integrity guardrails
 

@@ -642,6 +642,54 @@
    "alt": "leading / among the first（给证据）",
    "weight": 0.8,
    "fam": "inflation"
+  },
+  {
+   "w": "it is worth noting",
+   "alt": "state the point directly / 删去引导语直述",
+   "weight": 1.0,
+   "fam": "structure"
+  },
+  {
+   "w": "paves the way",
+   "alt": "enables / sets the stage for（具体动作）",
+   "weight": 1.2,
+   "fam": "inflation"
+  },
+  {
+   "w": "sheds light",
+   "alt": "clarifies / reveals（具体动词）",
+   "weight": 1.2,
+   "fam": "inflation"
+  },
+  {
+   "w": "highlighting the need",
+   "alt": "so … is needed（直述需求）",
+   "weight": 1.0,
+   "fam": "promo"
+  },
+  {
+   "w": "navigating the",
+   "alt": "addressing / working through（具体动作）",
+   "weight": 0.9,
+   "fam": "promo"
+  },
+  {
+   "w": "at its core",
+   "alt": "删去，直接给论点",
+   "weight": 0.8,
+   "fam": "structure"
+  },
+  {
+   "w": "comprehensive framework",
+   "alt": "framework（形容词交给评审判断）",
+   "weight": 0.8,
+   "fam": "inflation"
+  },
+  {
+   "w": "a myriad of",
+   "alt": "many / 数量写实",
+   "weight": 1.0,
+   "fam": "inflation"
   }
  ],
  "term_guards": [
@@ -943,6 +991,14 @@
    "show_hits": true,
    "rationale": "「The remainder of this paper is organized as follows / Section 2 introduces… Section 3…」类结构预告三段式是模型生成论文的开篇模板；人写论文按需交代结构，不以固定套路铺陈",
    "pattern": "[Tt]he (remainder|rest) of (this|the) (paper|article|chapter) (is|are) organized as follows|[Tt]his paper is structured as follows|[Tt]he (following|next) (section|sections) (will |)[a-z]+s?"
+  },
+  {
+   "pattern": "will continue to (?:shape|drive|evolve|expand|transform)",
+   "cat": "en_promo",
+   "label": "未来展望八股（forward-looking boilerplate）",
+   "rationale": "「will continue to + 宏观动词」是模板化结尾展望——结论应落在本文证据上，而不是替领域做预言",
+   "weight": 1.0,
+   "show_hits": true
   }
  ],
  "auto_fixes": [

@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 5.11.0
+version: 5.12.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: paper rewriting with AI-flavor
   self-check and style naturalization (scan reports are detection only),
@@ -41,9 +41,9 @@ and natural register — with integrity guardrails on every step.
 > (paper-polisher-pro); de-templating, model-residue cleanup, AI-flavor style
 > self-check and rewriting → this tool. Need both? Polish first, then run this pipeline.
 
-## Feature status (v5.11.0)
+## Feature status (v5.12.0)
 
-⚠️ rows = experimental (may reject valid files; review output). **The full per-generation capability list has moved to [references/feature_status.md](references/feature_status.md)**; per-item details live in references/errors.md and topic docs. Stable highlights (all stable), grouped: **Diagnose** (style self-check + per-section focus · statistical consistency · term drift / unification sheet · calibration evidence for density thresholds) · **Deep-rewrite** (sentence-level plan with line anchors · pipeline --handoff sheets · EN/CN signal libraries + density mirrors) · **Guard** (integrity verify + prescription report · fabrication defense · exportable learned guards · output grading [violations fail / warnings advisory / --strict upgrade]) · **Batch** (resume / concurrency isolation · worksheet + stats card · revision records) · **Deliver** (12-item submission bundle with write-manifest self-evidence · dashboard + compare sheets · docx write-back · print-friendly reports · in-package selfcheck · external lexicon (--lexicon, shared across skills).
+⚠️ rows = experimental (may reject valid files; review output). **The full per-generation capability list has moved to [references/feature_status.md](references/feature_status.md)**; per-item details live in references/errors.md and topic docs. Stable highlights (all stable), grouped: **Diagnose** (style self-check + per-section focus · statistical consistency · term drift / unification sheet · calibration evidence · EN signal library v3) · **Deep-rewrite** (sentence-level plan with line anchors · pipeline --handoff sheets · EN/CN signal libraries + density mirrors) · **Guard** (integrity verify + prescription report · fabrication defense · exportable learned guards · output grading [violations fail / warnings advisory / --strict upgrade]) · **Batch** (resume / concurrency isolation · worksheet + stats card · revision records) · **Deliver** (12-item submission bundle with write-manifest self-evidence · dashboard + compare sheets · docx write-back · print-friendly reports · in-package selfcheck · external lexicon (--lexicon, shared across skills).
 
 | Capability | Status | Since |
 |---|---|---|
@@ -265,9 +265,10 @@ Scripts are automation-first: every verdict is machine-readable, two ways.
    (decimals protected). `-a` adds em-dash reduction and empty-opener removal.
    `--deep` (v2.4.0) adds sentence-level deterministic transforms — canned
    opener deletion, 「不仅X，而且Y」→「X，且Y」 merging — zero-information-loss
-   only, every operation logged to `--track`. Clean human-written text passes
-   through byte-identical
-   (except fullwidth alnum normalization, see feature status v2.9).
+   only, every operation logged to `--track` — the log is the audit trail.
+   Text with no hits passes through with zero edits (fullwidth alnum
+   normalization is the only exception; per-replacement counts are
+   re-runnable via `--track`, so any claim here can be verified locally).
 3. **Quality revision** (the real work): optionally rank the work first —
    `python scripts/plan.py draft.txt -o plan.md` gives a sentence-level P0
    queue (worst offenders with section, category and advice) so deep effort
