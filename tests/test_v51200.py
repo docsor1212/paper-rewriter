@@ -74,11 +74,11 @@ def test_d_en_v3():
 
 
 def test_version():
-    check("ver.5.12.0", hxt_core.__version__ == "5.12.0", hxt_core.__version__)
+    check("ver.5.12.0", hxt_core.__version__ == "5.13.0", hxt_core.__version__)
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()
-    check("doc.ZH版本", "功能状态（v5.12.0）" in zh)
+    check("doc.ZH版本", "功能状态（v%s）" % hxt_core.__version__ in zh)
     en = open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8").read()
-    check("doc.EN版本", "Feature status (v5.12.0)" in en)
+    check("doc.EN版本", "Feature status (v%s)" % hxt_core.__version__ in en)
     fs = open(os.path.join(ROOT, "references/feature_status.md"), encoding="utf-8").read()
     check("doc.fs512", fs.count("v5.12") >= 2)
     # EN v3 词表与 ai_freq/vocabulary 零交叉

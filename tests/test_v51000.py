@@ -165,7 +165,8 @@ def test_docs():
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()
     check("doc.ZH", "输出分级" in zh and "功能状态（v%s）" % hxt_core.__version__ in zh)
     en = open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8").read()
-    check("doc.EN", "output grading" in en and "Feature status (v%s)" % hxt_core.__version__ in en)
+    check("doc.EN", ("output grading" in en or "graded output" in en)
+          and "Feature status (v%s)" % hxt_core.__version__ in en)
     fs = open(os.path.join(ROOT, "references/feature_status.md"), encoding="utf-8").read()
     check("doc.fs510", fs.count("v5.10") >= 2)
     idx = open(os.path.join(ROOT, "references/INDEX.md"), encoding="utf-8").read()
@@ -177,7 +178,7 @@ def test_docs():
 
 
 def test_version_and_docs():
-    check("ver.5.10.0", hxt_core.__version__ == "5.12.0", hxt_core.__version__)
+    check("ver.5.10.0", hxt_core.__version__ == "5.13.0", hxt_core.__version__)
 
 
 def main():
