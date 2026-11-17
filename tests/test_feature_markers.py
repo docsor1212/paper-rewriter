@@ -25,6 +25,8 @@ MARKERS = [
     ("v5.12 宣称收敛", "SKILL_ZH.md", "本节宣称均可本地复验"),
     ("v5.13 自动化下沉", "references/automation.md", "机器口径"),
     ("v5.13 主文档摘要", "SKILL_ZH.md", "## 自动化与 CI 集成"),
+    ("v5.14 CN v3", "scripts/patterns_zh.json", "注入强劲动力"),
+    ("v5.14 EN清扫", "SKILL.md", "(domain packs; `--list-packs` shows all eight)"),
     ("v5.3 bundle 指令单", "scripts/pipeline.py", "09_深改指令单"),
     ("v5.3 批量修订记录", "scripts/pipeline.py", "批量修订记录"),
     ("v5.4 写入清单", "scripts/pipeline.py", "00_写入清单"),
