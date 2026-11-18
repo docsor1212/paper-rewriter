@@ -68,7 +68,7 @@ def test_cn_v3():
 
 
 def test_version():
-    check("ver.5.14.0", hxt_core.__version__ == "5.15.0", hxt_core.__version__)
+    check("ver.5.14.0", hxt_core.__version__ == "5.15.1", hxt_core.__version__)
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()
     check("doc.ZH", "功能状态（v%s）" % hxt_core.__version__ in zh and "特征库与密度镜像（v3）" in zh)
     en = open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8").read()

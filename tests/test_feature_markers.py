@@ -28,7 +28,7 @@ MARKERS = [
     ("v5.14 CN v3", "scripts/patterns_zh.json", "注入强劲动力"),
     ("v5.14 EN清扫", "SKILL.md", "(domain packs; `--list-packs` shows all eight)"),
     ("v5.15 双形态", "scripts/selfcheck.py", "双形态自适应"),
-    ("v5.15 HXT EN", "references/feature_status.md", "HXT 镜像页主文档 EN 真内容"),
+    ("v5.15 HXT EN", "references/feature_status.md", "镜像 slug 主文档 EN 真内容"),
     ("v5.3 bundle 指令单", "scripts/pipeline.py", "09_深改指令单"),
     ("v5.3 批量修订记录", "scripts/pipeline.py", "批量修订记录"),
     ("v5.4 写入清单", "scripts/pipeline.py", "00_写入清单"),
