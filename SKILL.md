@@ -1,6 +1,6 @@
 ---
 name: paper-rewriter
-version: 5.14.0
+version: 5.15.0
 description: >
   Academic writing style toolkit, bilingual CN/EN: paper rewriting with AI-flavor
   self-check and style naturalization (scan reports are detection only),
@@ -41,9 +41,9 @@ and natural register — with integrity guardrails on every step.
 > (paper-polisher-pro); de-templating, model-residue cleanup, AI-flavor style
 > self-check and rewriting → this tool. Need both? Polish first, then run this pipeline.
 
-## Feature status (v5.14.0)
+## Feature status (v5.15.0)
 
-⚠️ rows = experimental (may reject valid files; review output). **The full per-generation capability list has moved to [references/feature_status.md](references/feature_status.md)**; per-item details live in references/errors.md and topic docs. Stable highlights (all stable), grouped: **Diagnose** (style self-check + per-section focus · statistical consistency · term drift / unification sheet · calibration evidence · EN signal library v3) · **Deep-rewrite** (sentence-level plan with line anchors · pipeline --handoff sheets · EN/CN signal libraries v3 + density mirrors) · **Guard** (integrity verify + prescription report · fabrication defense · exportable learned guards · graded output + --strict gate) · **Batch** (resume / concurrency isolation · worksheet + stats card · revision records · automation gates --exit-verdict/--ci) · **Deliver** (12-item submission bundle with write-manifest self-evidence · dashboard + compare sheets · docx write-back · print-friendly reports · in-package selfcheck · external lexicon (--lexicon, shared across skills).
+⚠️ rows = experimental (may reject valid files; review output). **The full per-generation capability list has moved to [references/feature_status.md](references/feature_status.md)**; per-item details live in references/errors.md and topic docs. Stable highlights (all stable), grouped: **Diagnose** (style self-check + per-section focus · statistical consistency · term drift / unification sheet · calibration evidence · EN signal library v3) · **Deep-rewrite** (sentence-level plan with line anchors · pipeline --handoff sheets · EN/CN signal libraries v3 + density mirrors) · **Guard** (integrity verify + prescription report · fabrication defense · exportable learned guards · graded output + --strict gate) · **Batch** (resume / concurrency isolation · worksheet + stats card · revision records · automation gates --exit-verdict/--ci) · **Deliver** (12-item submission bundle with write-manifest self-evidence · dashboard + compare sheets · docx write-back · print-friendly reports · in-package selfcheck (dual-form adaptive) · external lexicon (--lexicon, shared across skills).
 
 | Capability | Status | Since |
 |---|---|---|
