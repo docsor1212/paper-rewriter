@@ -55,6 +55,8 @@ def main():
                  help="PDF 最低置信度门闸（v3.3.0 引入；v3.8.0 起缺省=中）：低于阈值即拒收"
                       "并给处置建议——乱码形态的抽取不再混进报告；"
                       "--pdf-min-confidence 低 恢复「只标注不拦」旧行为")
+    ap.add_argument("--top", type=int, default=0, metavar="N",
+                    help="只输出权重×命中数排序的前 N 类命中（0=全部，缺省）——大文件快速浏览")
     ap.add_argument("--raw-markdown", action="store_true",
                     help="对 .md 输入保留 markdown 标记扫描（缺省 v3.6.0 起自动剥离"
                          "结构后扫描正文，结构统计单列不计分）")
@@ -383,7 +385,10 @@ def main():
             print("⚠ 命中模型残留（critical）——先 transform.py 清理")
         cats = r.get("categories") or {}
         if cats:
-            for cid, c in sorted(cats.items(), key=lambda kv: -(kv[1]["weight"] * kv[1]["count"])):
+            _cat_items = sorted(cats.items(), key=lambda kv: -(kv[1]["weight"] * kv[1]["count"]))
+            if getattr(args, "top", 0):
+                _cat_items = _cat_items[:max(1, args.top)]
+            for cid, c in _cat_items:
                 print("  - [%s] ×%d" % (c["label"], c["count"]))
                 if c.get("rationale"):
                     print("      依据: %s" % c["rationale"])
@@ -559,7 +564,10 @@ def main():
     print()
     if r["categories"]:
         print("分类明细:")
-        for cid in sorted(r["categories"], key=lambda k: -r["categories"][k]["count"] * r["categories"][k]["weight"]):
+        _cat_ids = sorted(r["categories"], key=lambda k: -r["categories"][k]["count"] * r["categories"][k]["weight"])
+        if getattr(args, "top", 0):
+            _cat_ids = _cat_ids[:max(1, args.top)]
+        for cid in _cat_ids:
             c = r["categories"][cid]
             mark = " [可自动修]" if cid in hxt_core.AUTO_FIXABLE else ""
             print("  · %-28s %3d 处%s" % (c["label"], c["count"], mark))

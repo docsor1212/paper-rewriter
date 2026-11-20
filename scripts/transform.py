@@ -216,6 +216,8 @@ def main():
     ap.add_argument("--lang", choices=["zh", "en", "auto"], default="auto")
     ap.add_argument("--lexicon", metavar="文件",
                     help="外挂词表 JSON（v5.11.0）：同名键逐项追加，多 skill 共享同一外部词表")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="预览模式：只报告将执行的替换与删除，不写输出文件、不改文本")
     ap.add_argument("--version", action="version", version="%(prog)s " + hxt_core.__version__)
     args = ap.parse_args()
 
@@ -260,6 +262,23 @@ def main():
             for op in deep_ops:
                 print("深改档: %s ×%d" % (op["op"], op["count"]), file=sys.stderr)
 
+    if getattr(args, "dry_run", False):
+        # v5.16.0 预览模式：文本已算好但不落盘不输出——只报将执行的动作
+        print("── dry-run 预览（不写盘、不输出文本）──", file=sys.stderr)
+        if applied:
+            for note, cnt in sorted(applied.items(), key=lambda kv: -kv[1]):
+                print("  将替换: %s ×%d" % (note, cnt), file=sys.stderr)
+        else:
+            print("  无机械替换", file=sys.stderr)
+        if removed:
+            print("  将删除句: %d 句" % len(removed), file=sys.stderr)
+            for _r in removed[:5]:
+                print("    - %s" % str(_r)[:60], file=sys.stderr)
+        if deep_ops:
+            for op in deep_ops:
+                print("  深改档将做: %s ×%d" % (op["op"], op["count"]), file=sys.stderr)
+        print("── 预览结束（去掉 --dry-run 实际执行）──", file=sys.stderr)
+        sys.exit(0)
     if args.output:
         try:
             hxt_core.write_output(out, args.output, src_path=args.file)

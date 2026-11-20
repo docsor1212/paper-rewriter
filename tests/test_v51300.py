@@ -56,7 +56,7 @@ def test_c_statusline():
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()
     en = open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8").read()
     check("c.ZH微缩", "输出分级+--strict 门禁" in zh and "automation 门禁" not in zh)
-    check("c.ZH automation短语", "--exit-verdict/--ci）" in zh)
+    check("c.ZH automation短语", "--exit-verdict/--ci" in zh and "--dry-run" in zh)
     check("c.EN微缩", "graded output + --strict gate" in en)
     # 锚保持（跨代测试钉）
     for w in ("写入清单", "前后对照", "导出共享", "指令单行号锚", "阈值校准证据化",
@@ -65,7 +65,7 @@ def test_c_statusline():
 
 
 def test_version():
-    check("ver.5.13.0", hxt_core.__version__ == "5.15.1", hxt_core.__version__)
+    check("ver.5.13.0", hxt_core.__version__ == "5.16.0", hxt_core.__version__)
     fs = open(os.path.join(ROOT, "references/feature_status.md"), encoding="utf-8").read()
     check("doc.fs513", fs.count("v5.13") >= 2)
 

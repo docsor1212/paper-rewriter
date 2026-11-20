@@ -10,6 +10,7 @@
 
 | 能力 | 状态 | 版本 |
 |---|---|---|
+| **交互速览三件**（detect --top N〔人读输出按权重×命中裁剪前 N 类，JSON 永远全量〕·transform --dry-run〔预览将执行的替换/删除，不写盘不输出〕·pipeline --summary〔一行速览：分数前后/档位/守卫判定/违规数/残留——agent/CI 快消费〕） | 稳定 | v5.16 |
 | **selfcheck 双形态自适应**（S4 双语版本行按打包形态分支：SH cp 副本形态〔SKILL.md=SKILL_ZH.md 内容〕只验 ZH 行——镜像安装版 selfcheck 误 FAIL 的实锤修复；真双语形态双行都验）·**镜像 slug 主文档 EN 真内容**（镜像发布包不再用中文副本覆盖 SKILL.md——双语宣称与包内实际一致；SKILL_ZH.md 中文面板保留）·**发布巡检 cookie 探测重试×3**（夜间网络瞬态误报「cookie 失效」修复） | 稳定 | v5.15 |
 | **EN 主文档版本清扫补齐**（P2 收口：EN 10 处内联版本标注去版本化——与 ZH 对称，残留仅 Feature status 行与 v3.8 PDF 门闸锚）·**CN 特征库 v3**（vocabulary +6 新闻腔/总结腔词〔注入强劲动力/按下快进键·加速键/交出答卷/谱写新篇章/浓墨重彩〕+regex 「提供了有力的支撑/保障」1 组带 rationale；彰显/凸显评估后拒收〔正当学术中文亦用〕；实测新闻腔样例 91 分命中/正当段 0 分） | 稳定 | v5.14 |
 | **主文档减负**（自动化与 CI 集成节整节下沉 [references/automation.md](automation.md)〔主文档留摘要+链接；INDEX 补路由行〕·主文档内联版本标注清扫〔9 处去版本化，描述只讲行为不讲纪年——v3.8 PDF 门闸锚与功能状态行保留〕·功能状态行括注微缩） | 稳定 | v5.13 |
@@ -82,6 +83,7 @@
 | **Main-doc slimming** (the automation & CI section moved whole to [references/automation.md](automation.md) 〔summary + link kept in the main doc; INDEX routing row added〕 · inline version stamps swept 〔9 spots de-versioned — wording describes behavior, not chronology; the v3.8 PDF-gate anchor and the status line stay〕 · status-line note slimmed) | Stable | v5.13 |
 | **EN main-doc version sweep** (P2 closure: 10 inline stamps de-versioned — symmetric with ZH; only the Feature status line and the v3.8 PDF-gate anchor keep stamps) · **CN signal library v3** (vocabulary +6 newsy/summary-register words + one 「提供了有力的支撑」 regex with rationale; 彰显/凸显 evaluated and rejected as legitimate in academic CN; stacked sample 91 / clean text 0) | Stable | v5.14 |
 | **selfcheck dual-form adaptive** (S4 bilingual-version check branches by packaging form: SH cp-copy form 〔SKILL.md = SKILL_ZH.md content〕 verifies the ZH line only — fixes the mirror-install selfcheck false FAIL caught by real-usage evaluation; true-bilingual form verifies both) · **mirror-slug main doc = genuine EN** (the mirror package no longer overwrites SKILL.md with the CN copy — the bilingual claim now matches package reality; SKILL_ZH.md CN panel kept) · **release-patrol cookie probe retry ×3** (night transient no longer misreported as cookie death) | Stable | v5.15 |
+| **Interactive quick-view trio** (detect --top N 〔human output trimmed to top-N by weight×hits, JSON always full〕 · transform --dry-run 〔preview pending edits, no writes〕 · pipeline --summary 〔one-line: scores/gate/violations/residue for agents〕) | Stable | v5.16 |
 
 Scale envelope: 800K-char chunks (2K overlap) · 50MB file cap · 120s step budget.
 
