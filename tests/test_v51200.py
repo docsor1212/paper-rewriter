@@ -74,7 +74,7 @@ def test_d_en_v3():
 
 
 def test_version():
-    check("ver.5.12.0", hxt_core.__version__ == "5.16.0", hxt_core.__version__)
+    check("ver.5.12.0", hxt_core.__version__ == "5.18.0", hxt_core.__version__)
     zh = open(os.path.join(ROOT, "SKILL_ZH.md"), encoding="utf-8").read()
     check("doc.ZH版本", "功能状态（v%s）" % hxt_core.__version__ in zh)
     en = open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8").read()
