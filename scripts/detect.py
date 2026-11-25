@@ -57,6 +57,8 @@ def main():
                       "--pdf-min-confidence 低 恢复「只标注不拦」旧行为")
     ap.add_argument("--top", type=int, default=0, metavar="N",
                     help="只输出权重×命中数排序的前 N 类命中（0=全部，缺省）——大文件快速浏览")
+    ap.add_argument("--csv", metavar="文件",
+                    help="批量汇总 CSV 导出（v5.19.0，配 --batch：文件/评分/档位/语言/单元数）")
     ap.add_argument("--raw-markdown", action="store_true",
                     help="对 .md 输入保留 markdown 标记扫描（缺省 v3.6.0 起自动剥离"
                          "结构后扫描正文，结构统计单列不计分）")
@@ -204,6 +206,18 @@ def main():
                   "（扫描件/嵌入字体缺失）。建议：检查来源，或统一导出 UTF-8 文本后重跑；"
                   "确要逐个强收可加 --pdf-min-confidence 低（输出需人工复核）" % gate_rej,
                   file=sys.stderr)
+        if getattr(args, "csv", None):
+            # v5.19.0 批量评分汇总 CSV（机器消费）
+            import csv as _csvmod
+            try:
+                with open(args.csv, "w", encoding="utf-8-sig", newline="") as cf:
+                    w = _csvmod.writer(cf)
+                    w.writerow(["file", "score", "level", "critical", "lang"])
+                    for f, sc2, l2, c2, g2 in rows_out:
+                        w.writerow([f, sc2, l2, c2, g2])
+                print("批量汇总 CSV 已写入 %s（%d 行）" % (args.csv, len(rows_out)), file=sys.stderr)
+            except OSError as e:
+                print("错误: 无法写入 CSV（%s）" % e, file=sys.stderr)
         if args.json:
             print(json.dumps([{"file": f, "score": s, "level": l, "critical": c, "lang": g,
                                "retried": retried.get(f, False)}

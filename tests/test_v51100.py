@@ -134,7 +134,7 @@ def test_docs():
 
 
 def test_version():
-    check("ver.5.11.0", hxt_core.__version__ == "5.18.0", hxt_core.__version__)
+    check("ver.5.11.0", hxt_core.__version__ == "5.19.0", hxt_core.__version__)
     # scan 旧调用兼容（不带 lexicon 关键字）
     r = hxt_core.scan("综上所述，本文具有重要意义。该项目赋能闭环。", source_ext=".txt")
     check("scan.旧签名兼容", "score" in r)

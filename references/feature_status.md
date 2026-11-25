@@ -10,6 +10,7 @@
 
 | 能力 | 状态 | 版本 |
 |---|---|---|
+| **批量清洗与批量速览**（transform --batch〔目录逐文件清洗写 <名>_clean.txt，输出已存在=跳过断点续跑；--in-place 原地+.bak 备份；--csv 批量汇总〕·detect --batch --csv〔批量评分汇总 CSV〕·pipeline --batch --summary〔逐文件一行速览〕） | 稳定 | v5.19 |
 | **守卫扩展三件**（verify --allow-list〔豁免清单外挂：violations 中 detail 含该词的项降级为 warning[allowlisted]——已核对原文的误报收口，不静默丢弃，分级语义保持〕·detect --summary-json〔单行 JSON 摘要 score/level/top_categories——agent 快消费〕·verify --summary〔一行守卫速览〕） | 稳定 | v5.18 |
 | **报告与门禁三件**（check_stats --html〔单页 HTML 一致性报告，复用打印友好骨架〕·compare --csv〔逐句对照 CSV 导出 tag/原文/改稿/行号——机器消费〕·detect --fail-under 分数门禁〔综合评分 ≥ 分数 → exit 3；独立于 --exit-verdict 也可用，组合时 verdict 分支先行〕） | 稳定 | v5.17 |
 | **交互速览三件**（detect --top N〔人读输出按权重×命中裁剪前 N 类，JSON 永远全量〕·transform --dry-run〔预览将执行的替换/删除，不写盘不输出〕·pipeline --summary〔一行速览：分数前后/档位/守卫判定/违规数/残留——agent/CI 快消费〕） | 稳定 | v5.16 |
@@ -88,6 +89,7 @@
 | **Interactive quick-view trio** (detect --top N 〔human output trimmed to top-N by weight×hits, JSON always full〕 · transform --dry-run 〔preview pending edits, no writes〕 · pipeline --summary 〔one-line: scores/gate/violations/residue for agents〕) | Stable | v5.16 |
 | **Reporting & gating trio** (check_stats --html 〔single-page HTML, print-friendly skeleton〕 · compare --csv 〔per-sentence diff CSV: tag/orig/new/lines for machines〕 · detect --fail-under score gate 〔score ≥ threshold → exit 3; standalone or combined with --exit-verdict〕) | Stable | v5.17 |
 | **Guard-extension trio** (verify --allow-list 〔exemption file: matching violations degrade to warnings[allowlisted] — reviewed false-positive closure, never silently dropped, grading preserved〕 · detect --summary-json 〔one-line JSON: score/level/top_categories〕 · verify --summary 〔one-line guard digest〕) | Stable | v5.18 |
+| **Batch cleanup & batch digest** (transform --batch 〔per-file cleanup to <name>_clean.txt, existing output = skip/resume; --in-place with .bak backup; --csv digest〕 · detect --batch --csv 〔score summary CSV〕 · pipeline --batch --summary 〔per-file one-liner〕) | Stable | v5.19 |
 
 Scale envelope: 800K-char chunks (2K overlap) · 50MB file cap · 120s step budget.
 

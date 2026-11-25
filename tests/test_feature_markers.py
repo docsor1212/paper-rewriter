@@ -35,6 +35,8 @@ MARKERS = [
     ("v5.17 fail-under", "scripts/detect.py", '"--fail-under"'),
     ("v5.18 allow-list", "scripts/verify.py", '"--allow-list"'),
     ("v5.18 summary-json", "scripts/detect.py", '"--summary-json"'),
+    ("v5.19 transform batch", "scripts/transform.py", "批量清洗"),
+    ("v5.19 detect csv", "scripts/detect.py", "批量汇总 CSV"),
     ("v5.3 bundle 指令单", "scripts/pipeline.py", "09_深改指令单"),
     ("v5.3 批量修订记录", "scripts/pipeline.py", "批量修订记录"),
     ("v5.4 写入清单", "scripts/pipeline.py", "00_写入清单"),
