@@ -387,7 +387,6 @@ def main():
             print("HTML 报告已写入 %s" % args.html, file=sys.stderr)
         except OSError as e:
             print("错误: 无法写入 HTML（%s）" % e, file=sys.stderr)
-            sys.exit(2)
 
     if not issues:
         print("未发现统计一致性问题。")

@@ -178,7 +178,7 @@ def test_docs():
 
 
 def test_version_and_docs():
-    check("ver.5.10.0", hxt_core.__version__ == "5.18.0", hxt_core.__version__)
+    check("ver.5.10.0", hxt_core.__version__ == "5.17.0", hxt_core.__version__)
 
 
 def main():

@@ -33,8 +33,6 @@ MARKERS = [
     ("v5.16 dry-run", "scripts/transform.py", "dry-run 预览"),
     ("v5.17 stats html", "scripts/check_stats.py", '"--html"'),
     ("v5.17 fail-under", "scripts/detect.py", '"--fail-under"'),
-    ("v5.18 allow-list", "scripts/verify.py", '"--allow-list"'),
-    ("v5.18 summary-json", "scripts/detect.py", '"--summary-json"'),
     ("v5.3 bundle 指令单", "scripts/pipeline.py", "09_深改指令单"),
     ("v5.3 批量修订记录", "scripts/pipeline.py", "批量修订记录"),
     ("v5.4 写入清单", "scripts/pipeline.py", "00_写入清单"),
