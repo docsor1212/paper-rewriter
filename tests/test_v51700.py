@@ -66,7 +66,7 @@ def td_dir():
     return d
 
 def test_version():
-    check("ver.5.17.0", hxt_core.__version__ == "5.17.0", hxt_core.__version__)
+    check("ver.5.17.0", hxt_core.__version__ == "5.18.0", hxt_core.__version__)
     fs = open(os.path.join(ROOT, "references/feature_status.md"), encoding="utf-8").read()
     check("doc.fs517", fs.count("v5.17") >= 2)
 

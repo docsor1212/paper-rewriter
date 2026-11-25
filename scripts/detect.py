@@ -67,6 +67,8 @@ def main():
                     help="章节专项（v4.5.0）：只切出指定章节独立诊断——审稿人第一眼重点节"
                          "（摘要/结论）的模板腔最浓缩；全文总分用不带本参数的 detect（与"
                          " --structure/--batch 互斥）")
+    ap.add_argument("--summary-json", action="store_true",
+                    help="单行 JSON 摘要（v5.18.0）：score/level/lang/top_categories——agent 快消费，输出后退出（不做完整报告）")
     ap.add_argument("--fail-under", type=float, default=0, metavar="分数",
                     help="分数门禁（v5.17.0）：综合评分 ≥ 分数时 exit 3——与 --exit-verdict 兼容")
     ap.add_argument("--exit-verdict", action="store_true",
@@ -531,11 +533,28 @@ def main():
             print("错误: 无法写入审稿报告（%s）" % e, file=sys.stderr)
             sys.exit(2)
 
+    if getattr(args, "summary_json", False):
+        import json as _json
+        _top = sorted(r.get("categories", {}).items(),
+                      key=lambda kv: -(kv[1]["weight"] * kv[1]["count"]))[:3]
+        print(_json.dumps({"score": r.get("score"), "level": r.get("level"),
+                           "lang": r.get("lang"), "units": r.get("units"),
+                           "top_categories": [{"id": k, "label": v["label"], "count": v["count"]}
+                                              for k, v in _top]},
+                          ensure_ascii=False))
+        # 门禁旗标与 --summary-json 同给时照常生效（v5.15 退出码契约不被快消费旁路）
+        _fu = getattr(args, "fail_under", 0) or 0
+        if args.exit_verdict:
+            sys.exit(hxt_core.verdict_exit_code(r.get("score", 0), r.get("critical_hit")))
+        if _fu and r.get("score", 0) >= _fu:
+            sys.exit(3)
+        sys.exit(0)
     if args.score:
         print("%d/%s" % (r["score"], r["level"]))
         if args.exit_verdict:
             _d = _deg_exit(r)
             sys.exit(_d if _d is not None else hxt_core.verdict_exit_code(r["score"], r["critical_hit"]))
+        # --fail-under 快消费门禁（v5.18：与速览旗标组合不旁路）
         _fu = getattr(args, "fail_under", 0) or 0
         if _fu and r["score"] >= _fu:
             sys.exit(3)
@@ -546,6 +565,9 @@ def main():
         if args.exit_verdict:
             _d = _deg_exit(r)
             sys.exit(_d if _d is not None else hxt_core.verdict_exit_code(r["score"], r["critical_hit"]))
+        _fu = getattr(args, "fail_under", 0) or 0
+        if _fu and r["score"] >= _fu:
+            sys.exit(3)
         sys.exit(0)
 
     # ---- 人类可读报告 ----
