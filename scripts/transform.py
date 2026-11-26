@@ -231,7 +231,7 @@ def main():
 
     # ── 批量清洗（v5.19.0）：目录逐文件，输出已存在=跳过（断点续跑）──
     if getattr(args, "batch", None):
-        # 审计 P1：--batch 与单文件旗标互斥——同给响亮拒绝（防 --dry-run 静默写盘）
+        # v5.20 审计 P1：--batch 与单文件旗标互斥——同给响亮拒绝（防 --dry-run 静默写盘）
         if getattr(args, "dry_run", False) or args.file or args.output:
             print("错误: --batch 与 --dry-run/-o/单文件输入互斥——预览请去掉 --batch 单跑 --dry-run",
                   file=sys.stderr)

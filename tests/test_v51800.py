@@ -65,7 +65,7 @@ def test_verify_summary():
     check("vs.PASS形态", r2.stdout.startswith("VERIFY PASS"), r2.stdout[:40])
 
 def test_version():
-    check("ver.5.18.0", hxt_core.__version__ == "5.20.0", hxt_core.__version__)
+    check("ver.5.18.0", hxt_core.__version__ == "5.21.0", hxt_core.__version__)
     fs = open(os.path.join(ROOT, "references/feature_status.md"), encoding="utf-8").read()
     check("doc.fs518", fs.count("v5.18") >= 2)
     # permissions 一致性：--allow-list 只读显式传入路径 ✓（承诺不变）

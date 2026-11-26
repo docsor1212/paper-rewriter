@@ -66,7 +66,7 @@ def mk2():
     return td, os.path.join(td, "o.txt"), os.path.join(td, "n.txt")
 
 def test_version():
-    check("ver.5.20.0", hxt_core.__version__ == "5.20.0", hxt_core.__version__)
+    check("ver.5.20.0", hxt_core.__version__ == "5.21.0", hxt_core.__version__)
     fs = open(os.path.join(ROOT, "references/feature_status.md"), encoding="utf-8").read()
     check("doc.fs520", fs.count("v5.20") >= 2)
 

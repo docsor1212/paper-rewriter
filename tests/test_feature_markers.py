@@ -39,6 +39,8 @@ MARKERS = [
     ("v5.19 detect csv", "scripts/detect.py", "批量汇总 CSV"),
     ("v5.20 正则豁免", "scripts/verify.py", 'startswith("re:")'),
     ("v5.20 pipeline sj", "scripts/pipeline.py", '"--summary-json"'),
+    ("v5.21 validate", "scripts/learn_guards.py", "VALIDATE OK"),
+    ("v5.21 coverage", "scripts/calibrate.py", "词表覆盖统计"),
     ("v5.3 bundle 指令单", "scripts/pipeline.py", "09_深改指令单"),
     ("v5.3 批量修订记录", "scripts/pipeline.py", "批量修订记录"),
     ("v5.4 写入清单", "scripts/pipeline.py", "00_写入清单"),

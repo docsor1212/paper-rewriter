@@ -59,7 +59,7 @@ def test_pipeline_summary():
         check("ps.格式", "guard PASS(PASS)" in r.stdout or "guard" in r.stdout)
 
 def test_version():
-    check("ver.5.19.0", hxt_core.__version__ == "5.20.0", hxt_core.__version__)
+    check("ver.5.19.0", hxt_core.__version__ == "5.21.0", hxt_core.__version__)
     fs = open(os.path.join(ROOT, "references/feature_status.md"), encoding="utf-8").read()
     check("doc.fs519", fs.count("v5.19") >= 2)
 
