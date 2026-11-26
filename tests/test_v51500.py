@@ -78,7 +78,7 @@ def test_autopub_redlines():
 
 
 def test_version():
-    check("ver.5.15.0", hxt_core.__version__ == "5.19.0", hxt_core.__version__)
+    check("ver.5.15.0", hxt_core.__version__ == "5.20.0", hxt_core.__version__)
 
 
 def main():

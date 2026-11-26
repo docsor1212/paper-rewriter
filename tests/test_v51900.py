@@ -24,7 +24,8 @@ def test_transform_batch():
         r = run_cli([SCRIPTS + "/transform.py", "--batch", td])
         check("tb.exit0", r.returncode == 0, r.stderr[-120:])
         check("tb.a_clean", os.path.exists(os.path.join(td, "a_clean.txt")))
-        check("tb.b_clean", os.path.exists(os.path.join(td, "b_clean.txt")))
+        check("tb.b_clean_md", os.path.exists(os.path.join(td, "b_clean.md")))
+        check("tb.b_clean", os.path.exists(os.path.join(td, "b_clean.md")))
         # 断点续跑：重跑全 skip
         r2 = run_cli([SCRIPTS + "/transform.py", "--batch", td])
         check("tb.断点跳过", "2 跳过" in r2.stderr, r2.stderr[-80:])
@@ -58,7 +59,7 @@ def test_pipeline_summary():
         check("ps.格式", "guard PASS(PASS)" in r.stdout or "guard" in r.stdout)
 
 def test_version():
-    check("ver.5.19.0", hxt_core.__version__ == "5.19.0", hxt_core.__version__)
+    check("ver.5.19.0", hxt_core.__version__ == "5.20.0", hxt_core.__version__)
     fs = open(os.path.join(ROOT, "references/feature_status.md"), encoding="utf-8").read()
     check("doc.fs519", fs.count("v5.19") >= 2)
 

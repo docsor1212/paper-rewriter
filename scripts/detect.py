@@ -547,12 +547,15 @@ def main():
             print("错误: 无法写入审稿报告（%s）" % e, file=sys.stderr)
             sys.exit(2)
 
+    if (getattr(args, "csv", None) or getattr(args, "summary_json", False)) and not args.batch:
+        print("[提示] --csv/--summary-json 需配 --batch 生效（单文件用 -j/--score）", file=sys.stderr)
     if getattr(args, "summary_json", False):
         import json as _json
         _top = sorted(r.get("categories", {}).items(),
                       key=lambda kv: -(kv[1]["weight"] * kv[1]["count"]))[:3]
         print(_json.dumps({"score": r.get("score"), "level": r.get("level"),
                            "lang": r.get("lang"), "units": r.get("units"),
+                           "critical_hit": r.get("critical_hit", False),
                            "top_categories": [{"id": k, "label": v["label"], "count": v["count"]}
                                               for k, v in _top]},
                           ensure_ascii=False))

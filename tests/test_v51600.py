@@ -64,7 +64,7 @@ def test_summary():
         check("sum.缺省保留旧报告", "风格特征分:" in r2.stdout)
 
 def test_version():
-    check("ver.5.16.0", hxt_core.__version__ == "5.19.0", hxt_core.__version__)
+    check("ver.5.16.0", hxt_core.__version__ == "5.20.0", hxt_core.__version__)
     fs = open(os.path.join(ROOT, "references/feature_status.md"), encoding="utf-8").read()
     check("doc.fs516", fs.count("v5.16") >= 2)
 
